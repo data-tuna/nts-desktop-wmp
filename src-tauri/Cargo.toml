@@ -1,0 +1,28 @@
+[package]
+name = "nts-desktop-wmp"
+version = "0.0.1"
+description = "Unofficial Windows Media Player-style desktop player for NTS Radio"
+authors = ["data-tuna"]
+license = "MIT"
+repository = "https://github.com/data-tuna/nts-desktop-wmp"
+edition = "2021"
+
+[lib]
+# The `_lib` suffix keeps the lib name distinct from the bin name, which
+# otherwise collides on Windows: https://github.com/rust-lang/cargo/issues/8519
+name = "nts_desktop_wmp_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+
+# Size over speed: https://tauri.app/concept/size/#cargo-configuration
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = "s"
+panic = "abort"
+strip = true
