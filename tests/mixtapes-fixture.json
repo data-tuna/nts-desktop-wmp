@@ -1,0 +1,18 @@
+{
+  "results": [
+    {
+      "mixtape_alias": "poolside",
+      "title": "Poolside",
+      "subtitle": "Balearic, boogie, and sophisti-pop for poolsides, beaches and car stereos.",
+      "audio_stream_endpoint": "https://stream-mixtape-geo.ntslive.net/mixtape4",
+      "audio_stream_endpoint_hls_mp3": "https://streams.radiomast.io/052d2e3c-389c-44cf-a91a-8f5e1854f4c6/hls.m3u8"
+    },
+    {
+      "mixtape_alias": "slow-focus",
+      "title": "Slow Focus",
+      "subtitle": "Meditative, relaxing and beatless: ambient, drone and ragas.",
+      "audio_stream_endpoint": "https://stream-mixtape-geo.ntslive.net/mixtape",
+      "audio_stream_endpoint_hls_mp3": "https://streams.radiomast.io/dfc76352-cda6-4a95-85dd-6f6609f83ba2/hls.m3u8"
+    }
+  ]
+}
