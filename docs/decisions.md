@@ -12,15 +12,16 @@ the evidence.
   `com.datatuna.ntswmp`, executable `nts-desktop-wmp.exe`. Each differs from
   the Winamp app's, so the two install into different folders, keep separate
   settings and WebView2 profiles, and run at the same time. Checked on
-  2026-10-10: `tauri dev` of this app opened beside an installed Winamp app
-  0.1.2, both windows up at once.
+  2026-10-10 with a debug build: `tauri dev` of this app opened beside an
+  installed Winamp app 0.1.2, both windows up at once. Two installed copies
+  side by side were not tried, since this app has no installer release yet.
 - **Dev port 1430**, not the Winamp app's 1420, so both repositories can run
   `tauri dev` together.
 - **The toolchain is the Winamp app's:** Vite, TypeScript, oxlint,
   `node --test`, `npm run check`, and the same CI job on `windows-latest`.
-- **NTS code is copied, not shared.** `live.ts`, the parsing and fetching
-  half of `picks.ts`, and `mixtapes.ts` (from the Winamp repo's PR #9, not
-  merged yet) came over with their tests and fixtures. A shared package is
+- **NTS code is copied, not shared.** `live.ts`, the parsing half of
+  `picks.ts`, and the parsing half of `mixtapes.ts` (from the Winamp repo's
+  PR #9, not merged yet) came over with their tests and fixtures. A shared package is
   not worth it for two apps yet.
 - **Left for later issues:** a single-instance lock, the updater and release
   workflow, a CSP, and an icon of its own.

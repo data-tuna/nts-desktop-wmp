@@ -1,7 +1,7 @@
 // The NTS live API: undocumented, no key, and free to change or vanish.
 // Nothing here may throw into playback; see AGENTS.md, Invariants.
-// Copied from nts-desktop-winamp's src/live.ts (PR #9, which exports `text`);
-// fix a bug in both copies.
+// Copied from nts-desktop-winamp's src/live.ts at 6379c0e (PR #9, which
+// exports `text`); fix a bug in both copies.
 
 export const LIVE_API = "https://www.nts.live/api/v2/live";
 
@@ -9,7 +9,7 @@ export const LIVE_API = "https://www.nts.live/api/v2/live";
 export type OnAir = {
   /**
    * `<show> - <location>`, or just the show when the API has no location.
-   * A hyphen, not an em dash, to match the Winamp app, whose bitmap font has no `—`.
+   * A hyphen, not an em dash: Winamp's bitmap font has no `—`.
    */
   title: string;
   artwork?: string;

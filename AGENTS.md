@@ -28,9 +28,10 @@ Written in English.
 ## Layout
 
     src/                  The frontend: Vite + TypeScript. Nothing on screen yet.
-                          live.ts reads the NTS live API, picks.ts the NTS
-                          Picks, mixtapes.ts the Infinite Mixtapes. All three
-                          are copied from nts-desktop-winamp; see below.
+                          live.ts reads the NTS live API; picks.ts and
+                          mixtapes.ts parse the NTS Picks and Infinite
+                          Mixtapes APIs. All three are copied from
+                          nts-desktop-winamp; see Gotchas.
     src-tauri/            The Rust shell (Tauri 2). Window config in tauri.conf.json,
                           permissions in capabilities/.
     src-tauri/icons/      App icons. For now the Winamp app's pixel-art radio.
@@ -102,10 +103,13 @@ Webamp Modern is MIT: code taken from it keeps its notice and credit.
 
 ## Gotchas
 
-**The NTS code is a copy.** `live.ts`, `picks.ts`, `mixtapes.ts` and their
-tests come from nts-desktop-winamp (`mixtapes.ts` and the exported `text`
-from its PR #9). The Webamp playback parts stay behind. A bug fixed in one
-repository needs fixing in the other; each file's header says so.
+**The NTS code is a copy.** `live.ts`, the parsing half of `picks.ts`,
+`mixtapes.ts` and their tests come from nts-desktop-winamp (`live.ts` and
+`mixtapes.ts` from its unmerged PR #9, which exports `text`); each header
+names the commit. The Webamp playback parts stay behind, so nothing fetches
+picks or mixtapes yet. A bug fixed in one repository needs fixing in the
+other. Only this repository's headers say so: the Winamp copies carry no
+such note.
 
 **The NTS live API is cached for 15 minutes.** It answers with
 `Cache-Control: max-age=900` and CloudFront honours it, so a bare request

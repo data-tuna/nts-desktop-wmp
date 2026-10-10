@@ -1,14 +1,14 @@
 // NTS Picks: the latest hand-picked episodes, each a SoundCloud track.
 // SoundCloud's API terms ask for credit to the uploader and to SoundCloud,
 // with a link back, wherever a pick plays.
-// Copied from nts-desktop-winamp's src/picks.ts, without the Webamp playback;
-// fix a bug in both copies.
+// Copied from nts-desktop-winamp's src/picks.ts at bdc0f10, parsing only:
+// the Webamp playback stays behind. Fix a bug in both copies.
 
 // The .ts extension lets `node --test` load this file directly.
 import { text } from "./live.ts";
 
 // Undocumented, like the live API. One page of 12, once per launch.
-const PICKS_API = "https://www.nts.live/api/v2/collections/nts-picks?offset=0&limit=12";
+export const PICKS_API = "https://www.nts.live/api/v2/collections/nts-picks?offset=0&limit=12";
 
 export type Pick = {
   /** The SoundCloud track page, query string dropped. */
@@ -17,13 +17,6 @@ export type Pick = {
   title: string;
   artwork?: string;
 };
-
-/** Fetch and parse the picks. Callers treat a failure as no picks. */
-export async function fetchPicks(): Promise<Pick[]> {
-  const response = await fetch(PICKS_API, { signal: AbortSignal.timeout(10_000) });
-  if (!response.ok) throw new Error(`NTS picks API: HTTP ${response.status}`);
-  return parsePicks(await response.json());
-}
 
 export function parsePicks(body: unknown): Pick[] {
   const results = (body as { results?: unknown } | null)?.results;
