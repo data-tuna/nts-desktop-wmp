@@ -19,10 +19,11 @@ the evidence.
   `tauri dev` together.
 - **The toolchain is the Winamp app's:** Vite, TypeScript, oxlint,
   `node --test`, `npm run check`, and the same CI job on `windows-latest`.
-- **NTS code is copied, not shared.** `live.ts`, the parsing half of
-  `picks.ts`, and the parsing half of `mixtapes.ts` (from the Winamp repo's
-  PR #9, not merged yet) came over with their tests and fixtures. A shared package is
-  not worth it for two apps yet.
+- **NTS code is copied, not shared.** `live.ts` and the parsing half of
+  `mixtapes.ts` come from the Winamp repo's PR #9 (`6379c0e`, not merged
+  yet); the parsing half of `picks.ts` comes from its `main` (`bdc0f10`).
+  Their tests and fixtures came along. A shared package is not worth it for
+  two apps yet.
 - **Left for later issues:** a single-instance lock, the updater and release
   workflow, a CSP, and an icon of its own.
 

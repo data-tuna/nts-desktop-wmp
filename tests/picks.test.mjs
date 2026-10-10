@@ -1,5 +1,5 @@
 // Run with `npm test`. Node strips the TypeScript types itself (22.18+).
-// Copied from nts-desktop-winamp with its fixture; keep the two in step.
+// Copied from nts-desktop-winamp at bdc0f10 with its fixture; keep the two in step.
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
