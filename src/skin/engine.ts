@@ -7,6 +7,7 @@
 // the window shape is the opaque pixels of the skin's images, and a subview's
 // clippingColor is a compositing step. Element semantics follow Microsoft's
 // skin reference (learn.microsoft.com/windows/win32/wmp/skin-programming-reference).
+import { CHANNELS } from "../player.ts";
 import { constants, type Node } from "./wms.ts";
 import { css, keyed, mappedElement, parseColor, rgbAt, runs, type Pixels } from "./pixels.ts";
 
@@ -26,10 +27,10 @@ export type State = {
 };
 export type Send = (msg: { type: string; [k: string]: unknown }) => void;
 
-type Kind = "container" | "button" | "group" | "element" | "slider" | "custom" | "progress" | "text" | "effects" | "none";
+type Kind = "container" | "button" | "group" | "element" | "slider" | "custom" | "progress" | "text" | "effects" | "playlist" | "none";
 
-// Drawn later or never: video and playlists need media, popups need scripts.
-const NOT_YET = new Set(["video", "wmpvideo", "playlist", "itemsplaylist", "dropdownplaylist", "popup"]);
+// Drawn later or never: video needs media, the other playlists and popups need scripts.
+const NOT_YET = new Set(["video", "wmpvideo", "itemsplaylist", "dropdownplaylist", "popup"]);
 // Elements with nothing to draw.
 const SILENT = new Set(["player", "network", "mediacenter", "equalizersettings", "videosettings", "theme"]);
 
@@ -39,6 +40,7 @@ function kindOf(tag: string): Kind {
   if (tag === "customslider") return "custom";
   if (tag === "progressbar") return "progress";
   if (tag === "effects" || tag === "wmpeffects") return "effects";
+  if (tag === "playlist") return "playlist";
   if (tag.endsWith("button")) return "button"; // button, imagebutton, playbutton, …
   if (tag.endsWith("element")) return "element"; // buttonelement, playelement, …
   if (tag.endsWith("slider")) return "slider"; // slider, seekslider, volumeslider, …
@@ -238,8 +240,8 @@ class El {
   // Painting. `g` has its origin at the parent's top-left.
   paint(g: CanvasRenderingContext2D) {
     if (!this.visible || this.kind === "none" || this.kind === "element") return;
-    // Visualisations and text are drawn inside the window's shape, not part of it.
-    if (this.skin.shaping && (this.kind === "effects" || this.kind === "text")) return;
+    // Visualisations, text and the playlist are drawn inside the window's shape, not part of it.
+    if (this.skin.shaping && (this.kind === "effects" || this.kind === "text" || this.kind === "playlist")) return;
     const alpha = this.skin.num(this, "alphablend");
     g.save();
     if (alpha !== null) g.globalAlpha = Math.min(1, Math.max(0, alpha / 255));
@@ -250,6 +252,7 @@ class El {
     else if (this.kind === "custom") this.paintCustom(g);
     else if (this.kind === "progress") this.paintProgress(g);
     else if (this.kind === "text") this.paintText(g);
+    else if (this.kind === "playlist") this.paintPlaylist(g);
     else if (this.kind === "effects") {
       // ponytail: a black placeholder until the visualisations (ATA-114).
       g.fillStyle = css(this.color("backgroundcolor") ?? 0);
@@ -427,6 +430,38 @@ class El {
     }
     g.fillText(text, left, y + 1);
     if ((this.attr("fontstyle") ?? "").toLowerCase().includes("underline")) g.fillRect(left, y + this.fontPx() + 1, width, 1);
+  }
+
+  /** The playlist's row height, in px. */
+  rowHeight(): number {
+    return Math.round(this.fontPx() * 2);
+  }
+
+  /** The playlist: the channels, one row each, the current one in the
+   * playing colours. */
+  private paintPlaylist(g: CanvasRenderingContext2D) {
+    const { x, y, w, h } = this;
+    const bg = this.color("backgroundcolor");
+    if (bg !== null) {
+      g.fillStyle = css(bg);
+      g.fillRect(x, y, w, h);
+    }
+    g.beginPath();
+    g.rect(x, y, w, h);
+    g.clip();
+    g.font = this.font();
+    g.textBaseline = "middle";
+    const row = this.rowHeight();
+    CHANNELS.forEach(({ title }, i) => {
+      const playing = i === this.skin.state.channel;
+      const rowBg = playing ? this.color("itemplayingbackgroundcolor") : null;
+      if (rowBg !== null) {
+        g.fillStyle = css(rowBg);
+        g.fillRect(x, y + i * row, w, row);
+      }
+      g.fillStyle = css((playing ? this.color("itemplayingcolor") : null) ?? this.color("foregroundcolor") ?? 0xffffff);
+      g.fillText(title, x + 6, y + i * row + row / 2);
+    });
   }
 
   // Hit testing, in the parent's coordinates. Returns the topmost interactive
@@ -745,7 +780,7 @@ export class Skin {
     const old = this.state;
     this.state = s;
     // Repaint for what skins show, not for the level or a sub-second clock.
-    const shown = (t: State) => JSON.stringify([t.playState, t.title, Math.floor(t.time), t.volume, t.mute, t.balance, t.eq]);
+    const shown = (t: State) => JSON.stringify([t.playState, t.channel, t.title, Math.floor(t.time), t.volume, t.mute, t.balance, t.eq]);
     if (shown(old) !== shown(s)) this.paint();
   }
 
@@ -803,6 +838,8 @@ export class Skin {
         if (found.kind === "slider" || found.kind === "custom") this.slide(found, ev, false);
         found.down = true;
         this.paint();
+      } else if (found?.kind === "playlist") {
+        this.pick(found, ev);
       } else if (found || this.opaque(ev)) {
         // The body of the skin: move the window.
         this.send({ type: "drag" });
@@ -853,6 +890,16 @@ export class Skin {
     // Back to the player's value. Seeking is disabled: live.
     if (done) e.dragValue = null;
     this.paint();
+  }
+
+  /** A click on a playlist row selects that channel: the player's next and
+   * previous step through the channels, playing if it was playing. */
+  private pick(list: El, ev: MouseEvent) {
+    const [, y] = this.point(ev);
+    const i = Math.floor((y - list.origin()[1] - list.y) / list.rowHeight());
+    if (i < 0 || i >= CHANNELS.length) return;
+    const steps = (i - this.state.channel + CHANNELS.length) % CHANNELS.length;
+    for (let n = 0; n < steps; n++) this.send({ type: "next" });
   }
 
   private click(e: El) {
