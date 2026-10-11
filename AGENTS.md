@@ -29,12 +29,14 @@ Written in English.
 
     src/                  The frontend: Vite + TypeScript. main.ts is the
                           trusted page: it owns the audio, saves the
-                          settings and answers the skin. player.ts keeps a
-                          channel playing and reconnects.
+                          settings, answers the skin and fills the playlist
+                          and the titles. player.ts keeps the playlist's
+                          current item playing and reconnects.
                           live.ts reads the NTS live API; picks.ts and
                           mixtapes.ts parse the NTS Picks and Infinite
                           Mixtapes APIs. All three are copied from
-                          nts-desktop-winamp; see Gotchas.
+                          nts-desktop-winamp; see Gotchas. widget.ts plays
+                          a pick through SoundCloud's hidden widget.
     src/skin/             The skin engine, which runs in the skin webview:
                           wmz.ts unzips, wms.ts decodes and parses the .wms,
                           engine.ts lays out and paints the view, runs the
@@ -133,8 +135,8 @@ Webamp Modern is MIT: code taken from it keeps its notice and credit.
 **The NTS code is a copy.** `live.ts`, the parsing half of `picks.ts`,
 `mixtapes.ts` and their tests come from nts-desktop-winamp (`live.ts` and
 `mixtapes.ts` from its unmerged PR #9, which exports `text`); each header
-names the commit. The Webamp playback parts stay behind, so nothing fetches
-picks or mixtapes yet. A bug fixed in one repository needs fixing in the
+names the commit. The Webamp playback parts stay behind; `main.ts` and
+`widget.ts` do that job here. A bug fixed in one repository needs fixing in the
 other. Only this repository's headers say so: the Winamp copies carry no
 such note.
 
@@ -143,6 +145,19 @@ such note.
 can return the show that ended a quarter of an hour ago. `live.ts` adds a
 query string that changes once a minute. `broadcast_title` arrives
 HTML-escaped (`&amp;`).
+
+**Picks play through SoundCloud's widget, not our audio graph.** It is a
+`w.soundcloud.com` frame in the trusted page, as in the Winamp app, never
+`/api/v2/resolve-stream`. Its audio never reaches our Web Audio graph, so
+during a pick the volume and mute follow (through the widget's
+`setVolume`) but the EQ, balance and the visualiser's level do not. Tauri
+injects its internals into that frame too; the ACL refuses it (`Command
+skin_send not allowed by ACL`, checked on a release build), because no
+capability names a remote origin. Keep it that way.
+
+**Windows' media overlay needs `HardwareMediaKeyHandling`.** WebView2 keeps
+`navigator.mediaSession` to itself unless that Chromium feature is on (the
+Winamp app found this), so both browser-argument lists enable it.
 
 **ICY titles are empty on these streams.** The title comes from the live API
 or the fallback.
@@ -225,7 +240,7 @@ as the change that makes them stale.
 Start it with WebView2's DevTools port open. The variable replaces the
 browser arguments in `tauri.conf.json`, so repeat them:
 
-    $env:WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS = "--remote-debugging-port=9355 --disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection --autoplay-policy=no-user-gesture-required"
+    $env:WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS = "--remote-debugging-port=9355 --disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection --autoplay-policy=no-user-gesture-required --enable-features=HardwareMediaKeyHandling"
     $env:NTS_WMP_SKIN = "C:\path\to\a\skin.wmz"      the skin to draw; unset, the house skin
     npm run tauri dev
 
@@ -298,10 +313,22 @@ build, the tests and `cargo fmt --check`.
 and settings views and 9SeriesDefault's compact view never open.
 
 **Video, item and drop-down playlists, and popups are not drawn,** and the
-visualiser is a black placeholder (ATA-114). `<playlist>` lists the two
-channels only. Their methods (`setColumnResizeMode`, the effects'
+visualiser is a black placeholder (ATA-114). `<playlist>` lists the
+channels, mixtapes and picks, and scrolls with the wheel; it has no
+columns or scroll bar. Their methods (`setColumnResizeMode`, the effects'
 `next`/`previous`, `appendItem`) are logged and do nothing. 9SeriesDefault's
 screen is black where WMP showed navy: that colour is WMP's visualiser's.
+
+**The media overlay is unverified.** The trusted page sets
+`navigator.mediaSession` (title, show, artwork; checked over DevTools), but
+the app runs on a hidden desktop in tests, and Windows listed no session
+for it there, muted or not. Someone needs to look at the overlay on a real
+desktop.
+
+**A pick's credit link is a click on the title.** A text element bound to
+`player.currentMedia` opens the pick's SoundCloud page when clicked; nothing
+on screen says so, and a skin without such a text shows the credit only
+in the playlist row.
 
 **Fast forward, rewind and seek sliders are drawn disabled:** a live stream
 has no length.

@@ -6,6 +6,42 @@ the evidence.
 
 ## Stack
 
+### Now playing, Infinite Mixtapes and NTS Picks (ATA-113, 2026-10-11)
+
+- **One playlist:** NTS 1, NTS 2, then the Infinite Mixtapes, then the
+  12 latest NTS Picks, appended once per launch when their APIs answer.
+  Next and previous walk the whole list and wrap; a playlist row sends the
+  new `select` message rather than a run of `next`s, which would reload a
+  stream at every step. The app still opens on NTS 1.
+- **Titles.** A channel's title is `NTS 1 - <show> - <location>`, the
+  channel first as in the Winamp app (Ata, 2026-10-09). That is
+  `player.currentMedia.name` and `getItemInfo("Title")`;
+  `getItemInfo("Author")` is the show and `getItemInfo("Location")` its
+  place. `live.ts` now keeps `show` and `location` apart for this, which the
+  Winamp copy does not. The live API is polled from the trusted page with
+  its per-minute query string; when it fails the titles are "NTS 1" and
+  "NTS 2" and the stream plays on. Checked with `www.nts.live` unreachable
+  (a dead proxy for everything but `*.radiomast.io`): titles fell back,
+  only the two channels were listed, and the clock and level kept moving.
+- **Mixtapes** are radiomast streams (`mixtapes.ts`) and play and reconnect
+  exactly like the channels.
+- **Picks** play through SoundCloud's widget in the trusted page
+  (`widget.ts`, adapted from the Winamp app). SoundCloud's terms want the
+  uploader and SoundCloud credited, with a link back: a pick's title ends
+  `- <uploader> on SoundCloud`, that credit is also its Author, and a click
+  on a text element showing `player.currentMedia` opens the track page
+  through `launchUrl`. A pick that does not start within 15 s, or that the
+  widget reports an error for, stops the player; a stuck pick is not
+  reloaded, since that would start a two-hour mix over; a finished pick
+  moves on to the next item. Pause keeps a pick's place. Picks report no
+  duration, so skins treat them as live (no seeking) for now.
+- **The state message** gains `author`, `location`, `link` (a pick's page,
+  else `""`) and `items` (the playlist's titles).
+- **Windows' media overlay** gets the title, the show and the artwork
+  through `navigator.mediaSession`, with play, pause, stop, next and
+  previous wired back to the player. Not yet seen in the overlay itself;
+  see AGENTS.md, Known gaps.
+
 ### The core player (ATA-109, 2026-10-11)
 
 - **The playlist is NTS 1 and NTS 2.** On launch NTS 1 plays, whatever was
@@ -109,7 +145,8 @@ unknown fields included, and refuses requests from any webview but `skin`
 | Message | Handled by |
 |---|---|
 | `{ "type": "play" }`, `{ "type": "pause" }`, `{ "type": "stop" }` | the trusted page |
-| `{ "type": "next" }`, `{ "type": "previous" }` | the trusted page: the other channel, wrapping around |
+| `{ "type": "next" }`, `{ "type": "previous" }` | the trusted page: the next or previous playlist item, wrapping around |
+| `{ "type": "select", "index": n }` | the trusted page: playlist item `n`, playing it if the player was playing (ATA-113) |
 | `{ "type": "mute", "value": true \| false }` | the trusted page |
 | `{ "type": "volume", "value": 0..1 }`, `{ "type": "balance", "value": -1..1 }` | the trusted page, clamped |
 | `{ "type": "eq", "band": 0..9, "gain": -15..15 }` | the trusted page, clamped |
@@ -123,7 +160,8 @@ Host to skin: the trusted page calls the `skin_send` command, and Rust
 dispatches a `message` event in the skin webview. Today that is, four times
 a second (ATA-109):
 
-    { "type": "state", "playState", "channel", "title", "time", "duration",
+    { "type": "state", "playState", "channel", "title", "author", "location",
+      "link", "items", "time", "duration",
       "volume", "mute", "balance", "eq", "level" }
 
 `playState` is `playing`, `buffering`, `reconnecting`, `paused` or
