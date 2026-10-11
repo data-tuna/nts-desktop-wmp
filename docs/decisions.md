@@ -277,12 +277,17 @@ As in the Winamp app (its `docs/decisions.md`, ATA-72), with this app's names.
 - **A clean machine is a fresh runner.** This PC runs Windows 11 Home, with
   no Windows Sandbox or Hyper-V (Mika for Ata). The release workflow's
   `install` job downloads the published installer on a new `windows-latest`
-  runner and runs `tools/install-check.ps1`: a silent install, the app
-  playing (the skin says "Playing" and its clock moves), a screenshot and
-  the skin it wore, then a silent uninstall that must leave no files, no
-  Settings > Apps entry and no shortcuts. It then installs the release
-  before and waits for it to update itself to the new one. The evidence is
-  the run's `install-check` artifact.
+  runner and runs `tools/install-check.ps1`: a silent install; the app
+  playing, which is one connection to a radiomast audio edge held for 15 s;
+  the skin it downloaded, whose md5 must be a working one in
+  `compatible.json`; two shots of the window 15 s apart; then a silent
+  uninstall that must leave no files, no Settings > Apps entry and no
+  shortcuts. It then installs the release before and waits for it to
+  update itself to the new one. The evidence is the run's `install-check`
+  artifact. Not over DevTools: the runner's WebView2 (153) opened no
+  DevTools port for `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS` or for its
+  per-app policy, and `PrintWindow` drew the window black there; a screen
+  capture shows it, clock running.
 - **No code signing yet.** SmartScreen warns on first run; the README says
   what to click. The Winamp app's decisions list the options.
 
