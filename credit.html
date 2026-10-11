@@ -1,0 +1,22 @@
+<!doctype html>
+<!-- The SoundCloud credit, drawn over the skin while a pick plays (ATA-115). -->
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>SoundCloud credit</title>
+    <style>
+      html, body { margin: 0; overflow: hidden; background: #f50; }
+      button {
+        display: block; box-sizing: border-box; height: 16px; max-width: 100vw; padding: 0 6px;
+        border: 0; background: #f50; color: #fff; font: bold 11px/16px Tahoma, Verdana, sans-serif;
+        white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer;
+      }
+      button:hover { text-decoration: underline; }
+      button:focus-visible { outline: 1px solid #fff; outline-offset: -2px; }
+    </style>
+    <script type="module" src="/src/credit.ts"></script>
+  </head>
+  <body>
+    <button type="button" id="credit" title="Open this track on SoundCloud"></button>
+  </body>
+</html>

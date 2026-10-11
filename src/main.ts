@@ -116,6 +116,14 @@ function onSkin(m: FromSkin) {
 
 apply();
 await listen<FromSkin>("skin", (e) => onSkin(e.payload));
+// The tray menu (lib.rs): play, stop and the two channels.
+await listen<string>("tray", ({ payload: id }) => {
+  if (id === "play" || id === "stop") onSkin({ type: id });
+  else if (id === "nts1" || id === "nts2") {
+    player.select(id === "nts1" ? 0 : 1);
+    onSkin({ type: "play" });
+  }
+});
 // On launch, NTS 1 plays. The browser arguments allow autoplay.
 onSkin({ type: "play" });
 
@@ -157,12 +165,24 @@ if ("mediaSession" in navigator) {
   for (const [action, type] of actions) navigator.mediaSession.setActionHandler(action, () => onSkin({ type } as FromSkin));
 }
 
+// The tray's tooltip, and while a pick plays its credit, which the app draws
+// over the skin and lists in the tray (lib.rs, now_playing).
+let tray = "";
+function updateTray(title: string, i: number, playState: string) {
+  const pick = picks.get(items[i].url);
+  const credit = pick && playState !== "stopped" ? { name: pick.uploader ?? "", url: pick.url } : null;
+  if (tray === JSON.stringify([title, credit])) return;
+  tray = JSON.stringify([title, credit]);
+  void invoke("now_playing", { title, credit }).catch((e: unknown) => console.warn("now_playing", e));
+}
+
 // 4 updates a second covers the clock and title. The visualisation gets its
 // own frames, below.
 setInterval(() => {
   const now = player.state();
   const { artwork: _, ...shown } = info(now.channel);
   updateOverlay(now.channel);
+  updateTray(shown.title, now.channel, now.playState);
   // duration 0: live streams have no length and cannot seek (WMP's convention).
   // ponytail: picks have a length, and SoundCloud's widget can seek; they are shown as live too until someone asks to seek a pick.
   const state = { type: "state", ...now, ...shown, items: items.map((_, i) => info(i).title), duration: 0, ...settings, level: level() };

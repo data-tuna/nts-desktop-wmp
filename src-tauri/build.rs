@@ -8,6 +8,10 @@ fn main() {
             "list_skins",
             "choose_skin",
             "open_link",
+            "now_playing",
+            "credit",
+            "credit_size",
+            "open_credit",
         ]),
     ))
     .expect("failed to run tauri-build");

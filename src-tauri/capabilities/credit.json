@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "credit",
+  "description": "The SoundCloud credit drawn over the skin while a pick plays: our own page. It reads its text and opens the pick's page, nothing else.",
+  "webviews": ["credit"],
+  "permissions": ["allow-credit", "allow-credit-size", "allow-open-credit"]
+}
