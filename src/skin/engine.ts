@@ -619,6 +619,8 @@ export class Skin {
   /** player.openState: open once the host names a channel. */
   openState = 0;
   private started = false;
+  /** True while a click's handlers run (`player.launchURL` needs it). */
+  private userAction = false;
   private players: El[] = [];
   private compiled = new Map<string, (...args: unknown[]) => unknown>();
   private keyCache = new WeakMap<Img, Map<string, HTMLCanvasElement>>();
@@ -656,6 +658,7 @@ export class Skin {
       elapsed: () => this.elapsed(),
       controlEnabled: (name) => this.controlEnabled(name),
       send: (msg) => this.send(msg),
+      userAction: () => this.userAction,
       set: (patch) => {
         this.state = { ...this.state, ...patch };
         this.changed();
@@ -713,8 +716,13 @@ export class Skin {
         // Global code, so the skin's functions and variables are shared by
         // its files, its handlers and its attributes, as in WMP.
         (globalThis as Record<string, unknown>).__wmpScope = this.scope;
+        // Inside the block, a top-level function becomes global only when
+        // its declaration is reached; JScript hoists them all. Copy them out
+        // first, so a statement that throws loses nothing declared below it
+        // (`typeof`: the scan also finds functions in comments).
+        const hoist = [...code.matchAll(/^function\s+([A-Za-z_$][\w$]*)/gm)].map(([, name]) => `if (typeof ${name} == "function") globalThis.${name} = ${name};`).join(" ");
         // oxlint-disable-next-line no-eval -- skin code runs in this webview by design (ATA-107)
-        (0, eval)(`with (__wmpScope) {\n${code}\n}`);
+        (0, eval)(`with (__wmpScope) { ${hoist}\n${code}\n}`);
       } catch (e) {
         // Keep what layout needs: the file's literal constants.
         this.log(`script ${file} failed: ${String(e)}`);
@@ -928,7 +936,10 @@ export class Skin {
 
   /** An attribute's value: set by script, plain, a binding, or an expression. */
   private value(e: El, name: string): { ok: boolean; v?: unknown } {
-    if (e.props.has(name)) return { ok: true, v: e.props.get(name) };
+    if (e.props.has(name)) {
+      const v = e.props.get(name);
+      return { ok: true, v: typeof v === "string" ? (resString(v, (msg) => this.log(msg)) ?? v) : v };
+    }
     const raw = e.attr(name);
     if (raw === undefined) return { ok: false };
     const m = BINDING.exec(raw);
@@ -1152,7 +1163,7 @@ export class Skin {
     });
     c.addEventListener("dblclick", (ev) => {
       const found = this.at(ev);
-      if (found?.interactive() && found.enabled) this.fire(found, "ondblclick");
+      if (found?.interactive() && found.enabled) this.byUser(() => this.fire(found, "ondblclick"));
     });
     window.addEventListener("mouseup", (ev) => {
       const e = this.pressed;
@@ -1220,7 +1231,21 @@ export class Skin {
     this.paint();
   }
 
+  /** Runs `f` as the user's own action: only then may a skin open a link. */
+  private byUser(f: () => void) {
+    this.userAction = true;
+    try {
+      f();
+    } finally {
+      this.userAction = false;
+    }
+  }
+
   private click(e: El) {
+    this.byUser(() => this.clicked(e));
+  }
+
+  private clicked(e: El) {
     const role = e.role;
     if (["play", "pause", "stop", "next"].includes(role)) this.send({ type: role });
     else if (role === "prev" || role === "previous") this.send({ type: "previous" });

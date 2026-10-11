@@ -166,7 +166,9 @@ open tags. `wms.ts` tokenizes forgivingly; don't swap in `DOMParser`.
 indirect `eval` inside `with (__wmpScope)`, so the skin's functions and
 variables land on the skin webview's global object, where handlers and
 `jscript:` attributes find them, and `eval("eq" + i + ".down = …")` inside a
-skin function still sees element ids. Element members are case-insensitive,
+skin function still sees element ids. Each file first copies its top-level
+functions to the global object: inside the `with` block they would
+otherwise appear only when execution reaches them. Element members are case-insensitive,
 as COM's are, but handler attributes are not members: `onLoad="OnLoad();"`
 must reach the function, not the attribute. Two skins never share a webview,
 so their globals never meet.

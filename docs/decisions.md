@@ -199,9 +199,12 @@ what the 7 ATA-103 skins call; no code from Webamp Modern.
   `player`, `theme`, `mediacenter` and the `ps*`/`os*` constants; anything
   else falls through to the global object, where the skin's own functions
   and variables live. Handlers and `jscript:` attributes run inside a second
-  `with`, for the element's own members (`value`, `down`, `left`). A script
-  that fails to parse is logged, and its literal constants are kept so the
-  layout still works (ATA-108's fallback).
+  `with`, for the element's own members (`value`, `down`, `left`). Inside the
+  `with` block a function becomes global only when its declaration is
+  reached, where JScript hoists them all, so each file starts by copying
+  its top-level functions to the global object: a statement that throws
+  loses nothing declared below it. A script that fails is logged, and its
+  literal constants are kept so the layout still works (ATA-108's fallback).
 - **Objects.** `runtime.ts`. WMP's objects are COM objects, so members are
   case-insensitive (`player.PlayState`). They read the host's state message
   and send its messages: `player.controls` (play, pause, stop, next,
@@ -211,7 +214,9 @@ what the 7 ATA-103 skins call; no code from Webamp Modern.
   (NTS 1 and NTS 2, so circle's track number reads 001 or 002), the
   equalizer's ten `gainLevel`s, `theme.loadPreference`/`savePreference`
   (per skin, in `localStorage`; an unsaved one reads `"--"`, booleans save as
-  `"True"`/`"False"` as JScript wrote them), and `player.launchURL`. What a
+  `"True"`/`"False"` as JScript wrote them), and `player.launchURL`, which
+  sends only while a click or double-click is being handled, so a skin's
+  timer or `onLoad` cannot open tabs on its own. What a
   radio cannot do returns a safe default: no video (`imageSourceWidth` 0), no
   DVD, no library, no scanning, no presets. Unknown members are logged once
   and read as undefined.

@@ -145,13 +145,39 @@ test("a sticky mute button flips down for its onClick, then follows the player a
   assert.equal(js("m.down"), true);
 });
 
+test("a statement that throws keeps the functions declared below it", () => {
+  const { js } = load(`<theme><view width="1" height="1" scriptFile="t.js" onLoad="ThrowLoaded = true;"/></theme>`, {
+    "t.js": "/*\nfunction CommentedOut() {}\n*/\nvar a = 1;\nmediacenter.missing.member;\nfunction DeclaredBelowThrow() { return 7; }",
+  });
+  assert.equal(js("DeclaredBelowThrow()"), 7);
+  assert.equal(js("ThrowLoaded"), true);
+});
+
+test("player.launchURL opens links only from a click", () => {
+  const { js, sent } = load(
+    `<theme><view width="20" height="20" onLoad="player.launchURL('https://onload.example/')">
+       <button left="0" top="0" width="20" height="20" onclick="player.launchURL('http://www.mediabay.com/'); player.launchURL('file:///C:/x')"/>
+     </view></theme>`,
+  );
+  js("player.launchURL('https://script.example/')");
+  const at = { button: 0, clientX: 5, clientY: 5 };
+  listeners.mousedown(at);
+  listeners.mouseup(at);
+  assert.deepEqual(sent.filter((m) => m.type === "launchUrl"), [{ type: "launchUrl", url: "http://www.mediabay.com/" }]);
+});
+
+test("a wmploc string a script sets reads as our stand-in", () => {
+  const { js } = load(`<theme><view width="1" height="1"><button id="q"/></view></theme>`);
+  js("q.upToolTip = 'res://wmploc/RT_STRING/#2063'");
+  assert.equal(js("q.upToolTip"), "Disconnected");
+});
+
 test("the player objects send the protocol's messages and update bindings at once", () => {
   const { js, sent } = load(`<theme><view width="100" height="100"><equalizerSettings id="eq"/></view></theme>`);
   js("player.settings.volume = 150");
   js("player.settings.mute = true");
   js("eq.gainLevel2 = -20");
   js("player.controls.play(), player.controls.next()");
-  js("player.launchURL('http://www.mediabay.com/'), player.launchURL('file:///C:/x')");
   const msgs = sent.filter((m) => m.type !== "shape");
   assert.deepEqual(msgs, [
     { type: "volume", value: 1 },
@@ -159,7 +185,6 @@ test("the player objects send the protocol's messages and update bindings at onc
     { type: "eq", band: 1, gain: -15 },
     { type: "play" },
     { type: "next" },
-    { type: "launchUrl", url: "http://www.mediabay.com/" },
   ]);
   assert.deepEqual(js("[player.settings.volume, player.settings.mute, eq.gainLevel2]"), [100, true, -15]);
   assert.equal(js("player.dvd.isAvailable('dvd')"), false, "what a radio cannot do reads as a safe default");

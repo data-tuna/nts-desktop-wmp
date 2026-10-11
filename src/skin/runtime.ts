@@ -36,6 +36,8 @@ export type Host = {
   set(patch: Partial<State>): void;
   log(msg: string): void;
   viewId(): string;
+  /** Whether a click is being handled now. */
+  userAction(): boolean;
   /** Where this skin's preferences live in localStorage. */
   prefix: string;
 };
@@ -147,9 +149,11 @@ export function objects(host: Host) {
     get status() { return host.status(); },
     get url() { return URLS[s().channel] ?? ""; },
     set url(_: unknown) { log("player.URL cannot be set: the app plays NTS 1 and NTS 2"); },
-    // Only http(s), and only through Rust, which checks again (lib.rs).
+    // Only http(s), only from a click, and only through Rust, which checks
+    // again (lib.rs): a skin's timer or onLoad opens nothing.
     launchurl: (url: unknown) => {
-      if (/^https?:\/\//i.test(String(url))) host.send({ type: "launchUrl", url: String(url) });
+      if (!host.userAction()) log("player.launchURL refused: not from a click");
+      else if (/^https?:\/\//i.test(String(url))) host.send({ type: "launchUrl", url: String(url) });
       else log(`player.launchURL refused ${String(url)}`);
     },
   };
