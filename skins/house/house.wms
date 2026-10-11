@@ -1,0 +1,56 @@
+<!--
+  Bootleg House: the skin that ships with NTS Radio Bootleg Media Player.
+  Original art, MIT like the rest of the repository. The bitmaps are built
+  from the layered SVGs in art/ by build.mjs; edit those, not the .bmp files.
+-->
+<theme id="BootlegHouse" title="Bootleg House" author="nts-desktop-wmp contributors">
+  <view id="main" title="NTS Radio Bootleg Media Player" width="420" height="232"
+        backgroundImage="body.bmp" clippingColor="#FF00FF" titleBar="false" resizable="false">
+
+    <!-- The round visualiser window in the dial, and its glass. -->
+    <subView id="dial" left="32" top="40" backgroundImage="dial.bmp" clippingColor="#FF00FF">
+      <effects id="vis" left="0" top="0" width="104" height="104"
+               backgroundColor="#05080A" foregroundColor="#F5A540"/>
+    </subView>
+    <subView id="glass" left="32" top="40" backgroundImage="gloss.bmp" transparencyColor="#FF00FF" alphaBlend="40"/>
+
+    <!-- The display. -->
+    <text id="title" left="180" top="46" width="206" height="20"
+          value="wmpprop:player.currentMedia.name"
+          fontFace="Tahoma" fontSize="11" fontStyle="bold" foregroundColor="#2A1803"
+          scrolling="true" scrollingDelay="40" scrollingAmount="1"/>
+    <text id="status" left="180" top="78" width="104" height="16"
+          value="wmpprop:player.status"
+          fontFace="Tahoma" fontSize="8" foregroundColor="#6E430E"/>
+    <text id="time" left="284" top="74" width="102" height="22"
+          value="wmpprop:player.controls.currentPositionString"
+          fontFace="Tahoma" fontSize="13" fontStyle="bold" foregroundColor="#2A1803" justification="right"/>
+
+    <!-- The controls. Play and pause share a place: whichever the player can do shows. -->
+    <buttonGroup id="transport" left="172" top="110" transparencyColor="#FF00FF"
+                 image="transport.bmp" hoverImage="transport_hover.bmp" downImage="transport_down.bmp"
+                 disabledImage="transport_off.bmp" mappingImage="transport_map.bmp">
+      <prevElement mappingColor="#FF0000" upToolTip="Previous channel" cursor="hand"/>
+      <stopElement mappingColor="#00FF00" upToolTip="Stop" cursor="hand"/>
+      <nextElement mappingColor="#0000FF" upToolTip="Next channel" cursor="hand"/>
+      <muteElement mappingColor="#FFFF00" upToolTip="Mute" downToolTip="Unmute" cursor="hand"/>
+    </buttonGroup>
+    <playButton id="play" left="202" top="108" transparencyColor="#FF00FF"
+                image="play.bmp" hoverImage="play_hover.bmp" downImage="play_down.bmp"
+                visible="wmpenabled:player.controls.play" upToolTip="Play" cursor="hand"/>
+    <pauseButton id="pause" left="202" top="108" transparencyColor="#FF00FF"
+                 image="pause.bmp" hoverImage="pause_hover.bmp" downImage="pause_down.bmp"
+                 visible="wmpenabled:player.controls.pause" upToolTip="Pause" cursor="hand"/>
+    <slider id="volume" left="334" top="116" width="62" height="20" transparencyColor="#FF00FF"
+            min="0" max="100" value="wmpprop:player.settings.volume"
+            backgroundImage="volume.bmp" foregroundImage="volume_fill.bmp"
+            thumbImage="thumb.bmp" thumbHoverImage="thumb_hover.bmp" thumbDownImage="thumb_down.bmp"
+            toolTip="Volume"/>
+
+    <!-- The playlist drawer: the two channels. -->
+    <playlist id="channels" left="192" top="166" width="192" height="48"
+              backgroundColor="#0D1316" foregroundColor="#9FB3BB"
+              itemPlayingColor="#F5A540" itemPlayingBackgroundColor="#18252B"
+              fontFace="Tahoma" fontSize="9"/>
+  </view>
+</theme>

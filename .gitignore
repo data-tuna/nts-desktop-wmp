@@ -26,3 +26,6 @@ dist-skin
 
 # Skins are fetched at runtime and never committed (see AGENTS.md).
 *.wmz
+
+# The house skin is our own and ships with the app.
+!skins/house/house.wmz

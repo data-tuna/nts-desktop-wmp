@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" width="36" height="36" viewBox="0 0 36 36">
+  <!-- Play and pause share one amber bead in one place: the skin shows
+       whichever the player can do now. One layer per button and state. -->
+  <defs>
+    <radialGradient id="amber" cx="0.42" cy="0.3" r="0.8">
+      <stop offset="0" stop-color="#ffe3ae"/>
+      <stop offset="0.5" stop-color="#f5a23a"/>
+      <stop offset="1" stop-color="#b0590a"/>
+    </radialGradient>
+    <radialGradient id="amberHover" cx="0.42" cy="0.3" r="0.8">
+      <stop offset="0" stop-color="#fff2d6"/>
+      <stop offset="0.5" stop-color="#ffb954"/>
+      <stop offset="1" stop-color="#c66d12"/>
+    </radialGradient>
+    <radialGradient id="amberDown" cx="0.5" cy="0.75" r="0.8">
+      <stop offset="0" stop-color="#f0a13e"/>
+      <stop offset="1" stop-color="#9a4c06"/>
+    </radialGradient>
+    <g id="bead">
+      <circle cx="18" cy="18" r="17" fill="#0a1114" shape-rendering="crispEdges"/>
+      <circle cx="18" cy="18" r="16"/>
+    </g>
+    <ellipse id="shine" cx="18" cy="9.5" rx="9" ry="4.5" fill="#ffffff" fill-opacity="0.55"/>
+    <path id="play" fill="currentColor" d="M14.5 11.5 25 18l-10.5 6.5z"/>
+    <path id="pause" fill="currentColor" d="M13.5 12h3.4v12h-3.4zM19.1 12h3.4v12h-3.4z"/>
+  </defs>
+
+  <g inkscape:groupmode="layer" id="key" inkscape:label="Key colour">
+    <rect width="36" height="36" fill="#ff00ff"/>
+  </g>
+
+  <g inkscape:groupmode="layer" id="play-up" inkscape:label="Play">
+    <use href="#bead" fill="url(#amber)"/><use href="#shine"/>
+    <use href="#play" color="#2a1803"/>
+  </g>
+  <g inkscape:groupmode="layer" id="play-hover" inkscape:label="Play, hover">
+    <use href="#bead" fill="url(#amberHover)"/><use href="#shine"/>
+    <use href="#play" color="#2a1803"/>
+  </g>
+  <g inkscape:groupmode="layer" id="play-down" inkscape:label="Play, down">
+    <use href="#bead" fill="url(#amberDown)"/>
+    <use href="#play" y="1" color="#2a1803"/>
+  </g>
+
+  <g inkscape:groupmode="layer" id="pause-up" inkscape:label="Pause">
+    <use href="#bead" fill="url(#amber)"/><use href="#shine"/>
+    <use href="#pause" color="#2a1803"/>
+  </g>
+  <g inkscape:groupmode="layer" id="pause-hover" inkscape:label="Pause, hover">
+    <use href="#bead" fill="url(#amberHover)"/><use href="#shine"/>
+    <use href="#pause" color="#2a1803"/>
+  </g>
+  <g inkscape:groupmode="layer" id="pause-down" inkscape:label="Pause, down">
+    <use href="#bead" fill="url(#amberDown)"/>
+    <use href="#pause" y="1" color="#2a1803"/>
+  </g>
+</svg>

@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" width="10" height="18" viewBox="0 0 10 18">
+  <!-- The volume slider's thumb, one layer per state. -->
+  <defs>
+    <linearGradient id="alu" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#f4f6f7"/>
+      <stop offset="1" stop-color="#8d9aa0"/>
+    </linearGradient>
+    <linearGradient id="aluHover" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#aab6bb"/>
+    </linearGradient>
+    <linearGradient id="aluDown" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#7b898f"/>
+      <stop offset="1" stop-color="#c3cbcf"/>
+    </linearGradient>
+    <g id="thumb">
+      <rect width="10" height="18" rx="3" fill="#0a1114" shape-rendering="crispEdges"/>
+      <rect x="1" y="1" width="8" height="16" rx="2"/>
+    </g>
+    <g id="grip" fill="#0a1114" fill-opacity="0.45">
+      <rect x="3" y="6" width="4" height="1"/>
+      <rect x="3" y="8.5" width="4" height="1"/>
+      <rect x="3" y="11" width="4" height="1"/>
+    </g>
+  </defs>
+  <g inkscape:groupmode="layer" id="key" inkscape:label="Key colour">
+    <rect width="10" height="18" fill="#ff00ff"/>
+  </g>
+  <g inkscape:groupmode="layer" id="up" inkscape:label="Up">
+    <use href="#thumb" fill="url(#alu)"/><use href="#grip"/>
+  </g>
+  <g inkscape:groupmode="layer" id="hover" inkscape:label="Hover">
+    <use href="#thumb" fill="url(#aluHover)"/><use href="#grip"/>
+  </g>
+  <g inkscape:groupmode="layer" id="down" inkscape:label="Down">
+    <use href="#thumb" fill="url(#aluDown)"/><use href="#grip"/>
+  </g>
+</svg>
