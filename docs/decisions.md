@@ -246,6 +246,90 @@ WebView, so the app stays light.
 A separate app in its own repository, drawing WMP skins with its own engine
 rather than through Webamp. WMP skins matter as much as the Winamp app does.
 
+## Distribution
+
+### Installer, releases, updates, and CPU (ATA-116, 2026-10-11)
+
+As in the Winamp app (its `docs/decisions.md`, ATA-72), with this app's names.
+
+- **NSIS only.** `.github/workflows/release.yml` builds the installer on a
+  `v*` tag and publishes it, with its signature and `latest.json`, as a
+  normal GitHub release (not a pre-release, or `releases/latest` would not
+  find it). The tag must match `package.json` and `Cargo.toml`. It installs
+  per user, with no administrator rights. 1.98 MiB for 0.1.0, against
+  2.23 MiB for the Winamp app's 0.1.2; the updater plugin added 0.6 MiB.
+- **Updates install on launch, without asking.** A release build checks
+  `releases/latest/download/latest.json` once at startup; if it is newer,
+  it downloads, installs in passive mode (a small progress window) and
+  restarts. The stream drops for a few seconds. Offline or with no release,
+  it plays on and tries next launch. Debug builds never check.
+- **The update signing key** was made with `npx tauri signer generate`,
+  with a password. Both are the repository secrets
+  `TAURI_SIGNING_PRIVATE_KEY` and `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`; the
+  key file and its password live outside the repository on Ata's PC, in
+  `%USERPROFILE%\.tauri\nts-desktop-wmp.key` (and `.key.password`). The
+  public half is in `tauri.conf.json`. Lose the private key or its password
+  and installed copies can never update again, so keep a copy outside
+  GitHub. Local builds skip signing: `createUpdaterArtifacts` is on only in
+  `src-tauri/tauri.release.conf.json`, which the workflow passes.
+- **Actions that see the signing key are pinned to commits**
+  (`tauri-action` v0.6.2 and `rust-cache` v2.9.2, the Winamp app's pins).
+- **A clean machine is a fresh runner.** This PC runs Windows 11 Home, with
+  no Windows Sandbox or Hyper-V (Mika for Ata). The release workflow's
+  `install` job downloads the published installer on a new `windows-latest`
+  runner and runs `tools/install-check.ps1`: a silent install, the app
+  playing (the skin says "Playing" and its clock moves), a screenshot and
+  the skin it wore, then a silent uninstall that must leave no files, no
+  Settings > Apps entry and no shortcuts. It then installs the release
+  before and waits for it to update itself to the new one. The evidence is
+  the run's `install-check` artifact.
+- **No code signing yet.** SmartScreen warns on first run; the README says
+  what to click. The Winamp app's decisions list the options.
+
+**CPU.** ATA-114 measured 29–35 % of one core with a visualisation showing.
+Three changes:
+
+- **Each frame redraws only the visualisation.** A full paint draws the
+  view twice, with each `effects` element as a solid white box and then a
+  solid black one, on an off-screen canvas. The difference says how much of
+  the visualisation shows at each pixel and what lies over it
+  (`pixels.ts` `overlay`), so a frame redraws just the visualisation's part
+  of the canvas, under its cover. It is exact because a visualisation is
+  opaque, and it keeps whatever a skin draws over it (anemone's pods,
+  clipping, `alphaBlend`). On all 40 working skins that show one at launch,
+  plus the house skin, a frame looks the same as before to within 2 levels
+  per channel, except Halloween's scrolling title, which moves with the
+  clock. Full paints still happen for state changes (the clock, once a
+  second) and scrolling text.
+- **Scrolling text steps on a timer** at its `scrollingDelay`, not every
+  display frame, and such a step reuses the visualisation's cover unless
+  the text overlaps it.
+- **The trusted page asks for display frames only while frames are
+  wanted:** a visualisation on screen and the stream playing. Before, its
+  loop ran at 60 Hz all the time.
+
+Measured on release builds side by side (main at `0be9c5c` and this
+branch), each run 30 s on a hidden desktop, muted, whole process tree, on a
+20-thread machine that other jobs were also using, so runs vary by several
+points:
+
+| Skin, playing | Before | After |
+|---|---|---|
+| Classic, no visualisation | 9.5–11.9 | 6.1–6.9 |
+| anemone, Bars | 28.6–41.5 | 24.3–28.1 |
+| Halloween, Bars and a scrolling title | 39.7–49.5 | 30.3–30.4 |
+| Bootleg House, Bars and a title scrolling every 40 ms | 36.4–43.3 | 27.9–40.4 |
+| The Winamp app 0.1.2, its spectrum showing | 12.7–22.5 | |
+
+What is left is mostly the frames' trip, not the drawing. Stopping the
+frames on Bootleg House took it from about 30 % to 15 %, though each frame
+now redraws a few thousand pixels: each of the 30 frames a second is an IPC
+call from the trusted page to Rust, then a script evaluated in the skin
+webview, then a composite of both webviews. The house skin also repaints in
+full 25 times a second for its title. RAM, playing: about 310 MB private
+(590 MB working set, which counts shared pages more than once), against
+280 MB (540 MB) for the Winamp app.
+
 ## Skins
 
 ### Skins from archive.org: the list, the launch, the picker (ATA-112, 2026-10-11)
@@ -364,7 +448,7 @@ WMP or from the GPL WMP 8 clone. `src/skin/effects.ts` has them.
   `{ "type": "vis", "bars": [32 × 0..255], "wave": [96 × 0..255] }` through
   `skin_send`, but only while the skin has said a visualisation is on screen
   (`effects` message) and the stream is playing. Each frame repaints the
-  skin on the next display frame.
+  skin on the next display frame (only the visualisation since ATA-116).
 - **Effect state.** `currentEffectType` and `currentPreset` name the effect
   as `mediacenter.effectType` and `effectPreset` do: "Bars and Waves"
   presets 0 (Bars) and 1 (Scope), and "Ambience" preset 0. An unknown type
