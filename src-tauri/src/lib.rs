@@ -3,6 +3,8 @@
 // the skin webview, so Tauri refuses every command from it, ours included
 // (see build.rs). The two pages talk only through the `skin` protocol below;
 // docs/decisions.md (ATA-107) has the message list.
+mod skins;
+
 use serde::Deserialize;
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
@@ -10,7 +12,7 @@ use tauri::http::{HeaderValue, Method, Request, Response, StatusCode};
 use tauri::webview::NewWindowResponse;
 use tauri::{
     AppHandle, Emitter, EventTarget, LogicalPosition, LogicalSize, Manager, Url, WebviewBuilder,
-    WebviewUrl,
+    WebviewUrl, WebviewWindowBuilder,
 };
 
 const SKIN_PAGE: &str = include_str!("../../src/skin/index.html");
@@ -82,6 +84,8 @@ enum FromSkin {
     LaunchUrl {
         url: String,
     },
+    /// A right click on the skin: open the skin picker (ATA-112).
+    Picker {},
     /// Whether a visualisation is on screen, so wants analyser frames.
     Effects {
         on: bool,
@@ -134,6 +138,11 @@ fn respond(app: &AppHandle, from: &str, req: Request<Vec<u8>>) -> Response<Vec<u
             .body(engine_js())
             .unwrap(),
         (&Method::GET, "/skin.wmz") => skin_file(),
+        // The skin page asks for it when a skin will not load.
+        (&Method::GET, "/house.wmz") => {
+            skins::wear_house();
+            Response::builder().body(HOUSE_SKIN.to_vec()).unwrap()
+        }
         (&Method::POST, "/msg") => match serde_json::from_slice::<FromSkin>(req.body()) {
             Ok(msg) => {
                 handle(app, msg);
@@ -149,8 +158,12 @@ fn respond(app: &AppHandle, from: &str, req: Request<Vec<u8>>) -> Response<Vec<u
 /// in the binary, so the app has a skin with no network at all.
 const HOUSE_SKIN: &[u8] = include_bytes!("../../skins/house/house.wmz");
 
-// ponytail: serves the .wmz named by NTS_WMP_SKIN, or the house skin. The
-// skin cache (ATA-112) serves the cached skin instead.
+/// How long the first paint waits for a skin still downloading before it
+/// settles for the house skin. The download goes on into the cache.
+const SKIN_WAIT: Duration = Duration::from_secs(8);
+
+/// The .wmz named by NTS_WMP_SKIN (for testing a skin by hand), else the
+/// skin worn now (skins.rs), else the house skin.
 fn skin_file() -> Response<Vec<u8>> {
     let bytes = std::env::var_os("NTS_WMP_SKIN")
         .and_then(|path| {
@@ -158,8 +171,100 @@ fn skin_file() -> Response<Vec<u8>> {
                 .inspect_err(|e| eprintln!("NTS_WMP_SKIN {path:?}: {e}; using the house skin"))
                 .ok()
         })
+        .or_else(|| skins::worn(SKIN_WAIT).map(|(_, bytes)| bytes.to_vec()))
         .unwrap_or_else(|| HOUSE_SKIN.to_vec());
     Response::builder().body(bytes).unwrap()
+}
+
+#[derive(serde::Serialize)]
+struct SkinList {
+    skins: Vec<PickerSkin>,
+    /// The skin picked to wear on every launch; none for a random one.
+    choice: Option<String>,
+    /// The skin on the window now; none for the house skin.
+    worn: Option<String>,
+    /// Whether a skin is on its way.
+    fetching: bool,
+}
+
+#[derive(serde::Serialize)]
+struct PickerSkin {
+    path: String,
+    /// Its archive.org page, the credit.
+    page: String,
+    size: u64,
+    cached: bool,
+}
+
+/// The picker's list: every skin marked as working.
+#[tauri::command]
+fn list_skins(app: AppHandle) -> SkinList {
+    let (worn, fetching) = skins::status();
+    SkinList {
+        skins: skins::working()
+            .map(|s| PickerSkin {
+                path: s.path.clone(),
+                page: skins::page(s).into(),
+                size: s.size,
+                cached: skins::is_cached(&app, s),
+            })
+            .collect(),
+        choice: skins::choice(&app),
+        worn: worn.map(|s| s.path.clone()),
+        fetching,
+    }
+}
+
+/// Wears `path` from now on, or with none a random skin each launch (and a
+/// new one now). The skin webview reloads whatever happens: a skin that
+/// fails gives the house skin, and the choice stays.
+#[tauri::command]
+async fn choose_skin(app: AppHandle, path: Option<String>) -> Result<(), String> {
+    let skin = match &path {
+        Some(p) => skins::find(p).ok_or_else(|| format!("{p} is not on the list"))?,
+        None => skins::random().ok_or("no skins on the list")?,
+    };
+    skins::set_choice(&app, path)?;
+    let result = tauri::async_runtime::spawn_blocking({
+        let app = app.clone();
+        move || skins::load(&app, skin)
+    })
+    .await
+    .map_err(|e| e.to_string())?;
+    if let Some(webview) = app.get_webview("skin") {
+        let _ = webview.eval("location.reload()");
+    }
+    result
+}
+
+/// The picker's links: a skin's archive.org page, and NTS's supporters page.
+#[tauri::command]
+fn open_link(url: String) -> Result<(), String> {
+    let url = Url::parse(&url).map_err(|e| e.to_string())?;
+    let allowed = url.scheme() == "https"
+        && match url.host_str() {
+            Some("archive.org") => url.path().starts_with("/details/"),
+            Some("www.nts.live") => url.path() == "/supporters",
+            _ => false,
+        };
+    if !allowed {
+        return Err(format!("not a link the picker opens: {url}"));
+    }
+    open_url(&url);
+    Ok(())
+}
+
+/// Opens the skin picker.
+fn open_picker(app: &AppHandle) {
+    let built = WebviewWindowBuilder::new(app, "picker", WebviewUrl::App("picker.html".into()))
+        .title("Skins - NTS Radio Bootleg Media Player")
+        .inner_size(380.0, 520.0)
+        .min_inner_size(300.0, 300.0)
+        .additional_browser_args(BROWSER_ARGS)
+        .build();
+    if let Err(e) = built {
+        eprintln!("cannot open the skin picker: {e}");
+    }
 }
 
 /// A view of at most 4096 px a side, with runs that are non-empty, inside it,
@@ -185,15 +290,21 @@ fn launchable(url: &str, now: Instant, last: &Mutex<Option<Instant>>) -> Option<
     if !matches!(url.scheme(), "http" | "https") || url.as_str().len() > 2048 {
         return None;
     }
+    throttle(now, last).then_some(url)
+}
+
+/// Whether 3 s have passed since the last time this said yes.
+fn throttle(now: Instant, last: &Mutex<Option<Instant>>) -> bool {
     let mut last = last.lock().unwrap();
     if last.is_some_and(|t| now.duration_since(t) < Duration::from_secs(3)) {
-        return None;
+        return false;
     }
     *last = Some(now);
-    Some(url)
+    true
 }
 
 static LAST_LAUNCH: Mutex<Option<Instant>> = Mutex::new(None);
+static LAST_PICKER: Mutex<Option<Instant>> = Mutex::new(None);
 
 fn handle(app: &AppHandle, msg: FromSkin) {
     let Some(window) = app.get_window("main") else {
@@ -225,6 +336,17 @@ fn handle(app: &AppHandle, msg: FromSkin) {
             if let Some(url) = launchable(&url, Instant::now(), &LAST_LAUNCH) {
                 open_url(&url);
             }
+        }
+        FromSkin::Picker {} => {
+            // A skin can send this itself: never while the picker is open, so
+            // it cannot keep taking the focus, and at most one every 3 s.
+            if app.get_webview_window("picker").is_some() || !throttle(Instant::now(), &LAST_PICKER)
+            {
+                return;
+            }
+            // Building a window on the UI thread, where this handler runs, deadlocks.
+            let app = app.clone();
+            std::thread::spawn(move || open_picker(&app));
         }
         other => {
             let _ = app.emit_to(EventTarget::webview("main"), "skin", other);
@@ -379,11 +501,28 @@ mod win32 {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
-        .invoke_handler(tauri::generate_handler![skin_send])
-        .register_uri_scheme_protocol("skin", |ctx, req| {
-            skin_protocol(ctx.app_handle(), ctx.webview_label(), req)
+        .invoke_handler(tauri::generate_handler![
+            skin_send,
+            list_skins,
+            choose_skin,
+            open_link
+        ])
+        .register_asynchronous_uri_scheme_protocol("skin", |ctx, req, responder| {
+            let (app, from) = (ctx.app_handle().clone(), ctx.webview_label().to_owned());
+            // The skin may still be downloading: wait for it off the UI thread.
+            if req.uri().path() == "/skin.wmz" {
+                std::thread::spawn(move || responder.respond(skin_protocol(&app, &from, req)));
+            } else {
+                responder.respond(skin_protocol(&app, &from, req));
+            }
         })
         .on_window_event(|window, event| {
+            // Closing the player quits, picker and all.
+            if let tauri::WindowEvent::Destroyed = event {
+                if window.label() == "main" {
+                    window.app_handle().exit(0);
+                }
+            }
             // A new monitor scale resizes the window but leaves its region in
             // the old device pixels.
             #[cfg(windows)]
@@ -401,6 +540,7 @@ pub fn run() {
             }
         })
         .setup(|app| {
+            skins::start(app.handle());
             let window = app.get_window("main").expect("main window");
             let size = window
                 .inner_size()?
@@ -488,6 +628,7 @@ mod tests {
         );
         assert_eq!(parse(r#"{"type":"mute","value":1}"#), None);
         assert_eq!(parse(r#"{"type":"close"}"#), Some(FromSkin::Close {}));
+        assert_eq!(parse(r#"{"type":"picker"}"#), Some(FromSkin::Picker {}));
         assert_eq!(parse(r#"{"type":"minimize","evil":1}"#), None);
         assert_eq!(
             parse(r#"{"type":"launchUrl","url":"https://www.nts.live/"}"#),

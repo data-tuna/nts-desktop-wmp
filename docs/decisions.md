@@ -71,9 +71,10 @@ the evidence.
   5 s after the cut ended. A pause during a cut stayed paused: no tunnel
   opened after the cut ended.
 - **Remembered:** volume, mute, balance and the EQ, in the trusted page's
-  `localStorage`, clamped on load. **Not yet:** the last skin. Nothing
-  chooses a skin until ATA-112, so it is left to that issue (noted on
-  ATA-112, with its conflict with a random skin on launch, for Ata).
+  `localStorage`, clamped on load. The skin came later, with ATA-112: a
+  skin picked in the picker is remembered, and with none picked every
+  launch wears a random one (Mika decided this for Ata on 2026-10-11; see
+  Skins below).
 
 ### Skin code runs in its own webview, with no capabilities (ATA-107, 2026-10-11)
 
@@ -166,6 +167,7 @@ unknown fields included, and refuses requests from any webview but `skin`
 | `{ "type": "shape", "width", "height", "rects": [[x, y, w, h], …] }` | Rust: sizes the window and sets its region. Ignored unless the view is 1–4096 px a side and every run is non-empty and inside it, with at most ceil(width / 2) runs per row |
 | `{ "type": "close" }`, `{ "type": "minimize" }` | Rust: closes or minimizes the window (ATA-110) |
 | `{ "type": "launchUrl", "url": "…" }` | Rust: opens the URL in the default browser, only if it parses as http(s), is at most 2048 characters, and comes 3 s or more after the last one (ATA-110) |
+| `{ "type": "picker" }` | Rust: opens the skin picker, unless it is open already or one opened in the last 3 s (ATA-112) |
 | `{ "type": "effects", "on": true \| false }` | the trusted page: whether a visualisation is on screen, so wants analyser frames (ATA-114) |
 
 Host to skin: the trusted page calls the `skin_send` command, and Rust
@@ -188,7 +190,8 @@ visualisation and the stream plays:
     { "type": "vis", "bars": [32 × 0..255], "wave": [96 × 0..255] }
 
 The skin also gets `GET /` (the engine page), `GET /engine.js` (the
-engine) and `GET /skin.wmz` (the skin itself, whole) from the protocol, and
+engine), `GET /skin.wmz` (the skin itself, whole) and `GET /house.wmz` (the
+house skin, for when a skin will not load; ATA-112) from the protocol, and
 nothing of the app's. Until ATA-108 the stub skin read its files one by one
 from `GET /files/<name>`.
 
@@ -244,6 +247,107 @@ A separate app in its own repository, drawing WMP skins with its own engine
 rather than through Webamp. WMP skins matter as much as the Winamp app does.
 
 ## Skins
+
+### Skins from archive.org: the list, the launch, the picker (ATA-112, 2026-10-11)
+
+- **The compatibility list.** `skins/compatible.json` holds all 216 `.wmz`
+  files in the item, by path, md5 and size, each marked `works`, `partial`
+  or `broken` with up to eight lines of what the engine logged. On
+  2026-10-11: **59 work, 97 partial, 60 broken.** All 7 ATA-103 skins work.
+  `tools/compat.mjs` builds it: it reads the item's metadata API, downloads
+  each skin once into `%LOCALAPPDATA%\nts-wmp-compat` (3 s apart, a second
+  try after 30 s), runs it through the engine in headless Edge with the
+  stand-in host from `skin-preview.mjs`, and records:
+  - **broken:** the engine could not load it, or it drew nothing. 54 of the
+    60 open on a view that only hands over to the player in a later view: a
+    `previewView` for WMP's skin chooser (30), or a `mediaSwitcherView` or
+    `versionView` that picks the player's view by media type or WMP version
+    (24). The engine draws only the first view (AGENTS.md, Known gaps).
+  - **partial:** it drew, but a script failed, an image was missing or
+    would not decode, an element is unknown, it has no play or no stop
+    control, or more than 20 pixels of `#FF00FF` are left on the canvas
+    (43 skins: a transparency the engine did not cut, which would show as
+    pink in the window).
+  - **works:** none of that. Video, item playlists and popups that are not
+    drawn do not count against a skin: a radio has no video.
+  The checks miss a skin that draws but looks wrong. A sample of the
+  screenshots was looked over; Kwanzaa, for one, is all visualiser, so its
+  candles are black while nothing plays. Rebuilt after ATA-114's
+  visualisations merged: the same 59, 97 and 60.
+- **On launch** (`skins.rs`): the skin picked in the picker, or else a
+  random `works` skin. It comes from the cache
+  (`%LOCALAPPDATA%\com.datatuna.ntswmp\skins\<md5>.wmz`), checked against
+  its md5, or is downloaded through Rust (archive.org sends no CORS
+  headers), checked, and cached. At most one download per launch; one more
+  try after a second, since archive.org now and then answers 500 for a file
+  it serves a second later. Connecting and the first response byte get
+  15 s each, the whole download 120 s. The first paint waits up to 8 s for it, then
+  settles for the house skin while the download finishes into the cache.
+  A skin that fails to download, fails its md5, or that the engine cannot
+  load gives the house skin. Only the latest fetch is worn: a launch
+  download that lands after a pick, or after the first paint gave up on
+  it, goes into the cache and nowhere else. The cache keeps 100 MB, oldest
+  out first, as the Winamp app's does; a worn skin is touched on each
+  launch, so a kept one stays.
+- **TLS:** `ureq` with the system's TLS (SChannel on Windows). Its
+  `native-tls-no-default` feature panics on every https request (ureq 3.4.2
+  checks for the `native-tls` feature), so the dependency uses
+  `native-tls`, which also carries a bundle of root certificates the app
+  does not use. The installer is 1.34 MiB, the exe 3.6 MiB.
+- **The picker** opens on a right click on the skin, as WMP's menu offered
+  its skin chooser. A skin can send that message too, so it is ignored
+  while the picker is open (no taking the focus back) and more often than
+  once every 3 s. Closing the player quits the app, picker and all. It is a window of our own (`picker.html`), with a
+  capability for three commands: `list_skins`, `choose_skin`, and
+  `open_link`, which opens only archive.org `/details/` pages and
+  `https://www.nts.live/supporters`. It lists the working skins with their
+  publisher folder and a link to each skin's archive.org page, notes the
+  download size of those not cached, and credits the archive and links to
+  NTS's supporters page. It asks the app every 2 s what is on the window,
+  so it follows a launch download landing or a skin falling back to the
+  house skin; when a kept skin failed, it says the kept one is tried again
+  next launch. archive.org has no preview per skin, so the picker shows
+  none; picking one puts it on the window. "A random skin on every launch"
+  also puts a new random skin on at once, so the choice shows.
+- **No preview images** (Mika for Ata, 2026-10-11). The issue asked for
+  archive.org preview images, but the item has none per skin. Drawing our
+  own would mean committing or bundling images of third-party skins, which
+  the standing rules forbid, and previewing a skin before wearing it would
+  mean a download per preview, against one download per launch. So the
+  picker shows each skin's name, folder and archive.org link, and a pick
+  goes straight onto the window.
+- **Remembering the choice** (Mika for Ata, 2026-10-11, carried over from
+  ATA-109): a skin picked in the picker opens on every launch and downloads
+  nothing. "A random skin on every launch" in the picker forgets the
+  choice. If the picked skin fails to load, the house skin shows and the
+  choice stays. It is kept in `skin.json` beside the cache, in Rust, since
+  Rust serves the skin before the trusted page has loaded.
+
+Checked on a release build on a hidden desktop, with `--mute-audio`,
+timing from process start to the skin's first canvas:
+- **Ten launches in a row**, from an empty cache, wore ten different skins
+  and all played NTS 1. Each downloaded its skin and drew in 2.4 to 4.2 s;
+  a launch on a cached skin draws in 1.1 to 1.3 s. (One earlier run of ten
+  wore nine: claw twice, the second time from the cache in 1.1 s.)
+- **archive.org blocked** (the webview with `--host-resolver-rules="MAP
+  archive.org ~NOTFOUND, MAP *.archive.org ~NOTFOUND"`; Rust ignores
+  Chromium's flags, so its downloads went to a dead `HTTPS_PROXY`) with an
+  empty cache: the house skin, playing, in 6.0 s with the connection
+  refused (two tries), and in 9.0 s with it hanging (the 8 s wait).
+- **The picker** opened from a right click, listed 59 skins, and put the
+  pick on the window (Kenwood_MPXP, Television, Thomas in three runs).
+  Relaunches wore it again in 1.1 to 1.3 s with no download. With the kept
+  skin removed from the cache and the network blocked, the house skin
+  showed and `skin.json` still named it. "A random skin on every launch"
+  set `{"skin":null}` and the next launches were random again.
+- **Isolation:** `tools/escape.mjs` gives the ATA-107 result on this build,
+  and now also tries the picker's commands from the skin: `list_skins`,
+  `choose_skin` and `open_link` are each refused by the ACL, and so is
+  `list_skins` from the trusted page. Only the picker's own webview has
+  them. A skin can open the picker (`{ "type": "picker" }`), which is all
+  a right click does.
+- Not tried: a real right click with a real mouse (the input came through
+  DevTools), and the picker's links, which open the default browser.
 
 ### Visualisations: our own bars, scope and ambience (ATA-114, 2026-10-11)
 

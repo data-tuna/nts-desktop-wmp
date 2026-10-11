@@ -1,0 +1,1843 @@
+[
+ {
+  "path": "BMG/elvis.wmz",
+  "md5": "baca0ec174e2fa280534f22dc0015984",
+  "size": 196900,
+  "status": "partial",
+  "notes": [
+   "ElvisSkin: Init(); failed: ReferenceError: UpdateMetaData is not defined"
+  ]
+ },
+ {
+  "path": "cablemusicnetworks/Cablemusic.wmz",
+  "md5": "b93111401d3f7bd3754cda6906dbb125",
+  "size": 347634,
+  "status": "works"
+ },
+ {
+  "path": "cyberchannel/cyberchannel.wmz",
+  "md5": "92dda2f73f2c7e8a314f392089d30c60",
+  "size": 208487,
+  "status": "works"
+ },
+ {
+  "path": "EdAverett/Melvin.wmz",
+  "md5": "604955b218dfb2022f9e4e64d80c861b",
+  "size": 78932,
+  "status": "works"
+ },
+ {
+  "path": "EdAverett/springflower.wmz",
+  "md5": "526f8a753000d5635ec14af0c7fe8848",
+  "size": 107591,
+  "status": "works"
+ },
+ {
+  "path": "EdAverett/Zengarden.wmz",
+  "md5": "be4550d17dd81bfcfef67aa3443945e4",
+  "size": 164069,
+  "status": "works"
+ },
+ {
+  "path": "EMI parlophone/Gorillaz.wmz",
+  "md5": "d4977669ed4a65de7867786356088bb1",
+  "size": 237437,
+  "status": "partial",
+  "notes": [
+   "noodle: JScript: timerHandler(); failed: ReferenceError: ejectclose is not defined"
+  ]
+ },
+ {
+  "path": "fanmade(periodcorrect)/Primitive.wmz",
+  "md5": "cf4e72ae4c628aa5f9f3547896cbf345",
+  "size": 490950,
+  "status": "works"
+ },
+ {
+  "path": "HortonLantzMarocco/YIL!OMA2K.wmz",
+  "md5": "861746f55dc70e6aae780b5e4ffcc0c8",
+  "size": 444380,
+  "status": "partial",
+  "notes": [
+   "<view>: Init(); failed: ReferenceError: vid is not defined"
+  ]
+ },
+ {
+  "path": "houseofblues/HOB.wmz",
+  "md5": "dc769f4f5bbc9fd1fa78ead89373542d",
+  "size": 799383,
+  "status": "partial",
+  "notes": [
+   "<view>: Init(); failed: ReferenceError: pl is not defined"
+  ]
+ },
+ {
+  "path": "howarduniversity/Blackface.wmz",
+  "md5": "ac8b478262f55a008702e8c55b43b610",
+  "size": 2318380,
+  "status": "partial",
+  "notes": [
+   "<view>: Init(); failed: ReferenceError: visEffect is not defined"
+  ]
+ },
+ {
+  "path": "howarduniversity/blackpower.wmz",
+  "md5": "6abbe2f8d75a4009950a7e41ef6fad3a",
+  "size": 83428,
+  "status": "works"
+ },
+ {
+  "path": "howarduniversity/buffaloSoldier1.wmz",
+  "md5": "df0e01283e2d213a45226d92b8e192c3",
+  "size": 125667,
+  "status": "partial",
+  "notes": [
+   "missing script mland.js"
+  ]
+ },
+ {
+  "path": "howarduniversity/FransisYoung.wmz",
+  "md5": "36506113819232c10edf19e86cc5bb7b",
+  "size": 591101,
+  "status": "partial",
+  "notes": [
+   "<player>: OnOpenStateChange(); failed: ReferenceError: bClose is not defined"
+  ]
+ },
+ {
+  "path": "howarduniversity/gnome.wmz",
+  "md5": "2685fba69ab702433862c7393998097b",
+  "size": 336088,
+  "status": "broken",
+  "notes": [
+   "drew nothing",
+   "<view>: OnLoad(); failed: ReferenceError: bgPlay is not defined"
+  ]
+ },
+ {
+  "path": "howarduniversity/HBCU_SKIN.wmz",
+  "md5": "b811112a80a67d2a5bc1cfd72125485b",
+  "size": 548108,
+  "status": "works"
+ },
+ {
+  "path": "howarduniversity/Jordan.wmz",
+  "md5": "d84fa92e32c0365f8c366da06b49f27f",
+  "size": 621232,
+  "status": "partial",
+  "notes": [
+   "left=\"jscript:balance.left+balance.width+500;\" could not be worked out, ignored",
+   "top=\"jscript:balance.top;\" could not be worked out, ignored",
+   "JordanBase: Init(); failed: ReferenceError: pl is not defined",
+   "value=\"wmpprop:player.currentartist.name\" could not be worked out, ignored"
+  ]
+ },
+ {
+  "path": "howarduniversity/Kwanzaa.wmz",
+  "md5": "35a9323a88eda88650a89c8966c9632a",
+  "size": 183993,
+  "status": "works"
+ },
+ {
+  "path": "howarduniversity/Lockskin.wmz",
+  "md5": "694e5a28448bdfa682859387d0401960",
+  "size": 356484,
+  "status": "works"
+ },
+ {
+  "path": "howarduniversity/MotherLand.wmz",
+  "md5": "a0b0ac4874e11a208cc21068c8e35dcb",
+  "size": 86949,
+  "status": "works"
+ },
+ {
+  "path": "howarduniversity/PastAndBeyond.wmz",
+  "md5": "4ebbf363903ddb5f5a74dd099d4939be",
+  "size": 551283,
+  "status": "partial",
+  "notes": [
+   "value=\"jscript: if(eq.enhancedAudio){'On'}else{'Off'}\" could not be worked out, ignored",
+   "<player>: OnOpenStateChange(); failed: ReferenceError: OnOpenStateChange is not defined",
+   "<player>: OnURLChange(); failed: ReferenceError: OnURLChange is not defined",
+   "<player>: OnPlayStateChange(); failed: ReferenceError: OnPlayStateChange is not defined"
+  ]
+ },
+ {
+  "path": "howarduniversity/Roboxcube.wmz",
+  "md5": "fee17c40b5d2c95632c93b97130759fd",
+  "size": 958968,
+  "status": "partial",
+  "notes": [
+   "cannot decode toleft1.bmp",
+   "<player>: OnOpenStateChange(); failed: ReferenceError: OnOpenStateChange is not defined",
+   "<player>: OnURLChange(); failed: ReferenceError: OnURLChange is not defined",
+   "<player>: OnPlayStateChange(); failed: ReferenceError: OnPlayStateChange is not defined"
+  ]
+ },
+ {
+  "path": "howarduniversity/sankofa skin.wmz",
+  "md5": "6d82ea5991b5ac0e6b94b9629e71b0d7",
+  "size": 805923,
+  "status": "works"
+ },
+ {
+  "path": "howarduniversity/TEDDY.WMZ",
+  "md5": "804ea82120a23be1dc8dc14a1cf59eea",
+  "size": 718611,
+  "status": "partial",
+  "notes": [
+   "cannot decode volume2.bmp",
+   "cannot decode hover.bmp",
+   "cannot decode downclic.bmp",
+   "cannot decode bttm.bmp",
+   "cannot decode skincopy.bmp",
+   "cannot decode skint.bmp",
+   "cannot decode volume1.bmp",
+   "cannot decode volume.bmp"
+  ]
+ },
+ {
+  "path": "howarduniversity/TimesofOld2.wmz",
+  "md5": "cd0bf5da2230fa3640367d75a3ef5e00",
+  "size": 317096,
+  "status": "works"
+ },
+ {
+  "path": "howarduniversity/Unity.wmz",
+  "md5": "8da178f21f8c23c71831c7e2d40112c5",
+  "size": 69634,
+  "status": "partial",
+  "notes": [
+   "mainVw: CheckVid(); failed: ReferenceError: CheckVid is not defined",
+   "<player>: CheckVid() failed: ReferenceError: CheckVid is not defined"
+  ]
+ },
+ {
+  "path": "howarduniversity/UPRISING.WMZ",
+  "md5": "792135500c512eb53e538b8358ce5c08",
+  "size": 622858,
+  "status": "partial",
+  "notes": [
+   "shows 64 pixels of key colour #FF00FF",
+   "<view>: Init(); failed: ReferenceError: Init is not defined",
+   "<player>: OnOpenStateChange(); failed: ReferenceError: OnOpenStateChange is not defined",
+   "<player>: OnPlayStateChange(); failed: ReferenceError: OnPlayStateChange is not defined"
+  ]
+ },
+ {
+  "path": "hypnosismedia/robbie.wmz",
+  "md5": "53ecf4fd196b2d7ca0132bc73a0876de",
+  "size": 377741,
+  "status": "partial",
+  "notes": [
+   "Robbie: JScript:init(); failed: ReferenceError: hypnosis is not defined"
+  ]
+ },
+ {
+  "path": "imusica/iMusica.wmz",
+  "md5": "672a9385e34d5dbd5a5527cd739b2a3c",
+  "size": 257048,
+  "status": "works"
+ },
+ {
+  "path": "mediabay/Asimov_Radio.wmz",
+  "md5": "c784416f5cdb98f8422eb2118d168023",
+  "size": 598341,
+  "status": "works"
+ },
+ {
+  "path": "microsoft/9SeriesDefault.wmz",
+  "md5": "99a2c3bb8f53b3fef39d3c0ec88d5680",
+  "size": 224345,
+  "status": "works"
+ },
+ {
+  "path": "microsoft/anemone.wmz",
+  "md5": "77e583e4c55dd7cf01e3aa5733e24863",
+  "size": 456604,
+  "status": "works"
+ },
+ {
+  "path": "microsoft/aoe.wmz",
+  "md5": "0089a4c4c7d03bf185f65e76a12acc64",
+  "size": 135384,
+  "status": "works"
+ },
+ {
+  "path": "microsoft/Atomic.wmz",
+  "md5": "a789c86fb32a66ccbb52b2ef1f7bf9ab",
+  "size": 198478,
+  "status": "partial",
+  "notes": [
+   "shows 3963 pixels of key colour #FF00FF"
+  ]
+ },
+ {
+  "path": "microsoft/Beck.wmz",
+  "md5": "c0c77407901da8736bc89ded6a611256",
+  "size": 213033,
+  "status": "works"
+ },
+ {
+  "path": "microsoft/bluegrid.wmz",
+  "md5": "905e5155222c5770bd7afc1991ebf384",
+  "size": 41466,
+  "status": "works"
+ },
+ {
+  "path": "microsoft/Bluesky.wmz",
+  "md5": "fc73243e21119cb4dadece95ce857ca8",
+  "size": 176825,
+  "status": "works"
+ },
+ {
+  "path": "microsoft/Canvas.wmz",
+  "md5": "dff6e4da1e0cdcd54c3f7ab9eff60d01",
+  "size": 135346,
+  "status": "works"
+ },
+ {
+  "path": "microsoft/cerulean.wmz",
+  "md5": "e663f804d02d286e3d321407763a8bd3",
+  "size": 216930,
+  "status": "works"
+ },
+ {
+  "path": "microsoft/circle.wmz",
+  "md5": "4fc015b3e5a31787c9d8c4ab75c80aa7",
+  "size": 55641,
+  "status": "works"
+ },
+ {
+  "path": "microsoft/Classic.wmz",
+  "md5": "0e7e8aa38de55c2e10c1b9277d8ca9fd",
+  "size": 24252,
+  "status": "works"
+ },
+ {
+  "path": "microsoft/claw.wmz",
+  "md5": "7b789d778bd2a2c8abf7b426c4f7127b",
+  "size": 102484,
+  "status": "works"
+ },
+ {
+  "path": "microsoft/Colorchooser.wmz",
+  "md5": "4462570c4f39890a064e0e14865341f4",
+  "size": 3682,
+  "status": "partial",
+  "notes": [
+   "<view>: jscript: var temp = theme.loadPreference('bgColor');  if (te failed: ReferenceError: checkForContent is not defined",
+   "<player>: if(NewState==3)checkForContent(); failed: ReferenceError: checkForContent is not defined"
+  ]
+ },
+ {
+  "path": "microsoft/compact.wmz",
+  "md5": "c0929dd2ff85022b25c4cf027f3a0451",
+  "size": 184959,
+  "status": "partial",
+  "notes": [
+   "missing image WMPImage_AdBanner"
+  ]
+ },
+ {
+  "path": "microsoft/Compact.wmz",
+  "md5": "3392eb0ff9d8e9f0d837391f57776a5b",
+  "size": 185722,
+  "status": "partial",
+  "notes": [
+   "missing image WMPImage_AdBanner"
+  ]
+ },
+ {
+  "path": "microsoft/Crystalball.wmz",
+  "md5": "a6ef2c32c3a65b07d6002b08a09d7d69",
+  "size": 833904,
+  "status": "partial",
+  "notes": [
+   "ballview: OnTimerTick(); failed: ReferenceError: metadataTime is not defined"
+  ]
+ },
+ {
+  "path": "microsoft/digitaldj.wmz",
+  "md5": "d7c954ed7ea1f72dac52101c78593627",
+  "size": 421430,
+  "status": "broken",
+  "notes": [
+   "drew nothing"
+  ]
+ },
+ {
+  "path": "microsoft/gadget.wmz",
+  "md5": "4339a9418f7f73edf4dca3aa9bb862da",
+  "size": 92863,
+  "status": "partial",
+  "notes": [
+   "shows 300 pixels of key colour #FF00FF"
+  ]
+ },
+ {
+  "path": "microsoft/Goo.wmz",
+  "md5": "01405a3baeb142011cd89fb5f5755861",
+  "size": 399476,
+  "status": "works"
+ },
+ {
+  "path": "microsoft/Headspace.wmz",
+  "md5": "664c7a71cfab77ef83ebf9fbcfd8b510",
+  "size": 241903,
+  "status": "works"
+ },
+ {
+  "path": "microsoft/heart.wmz",
+  "md5": "4766ea18d3f4b68773546294a73ea269",
+  "size": 176600,
+  "status": "partial",
+  "notes": [
+   "shows 73 pixels of key colour #FF00FF"
+  ]
+ },
+ {
+  "path": "microsoft/iconic.wmz",
+  "md5": "dac05b82d478b2b8db1de39dc9e910cf",
+  "size": 36613,
+  "status": "works"
+ },
+ {
+  "path": "microsoft/Jaws.wmz",
+  "md5": "1c11fdc6c6a8dbbe83941b611c9a5d06",
+  "size": 386958,
+  "status": "partial",
+  "notes": [
+   "jawsview: OnTimerTick(); failed: ReferenceError: metadataTime is not defined"
+  ]
+ },
+ {
+  "path": "microsoft/Miniplayer.wmz",
+  "md5": "05a7b12c6b32f9f4f4f2f9cb9ed21696",
+  "size": 49285,
+  "status": "works"
+ },
+ {
+  "path": "microsoft/modernblue.wmz",
+  "md5": "4ba1093de54f0caaa06c18c13894d5bd",
+  "size": 208336,
+  "status": "works"
+ },
+ {
+  "path": "microsoft/MSN.wmz",
+  "md5": "e2b60bbacd02d96ee37f4a21612a0222",
+  "size": 107948,
+  "status": "partial",
+  "notes": [
+   "shows 1643 pixels of key colour #FF00FF"
+  ]
+ },
+ {
+  "path": "microsoft/Ocean.wmz",
+  "md5": "de0c82c945c46881583c16eb3f79a4fc",
+  "size": 300566,
+  "status": "partial",
+  "notes": [
+   "unknown element <visualization>, skipped"
+  ]
+ },
+ {
+  "path": "microsoft/Optik.wmz",
+  "md5": "6841af74588eac2f5ee05a62b93a6422",
+  "size": 85878,
+  "status": "works"
+ },
+ {
+  "path": "microsoft/pharaoh.wmz",
+  "md5": "02961c8eb1b6dad7cb0ced5532a0d4aa",
+  "size": 201596,
+  "status": "works"
+ },
+ {
+  "path": "microsoft/Plus! Aquarium.wmz",
+  "md5": "e60d58c39358e96b8b756819028b2eb6",
+  "size": 519145,
+  "status": "works"
+ },
+ {
+  "path": "microsoft/Plus! da Vinci.wmz",
+  "md5": "7cc52cfee2cbb8d4d2b4735019023f1a",
+  "size": 488912,
+  "status": "partial",
+  "notes": [
+   "shows 7244 pixels of key colour #FF00FF"
+  ]
+ },
+ {
+  "path": "microsoft/Plus! Hard Boiled.wmz",
+  "md5": "d545e08c5c082f2451b429c3e9ef441e",
+  "size": 136260,
+  "status": "partial",
+  "notes": [
+   "eggSkin: Init(); failed: ReferenceError: volume_slider is not defined",
+   "<player>: OnOpenStateChange(); failed: ReferenceError: OnOpenStateChange is not defined"
+  ]
+ },
+ {
+  "path": "microsoft/Plus! HueShifter.wmz",
+  "md5": "5f2bc942db875fc64cd9daa7b71f0dc6",
+  "size": 262974,
+  "status": "partial",
+  "notes": [
+   "unknown element <automenu>, skipped",
+   "hueshifterSkin: Init(); failed: ReferenceError: UpdateMetaData is not defined"
+  ]
+ },
+ {
+  "path": "microsoft/Plus! Nature.wmz",
+  "md5": "3a153c46393d066e8757efd19f08eb8f",
+  "size": 490154,
+  "status": "partial",
+  "notes": [
+   "shows 13635 pixels of key colour #FF00FF"
+  ]
+ },
+ {
+  "path": "microsoft/Plus! Plasma Ball.wmz",
+  "md5": "3b2995836bc5995aad2f2190d77de681",
+  "size": 133967,
+  "status": "partial",
+  "notes": [
+   "unknown element <automenu>, skipped",
+   "BubbleSkin: Init() failed: ReferenceError: UpdateMetaData is not defined",
+   "<player>: OnOpenStateChange(); failed: ReferenceError: UpdateMetadata is not defined"
+  ]
+ },
+ {
+  "path": "microsoft/Plus! SlimLine.wmz",
+  "md5": "12aa90d57f8298c56187af6958f6b21b",
+  "size": 258065,
+  "status": "partial",
+  "notes": [
+   "<player>: OnOpenStateChange(); failed: ReferenceError: btnVD is not defined",
+   "<player>: OnPlayStateChange(); failed: ReferenceError: btnVD is not defined",
+   "perfectSkin: OnTimerTick(); failed: ReferenceError: OnTimerTick is not defined"
+  ]
+ },
+ {
+  "path": "microsoft/Plus! Space.wmz",
+  "md5": "2b1d442da51f49cd25ee3403bd1d87b7",
+  "size": 404697,
+  "status": "partial",
+  "notes": [
+   "shows 2871 pixels of key colour #FF00FF"
+  ]
+ },
+ {
+  "path": "microsoft/polygon.wmz",
+  "md5": "8cfe07e93cc3d185811d348a5b5d78cb",
+  "size": 60730,
+  "status": "works"
+ },
+ {
+  "path": "microsoft/PowerToys.wmz",
+  "md5": "a1e109ce217d3e781833227ed6518c32",
+  "size": 265885,
+  "status": "partial",
+  "notes": [
+   "no play control",
+   "no stop or pause control",
+   "<view>: t1.value=\"LIBRARY ACCESS IS DISABLED\\rright-click on this wi failed: TypeError: Cannot read properties of undefined (reading 'newPlaylist')"
+  ]
+ },
+ {
+  "path": "microsoft/PYRITE.WMZ",
+  "md5": "8b1021adb85aeadba71a6f761fede73d",
+  "size": 86406,
+  "status": "partial",
+  "notes": [
+   "shows 3629 pixels of key colour #FF00FF"
+  ]
+ },
+ {
+  "path": "microsoft/rad.wmz",
+  "md5": "d0eb999409a23060df9d72cb30dacd1a",
+  "size": 52220,
+  "status": "partial",
+  "notes": [
+   "shows 217 pixels of key colour #FF00FF",
+   "enabled=\"wmpenabled:player.settings.volume\" could not be worked out, ignored"
+  ]
+ },
+ {
+  "path": "microsoft/Radio.wmz",
+  "md5": "6371de4a56df1fc6c87d800dc59fb1d9",
+  "size": 52097,
+  "status": "partial",
+  "notes": [
+   "missing image corner_pieces.bmp",
+   "enabled=\"wmpenabled:player.settings.volume\" could not be worked out, ignored"
+  ]
+ },
+ {
+  "path": "microsoft/Revert (1).wmz",
+  "md5": "bae22c3847740715cff53f20489911cb",
+  "size": 67215,
+  "status": "broken",
+  "notes": [
+   "drew nothing",
+   "unknown element <automenu>, skipped",
+   "missing script res://-/RT_TEXT/#169",
+   "missing image WMPImage_AlbumArtSmall",
+   "<player>: vwPlayer_OnOpenStateChange(NewState); failed: TypeError: sz3.sprintf is not a function"
+  ]
+ },
+ {
+  "path": "microsoft/Revert.wmz",
+  "md5": "6050c60ecb60c492bff783b75a810a7f",
+  "size": 66725,
+  "status": "partial",
+  "notes": [
+   "unknown element <automenu>, skipped",
+   "missing script res://-/RT_TEXT/#169",
+   "missing image WMPImage_AlbumArtSmall",
+   "<player>: vwPlayer_OnOpenStateChange(NewState); failed: TypeError: sz3.sprintf is not a function"
+  ]
+ },
+ {
+  "path": "microsoft/Roundlet.wmz",
+  "md5": "440d5d632ec745910244333a557b27c1",
+  "size": 78682,
+  "status": "partial",
+  "notes": [
+   "shows 3989 pixels of key colour #FF00FF"
+  ]
+ },
+ {
+  "path": "microsoft/Rusty.wmz",
+  "md5": "4497c250df49a929aefed1ede5c6a654",
+  "size": 110046,
+  "status": "works"
+ },
+ {
+  "path": "microsoft/Science.wmz",
+  "md5": "0ebc64d6325198586da6c01f18f8e2c6",
+  "size": 627615,
+  "status": "partial",
+  "notes": [
+   "unknown element <bars>, skipped"
+  ]
+ },
+ {
+  "path": "microsoft/Splat.wmz",
+  "md5": "8c2d22c3dec620515572eae96172753d",
+  "size": 154499,
+  "status": "works"
+ },
+ {
+  "path": "microsoft/Toothy.wmz",
+  "md5": "783fca66b0d1fad0f83c9b7dfb85a92f",
+  "size": 43851,
+  "status": "partial",
+  "notes": [
+   "shows 142 pixels of key colour #FF00FF"
+  ]
+ },
+ {
+  "path": "microsoft/tubeframe.wmz",
+  "md5": "d1fc4e0aac18c1abe6ce697189773045",
+  "size": 114104,
+  "status": "partial",
+  "notes": [
+   "value=\"jscript: if(eq.bypass == true)'Off';else'On';\" could not be worked out, ignored"
+  ]
+ },
+ {
+  "path": "nintendo/New Super Mario Bros.wmz",
+  "md5": "fc05e9f46ff334522fd1e4e1e9ab2bde",
+  "size": 863237,
+  "status": "partial",
+  "notes": [
+   "<view>: startUp(); failed: ReferenceError: mainFadeOpen is not defined"
+  ]
+ },
+ {
+  "path": "NPRonline/NPR.wmz",
+  "md5": "a3e0e3886e079159f69fd0aec0218181",
+  "size": 55625,
+  "status": "partial",
+  "notes": [
+   "missing image nprlogo.gif",
+   "<player>: OnOpenStateChange(); failed: ReferenceError: bClose is not defined",
+   "<player>: OnPlayStateChange(); failed: ReferenceError: visEffects is not defined"
+  ]
+ },
+ {
+  "path": "petroldesigns/Charlies_Angels_Full_Throttle.wmz",
+  "md5": "ccf2b91f7a1e62d856985453a31753de",
+  "size": 872226,
+  "status": "partial",
+  "notes": [
+   "<view>: JScript:skin_init();UpdateMetadata(); failed: ReferenceError: skin_init is not defined",
+   "<player>: UpdateMetadata(); failed: ReferenceError: UpdateMetadata is not defined",
+   "<player>: OnURLChange(); failed: ReferenceError: OnURLChange is not defined"
+  ]
+ },
+ {
+  "path": "petroldesigns/Tomb Raider 2.wmz",
+  "md5": "6494468672be41a4935ebc4d4c0e34ab",
+  "size": 955857,
+  "status": "partial",
+  "notes": [
+   "<view>: JScript:skin_init();UpdateMetadata(); failed: ReferenceError: skin_init is not defined",
+   "<player>: UpdateMetadata(); failed: ReferenceError: UpdateMetadata is not defined"
+  ]
+ },
+ {
+  "path": "raveworld/raveworld.wmz",
+  "md5": "288ce4a6c67b249f17fc6ff148176338",
+  "size": 247589,
+  "status": "partial",
+  "notes": [
+   "<player>: if(NewState==13){if (player.currentMedia.getItemInfo('Banner failed: ReferenceError: bannerVisible is not defined"
+  ]
+ },
+ {
+  "path": "saltmine/activate.wmz",
+  "md5": "3576f726d040ad27dfc057c5efd65d94",
+  "size": 522626,
+  "status": "works"
+ },
+ {
+  "path": "saltmine/anime.wmz",
+  "md5": "854f9e1912b86b5f14f7e31f672bedf4",
+  "size": 418253,
+  "status": "works"
+ },
+ {
+  "path": "saltmine/Erektorset.wmz",
+  "md5": "cc942976ed3b741d47db2c0e0c22e3b8",
+  "size": 192389,
+  "status": "works"
+ },
+ {
+  "path": "saltmine/Kids.wmz",
+  "md5": "aa356b337bc3446a77dd6d7e0b137451",
+  "size": 139418,
+  "status": "partial",
+  "notes": [
+   "<player>: OnOpenStateChange(); failed: ReferenceError: OnOpenStateChange is not defined",
+   "<player>: OnPlayStateChange(); failed: ReferenceError: OnPlayStateChange is not defined"
+  ]
+ },
+ {
+  "path": "saltmine/Military.wmz",
+  "md5": "d670e2231d2d57427c53156e79284920",
+  "size": 404473,
+  "status": "partial",
+  "notes": [
+   "<player>: OnOpenStateChange(); failed: ReferenceError: bClose is not defined"
+  ]
+ },
+ {
+  "path": "saltmine/Nautical.wmz",
+  "md5": "7199ea56cfafd7afd7597d455c0be94e",
+  "size": 1525231,
+  "status": "works"
+ },
+ {
+  "path": "saltmine/Sports.wmz",
+  "md5": "11f95d818758951b202eebd994400c02",
+  "size": 337264,
+  "status": "works"
+ },
+ {
+  "path": "saltmine/Stealth.wmz",
+  "md5": "1d013ae391bd9be36b491359651b2ba4",
+  "size": 53331,
+  "status": "partial",
+  "notes": [
+   "unknown element <visualization>, skipped",
+   "drawer_video: toggleEqVis() failed: ReferenceError: toggleEqVis is not defined",
+   "drawer_visualization: toggleEqVis() failed: ReferenceError: toggleEqVis is not defined"
+  ]
+ },
+ {
+  "path": "saltmine/Television.wmz",
+  "md5": "bf9b60e9ce1562c58ba379cca2b741e7",
+  "size": 203220,
+  "status": "works"
+ },
+ {
+  "path": "saltmine/Thomas.wmz",
+  "md5": "d0b57c3cefce99ae92c549f1a404ec67",
+  "size": 981574,
+  "status": "works"
+ },
+ {
+  "path": "shapecoil/Israeli.wmz",
+  "md5": "575693a680592f4fc91bb7c4c7ff6a23",
+  "size": 138815,
+  "status": "partial",
+  "notes": [
+   "<view>: Init(); failed: ReferenceError: pl is not defined",
+   "<player>: OnOpenStateChange(); failed: ReferenceError: metadata is not defined",
+   "<player>: OnPlayStateChange(); failed: ReferenceError: bPlay is not defined"
+  ]
+ },
+ {
+  "path": "skinwerkz/border.wmz",
+  "md5": "399a266369697ac25740991d86d408ec",
+  "size": 45672,
+  "status": "partial",
+  "notes": [
+   "no play control",
+   "no stop or pause control"
+  ]
+ },
+ {
+  "path": "skinwerkz/Creed.wmz",
+  "md5": "364922ce51d5c18407e6fff37b9ea6f9",
+  "size": 749103,
+  "status": "partial",
+  "notes": [
+   "missing image ScreenMain.bmp",
+   "missing image CreedGlowing.gif",
+   "MainPlayer: Init(); failed: ReferenceError: OnOpenStateChange is not defined"
+  ]
+ },
+ {
+  "path": "skinwerkz/Deadside.wmz",
+  "md5": "35d92930d605461a43f87d49405ec02e",
+  "size": 44941,
+  "status": "broken",
+  "notes": [
+   "drew nothing"
+  ]
+ },
+ {
+  "path": "skinwerkz/Gold.wmz",
+  "md5": "0feb5a00e3d4c2083334ccdc1d86a91e",
+  "size": 450887,
+  "status": "partial",
+  "notes": [
+   "shows 5168 pixels of key colour #FF00FF"
+  ]
+ },
+ {
+  "path": "skinwerkz/Main_Street.wmz",
+  "md5": "041f3bb3c480a9f224aa641c1926d4a8",
+  "size": 202768,
+  "status": "partial",
+  "notes": [
+   "shows 36144 pixels of key colour #FF00FF"
+  ]
+ },
+ {
+  "path": "skinwerkz/Mandalay.wmz",
+  "md5": "a24ee6bfee6fbe56657b98a0b0bd83ff",
+  "size": 364556,
+  "status": "partial",
+  "notes": [
+   "missing image back1.bmp"
+  ]
+ },
+ {
+  "path": "skinwerkz/Navigator.wmz",
+  "md5": "8086e2b85f88837d7c7ea9e42e1b6150",
+  "size": 139014,
+  "status": "partial",
+  "notes": [
+   "missing image scr_left.bmp",
+   "missing image scr_right.bmp"
+  ]
+ },
+ {
+  "path": "skinwerkz/Raptor.wmz",
+  "md5": "baa4369ad3be9337517eef89e57e7083",
+  "size": 279891,
+  "status": "partial",
+  "notes": [
+   "shows 11406 pixels of key colour #FF00FF",
+   "<player>: OnOpenStateChange(); failed: ReferenceError: bClose is not defined"
+  ]
+ },
+ {
+  "path": "skinwerkz/The_Doobie_Brothers.wmz",
+  "md5": "32b05f6dc541cc7a296c61b8e989930d",
+  "size": 823796,
+  "status": "partial",
+  "notes": [
+   "shows 86671 pixels of key colour #FF00FF",
+   "missing image shim.bmp"
+  ]
+ },
+ {
+  "path": "skinwerkz/TwinBlade.wmz",
+  "md5": "fe048d199c0b4c3b572a88a0594fbf66",
+  "size": 117953,
+  "status": "works"
+ },
+ {
+  "path": "skinwerkz/Ursula.wmz",
+  "md5": "35bd3c39d82cf016cd9681a9c79187e1",
+  "size": 302361,
+  "status": "works"
+ },
+ {
+  "path": "skinwerkz/Utomjording.wmz",
+  "md5": "d3349a5fb3479f315eb55383c7e6b285",
+  "size": 198515,
+  "status": "partial",
+  "notes": [
+   "shows 813 pixels of key colour #FF00FF",
+   "missing image presetsmap.bmp",
+   "missing image presets.bmp",
+   "<player>: OnOpenStateChange(); failed: ReferenceError: artist is not defined"
+  ]
+ },
+ {
+  "path": "skinwerkz/v2_underworld.wmz",
+  "md5": "618f327dafd640af9a2bf07c94feff0c",
+  "size": 540831,
+  "status": "works"
+ },
+ {
+  "path": "skinwerkz/Vario.wmz",
+  "md5": "5f6a52729db5bfbdb2b0fbff81755456",
+  "size": 265758,
+  "status": "works"
+ },
+ {
+  "path": "sonypictures/Spider-man.wmz",
+  "md5": "f6a0cb805a093df2f0b4d7ac6a06af3d",
+  "size": 278187,
+  "status": "works"
+ },
+ {
+  "path": "supersoni/Faith Hill.wmz",
+  "md5": "ee4dea66a8bff106946fe677c778e446",
+  "size": 404682,
+  "status": "works"
+ },
+ {
+  "path": "tattoomedia/Heart_Butterfly.wmz",
+  "md5": "5140b032599ba1bc445944e0d58cffa4",
+  "size": 117799,
+  "status": "partial",
+  "notes": [
+   "<view>: Init(); failed: ReferenceError: pl is not defined"
+  ]
+ },
+ {
+  "path": "tattoomedia/holiday_skin.wmz",
+  "md5": "19b8edea36a230480774c07b793e45a2",
+  "size": 653223,
+  "status": "partial",
+  "notes": [
+   "<player>: OnOpenStateChange(); failed: ReferenceError: MediaOpen is not defined"
+  ]
+ },
+ {
+  "path": "tattoomedia/Josie_and_the_Pussycats.wmz",
+  "md5": "4fdc9c2f910f953803f94ce1cea90068",
+  "size": 171437,
+  "status": "partial",
+  "notes": [
+   "<view>: Init(); failed: ReferenceError: pl is not defined"
+  ]
+ },
+ {
+  "path": "theskinsfactory/Age_of_Mythology_MP7.wmz",
+  "md5": "fc020f4bb1415a5439c04ae5adfbafc6",
+  "size": 1562237,
+  "status": "partial",
+  "notes": [
+   "shows 16899 pixels of key colour #FF00FF",
+   "<player>: checkPlayerMediaGlobal() failed: ReferenceError: checkPlayerMediaGlobal is not defined"
+  ]
+ },
+ {
+  "path": "theskinsfactory/AlienMorph.wmz",
+  "md5": "dc7a48fe61526b38e17f37469e814c00",
+  "size": 9792590,
+  "status": "broken",
+  "notes": [
+   "drew nothing"
+  ]
+ },
+ {
+  "path": "theskinsfactory/Alienware_Darkstar_WMP11.wmz",
+  "md5": "ef33ab1035dc2566c1a2f5e1df2cf3be",
+  "size": 10002235,
+  "status": "broken",
+  "notes": [
+   "drew nothing"
+  ]
+ },
+ {
+  "path": "theskinsfactory/Alienware_Invader_by_The_Skins_Factory.wmz",
+  "md5": "78891a3e9f23e7cafc77614bd8c47a52",
+  "size": 60530991,
+  "status": "broken",
+  "notes": [
+   "drew nothing"
+  ]
+ },
+ {
+  "path": "theskinsfactory/AlienwareTeleport.wmz",
+  "md5": "499403d5947fb054877255d66013985e",
+  "size": 9792568,
+  "status": "broken",
+  "notes": [
+   "drew nothing"
+  ]
+ },
+ {
+  "path": "theskinsfactory/ALXMorph.wmz",
+  "md5": "408c78924ebc404e36afa45470ba819e",
+  "size": 15152048,
+  "status": "broken",
+  "notes": [
+   "drew nothing"
+  ]
+ },
+ {
+  "path": "theskinsfactory/ALXVortex.wmz",
+  "md5": "468e99f43e8b46173a92f1d134ffd3b2",
+  "size": 15152748,
+  "status": "broken",
+  "notes": [
+   "drew nothing"
+  ]
+ },
+ {
+  "path": "theskinsfactory/amped2.wmz",
+  "md5": "6bcbb61ae1018361e670f4f8a0b89bb4",
+  "size": 806908,
+  "status": "works"
+ },
+ {
+  "path": "theskinsfactory/Arizona Diamondbacks XP.wmz",
+  "md5": "374620ec7a4287ef91cfbfd191894190",
+  "size": 1285806,
+  "status": "partial",
+  "notes": [
+   "shows 507 pixels of key colour #FF00FF"
+  ]
+ },
+ {
+  "path": "theskinsfactory/Back to the Future Trilogy.wmz",
+  "md5": "e91293eb8f5b3fe921ee5e2b497026d9",
+  "size": 1639408,
+  "status": "partial",
+  "notes": [
+   "shows 1696 pixels of key colour #FF00FF",
+   "enablesplinetension=\"wmpprop:eq.enableSplineTension\" could not be worked out, ignored"
+  ]
+ },
+ {
+  "path": "theskinsfactory/Batman Begins.wmz",
+  "md5": "01f1755df7baddf8c7b97cbc8083edbe",
+  "size": 13880708,
+  "status": "broken",
+  "notes": [
+   "drew nothing"
+  ]
+ },
+ {
+  "path": "theskinsfactory/Blinx.wmz",
+  "md5": "1ae091d972d0eca4f5e4736515cd1168",
+  "size": 1379182,
+  "status": "partial",
+  "notes": [
+   "shows 1101 pixels of key colour #FF00FF"
+  ]
+ },
+ {
+  "path": "theskinsfactory/BlueCrush_MP7.wmz",
+  "md5": "03cc04b1a99f44b6e00f093efa6be03c",
+  "size": 1025425,
+  "status": "partial",
+  "notes": [
+   "<player>: checkPlayerState() failed: ReferenceError: shutterOn is not defined"
+  ]
+ },
+ {
+  "path": "theskinsfactory/BlueCrush_MPXP.wmz",
+  "md5": "b51d3f8850ab4981274e8844e159980e",
+  "size": 1047709,
+  "status": "partial",
+  "notes": [
+   "missing image screen_glare.png",
+   "<player>: checkPlayerState() failed: ReferenceError: shutterOn is not defined"
+  ]
+ },
+ {
+  "path": "theskinsfactory/Brilliant Black.wmz",
+  "md5": "c07625076673501e30af449a255e3cdb",
+  "size": 3475779,
+  "status": "broken",
+  "notes": [
+   "drew nothing"
+  ]
+ },
+ {
+  "path": "theskinsfactory/bruteforce.wmz",
+  "md5": "06c782eccdeacc29356874c2e6aafd87",
+  "size": 1670228,
+  "status": "partial",
+  "notes": [
+   "shows 317 pixels of key colour #FF00FF"
+  ]
+ },
+ {
+  "path": "theskinsfactory/Catwoman.wmz",
+  "md5": "ba798d2e6e071e2c73bfa6a0d6395a76",
+  "size": 4048814,
+  "status": "broken",
+  "notes": [
+   "drew nothing"
+  ]
+ },
+ {
+  "path": "theskinsfactory/Constantine.wmz",
+  "md5": "ea5d317f3eade6371d2d35b4676856dc",
+  "size": 4623036,
+  "status": "broken",
+  "notes": [
+   "drew nothing"
+  ]
+ },
+ {
+  "path": "theskinsfactory/Crimson_Skies.wmz",
+  "md5": "f91859b465d113196edf50fb955eef99",
+  "size": 1941317,
+  "status": "broken",
+  "notes": [
+   "drew nothing"
+  ]
+ },
+ {
+  "path": "theskinsfactory/Darkling.wmz",
+  "md5": "62acda0cd8b7615f1605d4a0633caeb5",
+  "size": 4501353,
+  "status": "partial",
+  "notes": [
+   "unknown element <editbox>, skipped"
+  ]
+ },
+ {
+  "path": "theskinsfactory/deepbluesomething.wmz",
+  "md5": "b60c81695a499e33fbed12976e2dca80",
+  "size": 1089899,
+  "status": "partial",
+  "notes": [
+   "shows 60794 pixels of key colour #FF00FF",
+   "missing image about.bmp",
+   "<player>: JScript:onPlayStateChange(); failed: ReferenceError: updateMetadata is not defined"
+  ]
+ },
+ {
+  "path": "theskinsfactory/Disney_Mix_Central.wmz",
+  "md5": "72856c4ed65e8f307aa7bed4276c397f",
+  "size": 4969794,
+  "status": "broken",
+  "notes": [
+   "drew nothing"
+  ]
+ },
+ {
+  "path": "theskinsfactory/Dreamcatcher.wmz",
+  "md5": "c2c4a956043b68cc070d452d3b6f538c",
+  "size": 2896539,
+  "status": "broken",
+  "notes": [
+   "drew nothing"
+  ]
+ },
+ {
+  "path": "theskinsfactory/Energy Blue.wmz",
+  "md5": "a57104efad8ccbca288a8aaf241db310",
+  "size": 1310333,
+  "status": "broken",
+  "notes": [
+   "drew nothing"
+  ]
+ },
+ {
+  "path": "theskinsfactory/Frostbite.wmz",
+  "md5": "3899b1b3af7e0d9dc4f2f94220a3759b",
+  "size": 517811,
+  "status": "broken",
+  "notes": [
+   "drew nothing"
+  ]
+ },
+ {
+  "path": "theskinsfactory/Ginger Man.wmz",
+  "md5": "8d687959ecb6ab64795855f64c2afb8e",
+  "size": 403439,
+  "status": "partial",
+  "notes": [
+   "shows 1196 pixels of key colour #FF00FF"
+  ]
+ },
+ {
+  "path": "theskinsfactory/Ginger_woman.wmz",
+  "md5": "50d7b652585744f49ec6ce73f702af82",
+  "size": 479624,
+  "status": "partial",
+  "notes": [
+   "shows 4952 pixels of key colour #FF00FF"
+  ]
+ },
+ {
+  "path": "theskinsfactory/Halloween.wmz",
+  "md5": "d0fd30c7bedfccffe81de5f59eab2871",
+  "size": 677914,
+  "status": "works"
+ },
+ {
+  "path": "theskinsfactory/Halo 2.wmz",
+  "md5": "6e3b54ad1c3430fd5560bb8ba4af9fd6",
+  "size": 5239082,
+  "status": "broken",
+  "notes": [
+   "drew nothing"
+  ]
+ },
+ {
+  "path": "theskinsfactory/Harry_Potter_and_the_Chamber_of_Secrets.wmz",
+  "md5": "0e65851544ed486b7d6ddf57515b35ba",
+  "size": 1729815,
+  "status": "partial",
+  "notes": [
+   "shows 3668 pixels of key colour #FF00FF"
+  ]
+ },
+ {
+  "path": "theskinsfactory/Ice.wmz",
+  "md5": "aebd808d1a33791eb8e220f8c2aa262e",
+  "size": 641080,
+  "status": "partial",
+  "notes": [
+   "shows 3940 pixels of key colour #FF00FF"
+  ]
+ },
+ {
+  "path": "theskinsfactory/ILO.wmz",
+  "md5": "8797dca306d206682119be1d56f2f9eb",
+  "size": 338457,
+  "status": "broken",
+  "notes": [
+   "drew nothing"
+  ]
+ },
+ {
+  "path": "theskinsfactory/Jewel.wmz",
+  "md5": "c493ae6e26362515ee8d8325c569d14a",
+  "size": 627860,
+  "status": "broken",
+  "notes": [
+   "drew nothing"
+  ]
+ },
+ {
+  "path": "theskinsfactory/Kakuto Chojin.wmz",
+  "md5": "a3121b9c322062470d000d5a6a1fae9e",
+  "size": 1930201,
+  "status": "works"
+ },
+ {
+  "path": "theskinsfactory/Kenwood_MP7.wmz",
+  "md5": "eca0a2463a37a80e680873978b092460",
+  "size": 1245871,
+  "status": "works"
+ },
+ {
+  "path": "theskinsfactory/Kenwood_MPXP.wmz",
+  "md5": "9b96e3d13d2f4af065278f60b5719b24",
+  "size": 1245780,
+  "status": "works"
+ },
+ {
+  "path": "theskinsfactory/KungFuChaos.wmz",
+  "md5": "a07c01ff3915c9314d825ceba8186df6",
+  "size": 3958354,
+  "status": "broken",
+  "notes": [
+   "drew nothing"
+  ]
+ },
+ {
+  "path": "theskinsfactory/livin_it_skate.wmz",
+  "md5": "0e11b31e2a62c90be46bff783355af9f",
+  "size": 7906220,
+  "status": "broken",
+  "notes": [
+   "drew nothing"
+  ]
+ },
+ {
+  "path": "theskinsfactory/Lollapalooza 2003.wmz",
+  "md5": "fed963caeb7af8fd0d3ebbc59d7defcd",
+  "size": 2779371,
+  "status": "broken",
+  "notes": [
+   "drew nothing"
+  ]
+ },
+ {
+  "path": "theskinsfactory/LostPlanet.wmz",
+  "md5": "2ea8946a45fca13553e9730ac3fc8273",
+  "size": 6528139,
+  "status": "broken",
+  "notes": [
+   "drew nothing"
+  ]
+ },
+ {
+  "path": "theskinsfactory/Major League Basebal XP.wmz",
+  "md5": "7cdeab639f1cda51268e36c37430d450",
+  "size": 1421853,
+  "status": "partial",
+  "notes": [
+   "shows 507 pixels of key colour #FF00FF"
+  ]
+ },
+ {
+  "path": "theskinsfactory/Medal of Honor Airborne.wmz",
+  "md5": "eb72264eea7933d3e42c13f0110feb2e",
+  "size": 591984,
+  "status": "broken",
+  "notes": [
+   "drew nothing"
+  ]
+ },
+ {
+  "path": "theskinsfactory/NASCARPC.wmz",
+  "md5": "fd875f154821433cb9fa93c5cbcea4e6",
+  "size": 5736071,
+  "status": "broken",
+  "notes": [
+   "drew nothing"
+  ]
+ },
+ {
+  "path": "theskinsfactory/Need_for_Speed_Underground.wmz",
+  "md5": "6c3e68a2e61b88188bdd3f7ee205b93a",
+  "size": 5198765,
+  "status": "broken",
+  "notes": [
+   "drew nothing"
+  ]
+ },
+ {
+  "path": "theskinsfactory/New York Yankees XP.wmz",
+  "md5": "61a3e784eab148a8dbef2711c69279a3",
+  "size": 1324887,
+  "status": "partial",
+  "notes": [
+   "shows 507 pixels of key colour #FF00FF"
+  ]
+ },
+ {
+  "path": "theskinsfactory/NVIDIA.wmz",
+  "md5": "219c83380cf6abe70982c4664f990aad",
+  "size": 5547144,
+  "status": "broken",
+  "notes": [
+   "drew nothing"
+  ]
+ },
+ {
+  "path": "theskinsfactory/Official_Xbox_MP71.wmz",
+  "md5": "5b65c1921e5ca022d6f2892b450b776b",
+  "size": 973285,
+  "status": "partial",
+  "notes": [
+   "mainBox: mainLoader(); failed: ReferenceError: videoWin is not defined",
+   "mainBox: resetCode() failed: TypeError: Cannot set properties of undefined (setting 'keycode')",
+   "animTrigger: pullAnimation(); failed: ReferenceError: mainIntro is not defined"
+  ]
+ },
+ {
+  "path": "theskinsfactory/Official_Xbox_XP.wmz",
+  "md5": "4425dd3106a5e53a85af55c57160b87e",
+  "size": 1592692,
+  "status": "broken",
+  "notes": [
+   "drew nothing"
+  ]
+ },
+ {
+  "path": "theskinsfactory/Plus! Bionic Dot.wmz",
+  "md5": "8f3ddcd6f90bbdd4a85b4b6e6037c3e4",
+  "size": 1092508,
+  "status": "partial",
+  "notes": [
+   "shows 1813 pixels of key colour #FF00FF"
+  ]
+ },
+ {
+  "path": "theskinsfactory/Plus! Mecha.wmz",
+  "md5": "15b37487f2930fcb6491bc58adfa3084",
+  "size": 699426,
+  "status": "broken",
+  "notes": [
+   "drew nothing"
+  ]
+ },
+ {
+  "path": "theskinsfactory/Plus!_The_Bionic_Dot.wmz",
+  "md5": "6ac91bb326c2f7dfc76fe270048bcd21",
+  "size": 940132,
+  "status": "partial",
+  "notes": [
+   "shows 1813 pixels of key colour #FF00FF"
+  ]
+ },
+ {
+  "path": "theskinsfactory/portals.wmz",
+  "md5": "e23d9652bdd29b783fd634b011c61661",
+  "size": 844793,
+  "status": "works"
+ },
+ {
+  "path": "theskinsfactory/Project Gotham Racing 2.wmz",
+  "md5": "b169006e18a7f2d488339dcc8c892ac7",
+  "size": 1092167,
+  "status": "partial",
+  "notes": [
+   "shows 378 pixels of key colour #FF00FF"
+  ]
+ },
+ {
+  "path": "theskinsfactory/QuantumRedshiftWMPSkin.wmz",
+  "md5": "d7cf04ad21494d8d82a2376c9511e74e",
+  "size": 1469691,
+  "status": "works"
+ },
+ {
+  "path": "theskinsfactory/QuickSilver (2).wmz",
+  "md5": "201920feea0de95160e5e04bb343d234",
+  "size": 916798,
+  "status": "broken",
+  "notes": [
+   "drew nothing"
+  ]
+ },
+ {
+  "path": "theskinsfactory/QuickSilver.wmz",
+  "md5": "a7be856baaddacaff555899dfaa7a177",
+  "size": 911548,
+  "status": "broken",
+  "notes": [
+   "drew nothing"
+  ]
+ },
+ {
+  "path": "theskinsfactory/Rave-MP.wmz",
+  "md5": "5019c31b35b02033a44afb3298335434",
+  "size": 1401572,
+  "status": "broken",
+  "notes": [
+   "drew nothing"
+  ]
+ },
+ {
+  "path": "theskinsfactory/RCT3.wmz",
+  "md5": "7c77719d6daaa531a76c25356692446c",
+  "size": 3915059,
+  "status": "broken",
+  "notes": [
+   "drew nothing"
+  ]
+ },
+ {
+  "path": "theskinsfactory/Scooby-Doo_2.wmz",
+  "md5": "208e253e2b7cc9b5829470c7bfd6978c",
+  "size": 2384832,
+  "status": "broken",
+  "notes": [
+   "drew nothing"
+  ]
+ },
+ {
+  "path": "theskinsfactory/Secura.wmz",
+  "md5": "762095b0e4bf14cf8dceb69d25a77c34",
+  "size": 819535,
+  "status": "partial",
+  "notes": [
+   "<player>: JScript:onPlayStateChange(); failed: ReferenceError: updateMetadata is not defined"
+  ]
+ },
+ {
+  "path": "theskinsfactory/Smart Display Blue.wmz",
+  "md5": "24f2cddf39485d58d9ef9370165acb30",
+  "size": 965930,
+  "status": "broken",
+  "notes": [
+   "drew nothing"
+  ]
+ },
+ {
+  "path": "theskinsfactory/Smart Display Silver.wmz",
+  "md5": "7d04ff9a8b8f35da22735332702528de",
+  "size": 938605,
+  "status": "broken",
+  "notes": [
+   "drew nothing"
+  ]
+ },
+ {
+  "path": "theskinsfactory/Sony Ericsson.wmz",
+  "md5": "c30e349eb924e613305ce0cd450d9e58",
+  "size": 6000570,
+  "status": "broken",
+  "notes": [
+   "drew nothing"
+  ]
+ },
+ {
+  "path": "theskinsfactory/SplinterCellWMPSkin.wmz",
+  "md5": "51b2fd1852adae37a90d0476e33b0668",
+  "size": 994893,
+  "status": "partial",
+  "notes": [
+   "shows 5156 pixels of key colour #FF00FF"
+  ]
+ },
+ {
+  "path": "theskinsfactory/STALKER.wmz",
+  "md5": "1b62e70a19bf6d39bb49c06847ad8dcd",
+  "size": 3533248,
+  "status": "broken",
+  "notes": [
+   "drew nothing"
+  ]
+ },
+ {
+  "path": "theskinsfactory/Star Wars.wmz",
+  "md5": "af601f84c48b8cc995275a69128e2b48",
+  "size": 3090513,
+  "status": "broken",
+  "notes": [
+   "drew nothing"
+  ]
+ },
+ {
+  "path": "theskinsfactory/Stars and Stripes.wmz",
+  "md5": "0fd588c6c0c4f47d78303b2c66ded3eb",
+  "size": 1322961,
+  "status": "partial",
+  "notes": [
+   "shows 11475 pixels of key colour #FF00FF"
+  ]
+ },
+ {
+  "path": "theskinsfactory/Superman.wmz",
+  "md5": "f74b8a8490c177cfe217bb6db14a1e4d",
+  "size": 847003,
+  "status": "broken",
+  "notes": [
+   "drew nothing"
+  ]
+ },
+ {
+  "path": "theskinsfactory/T3-Skynet_Media_Player.wmz",
+  "md5": "1e4fc9cb9bae6edf1671a8222de63340",
+  "size": 2448660,
+  "status": "broken",
+  "notes": [
+   "drew nothing"
+  ]
+ },
+ {
+  "path": "theskinsfactory/TDK Digital Mixmaster.wmz",
+  "md5": "da2a794c2fd31e6c085d841a14c65f88",
+  "size": 740743,
+  "status": "partial",
+  "notes": [
+   "module_main: init(); failed: ReferenceError: playlist_frame is not defined",
+   "value=\"wmpprop:Player.controls.currentPositionString\" could not be worked out, ignored"
+  ]
+ },
+ {
+  "path": "theskinsfactory/TDK.wmz",
+  "md5": "da2a794c2fd31e6c085d841a14c65f88",
+  "size": 740743,
+  "status": "partial",
+  "notes": [
+   "module_main: init(); failed: ReferenceError: playlist_frame is not defined",
+   "value=\"wmpprop:Player.controls.currentPositionString\" could not be worked out, ignored"
+  ]
+ },
+ {
+  "path": "theskinsfactory/The Battle for Middle-Earth.wmz",
+  "md5": "2be0d55c543d15bdb12ff2a04147cb46",
+  "size": 5102546,
+  "status": "broken",
+  "notes": [
+   "drew nothing"
+  ]
+ },
+ {
+  "path": "theskinsfactory/The Movies.wmz",
+  "md5": "00943379aa20918b8bf0ff569e321ed9",
+  "size": 2681027,
+  "status": "broken",
+  "notes": [
+   "drew nothing"
+  ]
+ },
+ {
+  "path": "theskinsfactory/The Sentinel.wmz",
+  "md5": "e11349aa71af1416853fd28931164152",
+  "size": 945252,
+  "status": "partial",
+  "notes": [
+   "missing image yes_on.gif",
+   "mainModule: init(); failed: ReferenceError: PlaylistFrame is not defined"
+  ]
+ },
+ {
+  "path": "theskinsfactory/The_Last_Samurai.wmz",
+  "md5": "ded3497420e0f5eb4fcbf8b229a9d8d5",
+  "size": 3130950,
+  "status": "broken",
+  "notes": [
+   "drew nothing"
+  ]
+ },
+ {
+  "path": "theskinsfactory/The_Sentinel_v.1.0.wmz",
+  "md5": "e11349aa71af1416853fd28931164152",
+  "size": 945252,
+  "status": "partial",
+  "notes": [
+   "missing image yes_on.gif",
+   "mainModule: init(); failed: ReferenceError: PlaylistFrame is not defined"
+  ]
+ },
+ {
+  "path": "theskinsfactory/The_Unit_v3.wmz",
+  "md5": "5750db0f05be28c1862f9fa83073cad6",
+  "size": 1073598,
+  "status": "works"
+ },
+ {
+  "path": "theskinsfactory/TheUnit.wmz",
+  "md5": "ec97efb5abd0f18fd99814b80d8dd0b8",
+  "size": 1068277,
+  "status": "works"
+ },
+ {
+  "path": "theskinsfactory/TripleX for 7.1.wmz",
+  "md5": "7c698904ba6d12d8341eac3bda268d29",
+  "size": 1613808,
+  "status": "broken",
+  "notes": [
+   "drew nothing"
+  ]
+ },
+ {
+  "path": "theskinsfactory/US Air Force.wmz",
+  "md5": "37e107fdf0b01b26be9bd82eed3e2b28",
+  "size": 1340370,
+  "status": "partial",
+  "notes": [
+   "shows 11475 pixels of key colour #FF00FF"
+  ]
+ },
+ {
+  "path": "theskinsfactory/US Army.wmz",
+  "md5": "456a4878b7f5aca575e5778c3d59ba58",
+  "size": 1173725,
+  "status": "partial",
+  "notes": [
+   "shows 11475 pixels of key colour #FF00FF",
+   "MainPlayer: Init(); failed: ReferenceError: gears is not defined",
+   "<player>: JScript:onPlayStateChange(); failed: ReferenceError: gears is not defined"
+  ]
+ },
+ {
+  "path": "theskinsfactory/US Coast Guard.wmz",
+  "md5": "55db5a8f830300b5e4d759b61d776153",
+  "size": 1409933,
+  "status": "partial",
+  "notes": [
+   "shows 11475 pixels of key colour #FF00FF"
+  ]
+ },
+ {
+  "path": "theskinsfactory/US Marine Corps.wmz",
+  "md5": "9e71cd36818f8a8b82974a4feebc03c4",
+  "size": 1407237,
+  "status": "partial",
+  "notes": [
+   "shows 11475 pixels of key colour #FF00FF"
+  ]
+ },
+ {
+  "path": "theskinsfactory/US Navy.wmz",
+  "md5": "30790bfb104020487e2951bb4de32a18",
+  "size": 1404113,
+  "status": "partial",
+  "notes": [
+   "shows 11475 pixels of key colour #FF00FF",
+   "MainPlayer: Init(); failed: ReferenceError: gears is not defined",
+   "<player>: JScript:onPlayStateChange(); failed: ReferenceError: gears is not defined"
+  ]
+ },
+ {
+  "path": "theskinsfactory/WALL-E.wmz",
+  "md5": "05465c0a2ec3db20c5859eed7d951b04",
+  "size": 1023802,
+  "status": "broken",
+  "notes": [
+   "drew nothing"
+  ]
+ },
+ {
+  "path": "theskinsfactory/Washington Redskins.wmz",
+  "md5": "d307a815abba1864873c5fbd92d446e1",
+  "size": 17092361,
+  "status": "broken",
+  "notes": [
+   "drew nothing"
+  ]
+ },
+ {
+  "path": "theskinsfactory/Windows_XP_Media_Center_Edition_-_Enhanced_for_XPS9.wmz",
+  "md5": "56546c196b115a2bbc3db52dec186ee0",
+  "size": 2621419,
+  "status": "partial",
+  "notes": [
+   "shows 265 pixels of key colour #FF00FF"
+  ]
+ },
+ {
+  "path": "theskinsfactory/Windows_XP_Media_Center_Edition.wmz",
+  "md5": "d71ee64ebb09826caafd3262b64b7443",
+  "size": 2067817,
+  "status": "partial",
+  "notes": [
+   "shows 265 pixels of key colour #FF00FF"
+  ]
+ },
+ {
+  "path": "theskinsfactory/WindowsMediaCenter10.wmz",
+  "md5": "a5756d10919da528cadc1eceff1f8a09",
+  "size": 1867822,
+  "status": "broken",
+  "notes": [
+   "drew nothing"
+  ]
+ },
+ {
+  "path": "theskinsfactory/wmp10_reload.wmz",
+  "md5": "6be9bdde3acfbc27c9bfaa02d19986dc",
+  "size": 497628,
+  "status": "broken",
+  "notes": [
+   "drew nothing"
+  ]
+ },
+ {
+  "path": "theskinsfactory/WoW.wmz",
+  "md5": "b55a1667c71ccfbee5fcce73360b5b75",
+  "size": 3344639,
+  "status": "broken",
+  "notes": [
+   "drew nothing"
+  ]
+ },
+ {
+  "path": "theskinsfactory/WWC.wmz",
+  "md5": "76f92d28ef233c659c430d098a0c46f6",
+  "size": 1573025,
+  "status": "partial",
+  "notes": [
+   "shows 7974 pixels of key colour #FF00FF"
+  ]
+ },
+ {
+  "path": "theskinsfactory/WWN_mp7.wmz",
+  "md5": "321fbccf1b03ec09df1a6ea4466ff261",
+  "size": 1046756,
+  "status": "broken",
+  "notes": [
+   "drew nothing"
+  ]
+ },
+ {
+  "path": "theskinsfactory/WWN_xp.wmz",
+  "md5": "c8d485974222e340550bbda69a68ab64",
+  "size": 830110,
+  "status": "broken",
+  "notes": [
+   "drew nothing"
+  ]
+ },
+ {
+  "path": "theskinsfactory/Xbox Live Skin.wmz",
+  "md5": "f5c485f403cef0a1aa30294f57cea82b",
+  "size": 2723546,
+  "status": "broken",
+  "notes": [
+   "drew nothing"
+  ]
+ },
+ {
+  "path": "theskinsfactory/XBOX_Music_Mixer.wmz",
+  "md5": "1c9e678a8ce0b1b8943f877ce70be70c",
+  "size": 1350420,
+  "status": "broken",
+  "notes": [
+   "drew nothing"
+  ]
+ },
+ {
+  "path": "theskinsfactory/XBOX.wmz",
+  "md5": "66c354d1c4279f2092943c6c137e7746",
+  "size": 1595395,
+  "status": "broken",
+  "notes": [
+   "drew nothing"
+  ]
+ },
+ {
+  "path": "theskinsfactory/xsn_sports.wmz",
+  "md5": "e3661218cabd5c80557c682447312892",
+  "size": 2875235,
+  "status": "broken",
+  "notes": [
+   "drew nothing"
+  ]
+ },
+ {
+  "path": "theskinsfactory/xXx_night_vision_redx.wmz",
+  "md5": "c069dcace43a81ec53d09f576d2bafc0",
+  "size": 1806668,
+  "status": "broken",
+  "notes": [
+   "drew nothing"
+  ]
+ },
+ {
+  "path": "universalhomevideo/Grinch.wmz",
+  "md5": "2f4caaa33849eb46105e71d9104d340f",
+  "size": 432090,
+  "status": "partial",
+  "notes": [
+   "<view>: Init(); failed: ReferenceError: equalizersettings is not defined"
+  ]
+ },
+ {
+  "path": "wotch/Ducky.wmz",
+  "md5": "6943dda9e3d365cca53855711e663372",
+  "size": 117459,
+  "status": "partial",
+  "notes": [
+   "shows 32047 pixels of key colour #FF00FF",
+   "<view>: OnTimerTick(); failed: ReferenceError: tracktime is not defined"
+  ]
+ }
+]

@@ -16,8 +16,8 @@ async function decodeImage(bytes: Uint8Array): Promise<Img> {
   return { width: bitmap.width, height: bitmap.height, data, bitmap };
 }
 
-async function load(): Promise<Skin> {
-  const res = await fetch("/skin.wmz");
+async function load(url: string): Promise<Skin> {
+  const res = await fetch(url);
   if (!res.ok) throw new Error(`no skin to load (${res.status})`);
   const files = await unzip(new Uint8Array(await res.arrayBuffer()));
   const wms = [...files.keys()].find((name) => name.endsWith(".wms"));
@@ -37,8 +37,15 @@ async function load(): Promise<Skin> {
   return new Skin(parse(decode(files.get(wms)!)), images, send, scripts, `pref:${wms}:`);
 }
 
+// A right click opens the skin picker, as WMP's menu offered its skin chooser.
+window.addEventListener("contextmenu", (e) => {
+  e.preventDefault();
+  send({ type: "picker" });
+});
+
+// A skin the engine cannot load gives way to the house skin (ATA-112).
 // A classic script has no top-level await.
-load().then(
+load("/skin.wmz").catch((e) => (console.warn(`skin: ${String(e)}; wearing the house skin`), load("/house.wmz"))).then(
   (skin) => {
     document.body.append(skin.canvas);
     skin.start();

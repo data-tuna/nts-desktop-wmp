@@ -9,6 +9,8 @@ export default defineConfig({
   //
   // 1. prevent Vite from obscuring rust errors
   clearScreen: false,
+  // The player and the skin picker (ATA-112).
+  build: { rolldownOptions: { input: ["index.html", "picker.html"] } },
   // 2. tauri expects a fixed port, fail if that port is not available.
   // 1430, not the Winamp app's 1420, so both can run `tauri dev` at once.
   server: {
