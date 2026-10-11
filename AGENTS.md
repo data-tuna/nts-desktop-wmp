@@ -34,7 +34,9 @@ Written in English.
                           live.ts reads the NTS live API; picks.ts and
                           mixtapes.ts parse the NTS Picks and Infinite
                           Mixtapes APIs. All three are copied from
-                          nts-desktop-winamp; see Gotchas.
+                          nts-desktop-winamp; see Gotchas. picker.ts is
+                          the skin picker (picker.html), a trusted page of
+                          its own.
     src/skin/             The skin engine, which runs in the skin webview:
                           wmz.ts unzips, wms.ts decodes and parses the .wms,
                           engine.ts lays out and paints the view, runs the
@@ -47,7 +49,12 @@ Written in English.
                           that renders them to bitmaps and zips house.wmz,
                           and house.wmz itself, committed and built into the
                           binary.
-    src-tauri/            The Rust shell (Tauri 2). Window config in tauri.conf.json,
+    skins/compatible.json Every .wmz in the archive.org item: path, md5,
+                          size, and works / partial / broken, with what the
+                          engine logged. Built by tools/compat.mjs; the app
+                          wears only "works". Never the skins themselves.
+    src-tauri/            The Rust shell (Tauri 2). skins.rs picks, downloads
+                          and caches the skin. Window config in tauri.conf.json,
                           permissions in capabilities/.
     src-tauri/icons/      App icons. For now the Winamp app's pixel-art radio.
     docs/decisions.md     Decisions, research findings, and why.
@@ -64,6 +71,7 @@ Written in English.
     npm run build         Frontend only: dist/, and the skin engine in dist-skin/
     npm run build:skin    The skin engine alone (dist-skin/engine.js)
     npm run build:house   Rebuild skins/house/house.wmz from its sources
+    node tools/compat.mjs Rebuild skins/compatible.json (downloads the item once; slow)
     npm test              node --test on tests/ (Node 22.18+ runs the .ts imports)
     npm run check         lint + typecheck + build + test; CI runs this plus cargo fmt
     npm run tauri build   Release binary and the NSIS installer (slow, minutes)
@@ -101,6 +109,8 @@ clock stuck for 10 s alike.
 
 **The app always opens on NTS 1 and plays it.** Volume, mute, balance and the
 EQ are remembered (`localStorage` in the trusted page); the channel is not.
+The skin picked in the picker is remembered too (`skin.json` beside the skin
+cache); with none picked, every launch wears a random working skin.
 
 **Skins are fetched at runtime and never committed.** `.wmz` skins are
 third-party works, and many of the classic ones are Microsoft's own. They
@@ -109,7 +119,11 @@ the user's machine, and never enter this repository or the installer
 (`.gitignore` blocks `*.wmz`). The repository may hold a compatibility list of
 skin names and checksums, never the skins. The only skin that ships is our
 own house skin, `skins/house/`, the one `.wmz` the repository holds. Be
-polite to archive.org: one skin per launch, no bulk downloads.
+polite to archive.org: one skin per launch, no bulk downloads. The app
+downloads at most one skin per launch, plus one for each skin the listener
+picks. `tools/compat.mjs` is the one bulk download, run by hand when the
+engine changes: it fetches each file once, a few seconds apart, into a cache
+outside the repository, and fetches only what is missing on a rerun.
 
 **Skin scripts never run where they can reach Tauri.** A skin's JScript is
 untrusted code. It runs only in the `skin` webview, which no capability
@@ -151,6 +165,16 @@ or the fallback.
 Without it the stream plays as silence while the clock runs.
 
 **archive.org downloads send no CORS headers.** Fetch skins through Rust.
+archive.org also answers 500 now and then for a file it serves a second
+later; `skins.rs` tries a failed download once more.
+
+**The compatibility list is only as good as its checks.** `tools/compat.mjs`
+marks a skin "works" when the engine draws it in headless Edge with no
+failed script, missing image or unknown element, the skin has play and stop
+(or pause) controls, and the canvas holds no more than 20 pixels of the key
+colour `#FF00FF`. It cannot see a skin that draws but looks wrong, so look
+at the screenshots it leaves next to the cached skins (`<md5>.png`). Rerun it
+after engine changes: `npm run build:skin`, then `node tools/compat.mjs`.
 
 **Tauri's asset protocol sends no CORS headers.** A frame with an opaque
 origin (`sandbox` without `allow-same-origin`) cannot load module scripts
@@ -226,7 +250,7 @@ Start it with WebView2's DevTools port open. The variable replaces the
 browser arguments in `tauri.conf.json`, so repeat them:
 
     $env:WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS = "--remote-debugging-port=9355 --disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection --autoplay-policy=no-user-gesture-required"
-    $env:NTS_WMP_SKIN = "C:\path\to\a\skin.wmz"      the skin to draw; unset, the house skin
+    $env:NTS_WMP_SKIN = "C:\path\to\a\skin.wmz"      the skin to draw; unset, the picked or a random one
     npm run tauri dev
 
 or, to keep the window off the screen entirely, start the built exe on a
@@ -284,6 +308,17 @@ yet.
 **The trusted page has no content security policy.** `tauri.conf.json` has
 `"csp": null`, the scaffold default. The skin protocol sends its own CSP
 (`SKIN_CSP` in `lib.rs`).
+
+**60 of the archive's 216 skins draw nothing yet.** Most are The Skins
+Factory's. 54 open on a view that only hands over to the player in a later
+one: a `previewView` for WMP's skin chooser, or a `mediaSwitcherView` or
+`versionView`. The engine draws only the first view (below), so
+`compatible.json` marks them broken until it opens others.
+
+**The picker shows no previews.** archive.org holds no preview image per
+skin (the item has one image for the whole collection), and screenshots of
+the skins are third-party works too, so none are committed. Picking a skin
+puts it on the window, which is the preview.
 
 **The icon is the Winamp app's.** Both apps look the same in the taskbar
 until this one gets its own.

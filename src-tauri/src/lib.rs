@@ -318,7 +318,11 @@ fn handle(app: &AppHandle, msg: FromSkin) {
                 open_url(&url);
             }
         }
-        FromSkin::Picker {} => open_picker(app),
+        FromSkin::Picker {} => {
+            // Building a window on the UI thread, where this handler runs, deadlocks.
+            let app = app.clone();
+            std::thread::spawn(move || open_picker(&app));
+        }
         other => {
             let _ = app.emit_to(EventTarget::webview("main"), "skin", other);
         }

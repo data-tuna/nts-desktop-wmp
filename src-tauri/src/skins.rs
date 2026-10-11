@@ -110,7 +110,17 @@ pub fn fetch(app: &AppHandle, skin: &Skin) -> Result<Vec<u8>, String> {
     Ok(bytes)
 }
 
+/// archive.org now and then answers 500 for a file it serves a second
+/// later, so a failed download is tried once more: still the same one skin.
 fn download(skin: &Skin) -> Result<Vec<u8>, String> {
+    download_once(skin).or_else(|e| {
+        eprintln!("{e}; trying once more");
+        std::thread::sleep(Duration::from_secs(1));
+        download_once(skin)
+    })
+}
+
+fn download_once(skin: &Skin) -> Result<Vec<u8>, String> {
     let url = item_url("https://archive.org/download", &skin.path);
     let tls = ureq::tls::TlsConfig::builder()
         .provider(ureq::tls::TlsProvider::NativeTls)
@@ -125,7 +135,13 @@ fn download(skin: &Skin) -> Result<Vec<u8>, String> {
     let bytes = agent
         .get(url.as_str())
         .call()
-        .and_then(|mut res| res.body_mut().with_config().limit(skin.size).read_to_vec())
+        // ureq refuses a body that reaches its limit, so one byte over the size.
+        .and_then(|mut res| {
+            res.body_mut()
+                .with_config()
+                .limit(skin.size + 1)
+                .read_to_vec()
+        })
         .map_err(|e| format!("{}: {e}", skin.path))?;
     if md5_hex(&bytes) != skin.md5 {
         return Err(format!("{}: checksum mismatch", skin.path));
@@ -289,5 +305,19 @@ mod tests {
         left.sort();
         fs::remove_dir_all(&dir).unwrap();
         assert_eq!(left, ["a.wmz", "b.wmz", "d.wmz", "notes.txt"]);
+    }
+}
+/// Reaches archive.org: `cargo test -- --ignored`.
+#[cfg(test)]
+mod net {
+    #[test]
+    #[ignore]
+    fn downloads_one() {
+        let s = super::list()
+            .iter()
+            .find(|s| s.path == "microsoft/Goo.wmz")
+            .unwrap();
+        let b = super::download(s).unwrap();
+        assert_eq!(b.len() as u64, s.size);
     }
 }

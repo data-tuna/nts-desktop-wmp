@@ -50,6 +50,7 @@ async function render() {
       return li;
     }),
   );
+  list.querySelector('[aria-current="true"]')?.scrollIntoView({ block: "center" });
 }
 
 random.addEventListener("change", () => void choose(null, "a random skin"));
