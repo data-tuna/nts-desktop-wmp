@@ -272,6 +272,11 @@ WMP or from the GPL WMP 8 clone. `src/skin/effects.ts` has them.
   `foregroundColor` for bars and scope if the skin gives one (the house
   skin's amber); otherwise WMP-like green to red.
 - **Stopped or paused,** the screen is its background colour.
+- **Picks show a flat visualisation.** NTS Picks play through SoundCloud's
+  hidden widget, another origin's frame whose audio never enters our Web
+  Audio graph (ATA-113). The pick plays, and frames keep coming, but every
+  bar is 0 and the wave sits at 128, so Bars is empty and Scope is a flat
+  line (checked on the merged build, anemone, 2026-10-11).
 - **Clicks.** A subview's drawn background pixels now stop a click, so a
   visualisation behind it (anemone's, `zIndex="-1"` under its yellow pods)
   takes clicks only through the hole. Before, a click on the pod ran the
