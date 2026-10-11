@@ -85,8 +85,8 @@ enum FromSkin {
 }
 
 /// Trusted page to skin: play state, time, title, levels, and analyser
-/// frames for the visualisation. The trusted page is
-/// the only caller (the skin webview has no capability for this command).
+/// frames for the visualisation. The trusted page is the only caller (the
+/// skin webview has no capability for this command).
 #[tauri::command]
 fn skin_send(app: AppHandle, msg: serde_json::Value) -> Result<(), String> {
     let skin = app.get_webview("skin").ok_or("no skin webview")?;
