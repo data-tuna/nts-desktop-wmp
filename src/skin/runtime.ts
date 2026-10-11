@@ -75,7 +75,7 @@ export function objects(host: Host) {
   const s = () => host.state;
   const media: Record<string, any> = wmpObject("player.currentMedia", {
     get name() { return s().title; },
-    getiteminfo: (attr: unknown) => (/^#?title$/i.test(String(attr)) ? s().title : /^type$/i.test(String(attr)) ? "broadcast" : ""),
+    getiteminfo: (attr: unknown) => itemInfo(s(), String(attr)),
     duration: 0,
     durationstring: "",
     imagesourcewidth: 0,
@@ -83,11 +83,18 @@ export function objects(host: Host) {
     get sourceurl() { return URLS[s().channel] ?? ""; },
     isidentical: (other: unknown) => other === media,
   }, log);
-  // The playlist is the two channels, NTS 1 and NTS 2.
+  // The playlist: the channels, then the mixtapes and picks.
   const playlist = wmpObject("player.currentPlaylist", {
     name: "",
-    count: URLS.length,
-    item: (i: number) => (i === s().channel ? media : wmpObject("player.currentPlaylist.item", { name: "", getiteminfo: () => "", isidentical: () => false }, log)),
+    get count() { return s().items.length; },
+    item: (i: number) =>
+      i === s().channel
+        ? media
+        : wmpObject("player.currentPlaylist.item", {
+            name: s().items[i] ?? "",
+            getiteminfo: (attr: unknown) => (/^#?title$/i.test(String(attr)) ? (s().items[i] ?? "") : ""),
+            isidentical: () => false,
+          }, log),
     getiteminfo: () => "",
   }, log);
   const controls = wmpObject("player.controls", {
@@ -205,6 +212,16 @@ export function objects(host: Host) {
     });
   const vs = { brightness: 0, contrast: 0, hue: 0, saturation: 0, reset: () => {} };
   return { player, theme, mediacenter, eq, vs, network };
+}
+
+/** `currentMedia.getItemInfo(attr)`: the title, the show (or a pick's
+ * credit) as its author, and the show's location. */
+export function itemInfo(state: State, attr: string): string {
+  const a = attr.toLowerCase();
+  if (a === "title" || a === "#title") return state.title;
+  if (a === "author" || a === "artist" || a === "wm/albumartist") return state.author;
+  if (a === "location") return state.location;
+  return a === "type" ? "broadcast" : "";
 }
 
 // Our own wording, for the resources the ATA-103 skins load. RT_TEXT/#132 is
