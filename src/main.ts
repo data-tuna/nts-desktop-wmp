@@ -21,8 +21,8 @@ const source = ctx.createMediaElementSource(audio);
 [source, gain, pan, ...eq, analyser].reduce((a, b) => (a.connect(b), b));
 analyser.connect(ctx.destination);
 // The visualisations read the stream before the volume, as WMP's do, so
-// they move at any volume and when muted.
-// Loud music tops out near -15 dB, so the bars keep some headroom.
+// they move at any volume and when muted. Loud music tops out near -15 dB,
+// which leaves the bars some headroom.
 const visAnalyser = new AnalyserNode(ctx, { minDecibels: -90, maxDecibels: -15 });
 source.connect(visAnalyser);
 
@@ -108,8 +108,9 @@ setInterval(() => {
 }, 250);
 
 // Analyser frames for the skin's visualisation, about 30 a second, only
-// while one is on screen and the stream plays. requestAnimationFrame stops
-// while the window is minimised, and the frames with it.
+// while one is on screen and the stream plays. Rust hides the webviews
+// while the window is minimised, so requestAnimationFrame, and the frames,
+// stop then.
 const spectrum = new Uint8Array(visAnalyser.frequencyBinCount);
 const wave = new Uint8Array(visAnalyser.fftSize);
 let lastFrame = 0;
