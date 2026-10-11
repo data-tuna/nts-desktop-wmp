@@ -96,8 +96,10 @@ unknown fields included, and refuses requests from any webview but `skin`
 Host to skin: the trusted page calls the `skin_send` command, and Rust
 dispatches a `message` event in the skin webview. Today that is
 `{ "type": "state", "playing", "time", "title", "level" }`, four times a
-second. The skin also gets `GET /` (the engine page) and `GET /files/<name>`
-(the skin's own files) from the protocol, and nothing of the app's.
+second. The skin also gets `GET /` (the engine page), `GET /engine.js` (the
+engine) and `GET /skin.wmz` (the skin itself, whole) from the protocol, and
+nothing of the app's. Until ATA-108 the stub skin read its files one by one
+from `GET /files/<name>`.
 
 **Window shape.** The skin computes its opaque runs from the view's
 `transparencyColor` and sends them; Rust combines them with
@@ -151,6 +153,43 @@ A separate app in its own repository, drawing WMP skins with its own engine
 rather than through Webamp. WMP skins matter as much as the Winamp app does.
 
 ## Skins
+
+### The engine: one canvas, static first (ATA-108, 2026-10-11)
+
+Written for this project, reading Microsoft's skin reference and checking
+against the 7 ATA-103 skins; no code from Webamp Modern.
+
+- **Load.** The skin page fetches the whole `.wmz` and unzips it with the
+  platform's `DecompressionStream`, so Rust only serves bytes and no zip
+  library ships. File names are looked up lower-cased.
+- **Parse.** A forgiving tokenizer, not `DOMParser`: real skins repeat
+  attributes (the first wins), put raw `&&` and `<` in script attributes, and
+  close `<buttonGroup>` with `</buttongroup>`.
+- **Paint.** Everything is painted back to front on one canvas the size of
+  the view. A subview is drawn on its own layer: children with a negative
+  `zIndex`, then its background with its `transparencyColor` (and
+  `clippingColor`) cut out, then the other children, then its
+  `clippingColor` cuts the whole layer. Negative `zIndex` behind the
+  parent's background is how cerulean's visualiser shows through the
+  magenta hole in its face.
+- **Window shape.** The opaque pixels of the skin's images. Visualisation
+  areas and text are drawn inside that shape but do not add to it, or
+  anemone's rectangular visualiser would square off its outline. On each of
+  the six target skins, the region Windows reports has exactly as many
+  pixels as the canvas has opaque ones (anemone 54,764; bluegrid 33,480;
+  cerulean 52,570; circle 10,600; Asimov_Radio 119,564; 9SeriesDefault
+  115,213).
+- **Expressions.** `jscript:` attributes made only of element properties
+  (`jscript:svTopMiddle.left+svTopMiddle.width;`, with the element's own
+  properties in scope too) are evaluated in the skin webview, where skin
+  code may run anyway. So are literal constants a skin's scripts declare at
+  the top level (`var leftOffset = 260;`), which Asimov_Radio lays out with;
+  reading a literal runs none of the script. Anything else is logged and
+  skipped until the script runtime (ATA-110).
+- **Player state.** The named controls follow the host's state: Play is
+  enabled while stopped, Stop and Pause while playing, Previous and Next
+  never (a live stream has neither). Pause sends `stop`. Sliders bound to
+  the volume or balance, named or not, send `volume` and `balance`.
 
 ### Source: archive.org, one per launch, a compatibility list (proposed by Lama, confirmed by Ata, 2026-10-10)
 
