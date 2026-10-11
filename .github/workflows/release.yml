@@ -1,0 +1,92 @@
+name: Release
+
+# Pushing a tag such as v0.1.0 builds the Windows installer and publishes it,
+# with its signature and the updater's latest.json, as a GitHub Release. A
+# fresh runner then installs the published installer, plays, updates from the
+# release before it, and uninstalls.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Tag matches the app version
+        shell: bash
+        run: |
+          version=$(node -p "require('./package.json').version")
+          cargo_version=$(sed -n 's/^version = "\(.*\)"/\1/p' src-tauri/Cargo.toml | head -1)
+          if [ "v$version" != "$GITHUB_REF_NAME" ] || [ "$cargo_version" != "$version" ]; then
+            echo "::error::tag $GITHUB_REF_NAME, package.json $version, Cargo.toml $cargo_version: bump both to the tag"
+            exit 1
+          fi
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          workspaces: src-tauri
+
+      - run: npm ci
+
+      # Pinned to a commit, not a tag: this step holds the update signing key.
+      - uses: tauri-apps/tauri-action@84b9d35b5fc46c1e45415bdb6144030364f7ebc5 # v0.6.2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          # Signs the installer for the updater; local builds skip it.
+          args: --config src-tauri/tauri.release.conf.json
+          tagName: ${{ github.ref_name }}
+          releaseName: NTS Radio Bootleg Media Player ${{ github.ref_name }}
+          releaseBody: |
+            Windows: download the `-setup.exe` below and run it. Windows SmartScreen will warn that the app is unrecognised, because it is not code-signed: click **More info**, then **Run anyway**. Installed copies update themselves on launch.
+
+            An unofficial fan project, not made or endorsed by NTS. Support the station at https://www.nts.live/supporters.
+          releaseDraft: false
+          prerelease: false
+
+  # No signing key here: this job only downloads what was published.
+  install:
+    needs: windows
+    runs-on: windows-latest
+    permissions:
+      contents: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+
+      - name: Install the release, play, uninstall
+        run: |
+          gh release download $env:GITHUB_REF_NAME -p "*-setup.exe" -D new
+          powershell -File tools/install-check.ps1 (Get-Item new/*-setup.exe).FullName -Out install-check/new
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+
+      - name: Install the release before, let it update itself, uninstall
+        run: |
+          $previous = gh release list --exclude-drafts --exclude-pre-releases --json tagName -q ".[].tagName" | Where-Object { $_ -ne $env:GITHUB_REF_NAME } | Select-Object -First 1
+          if (-not $previous) { "no earlier release to update from"; exit 0 }
+          gh release download $previous -p "*-setup.exe" -D old
+          powershell -File tools/install-check.ps1 (Get-Item old/*-setup.exe).FullName -UpdateTo $env:GITHUB_REF_NAME.TrimStart("v") -Out install-check/update
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: install-check
+          path: install-check/
