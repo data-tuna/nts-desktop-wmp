@@ -310,8 +310,26 @@ As in the Winamp app (its `docs/decisions.md`, ATA-72), with this app's names.
   `v*` tag and publishes it, with its signature and `latest.json`, as a
   normal GitHub release (not a pre-release, or `releases/latest` would not
   find it). The tag must match `package.json` and `Cargo.toml`. It installs
-  per user, with no administrator rights. 1.98 MiB for 0.1.0, against
-  2.23 MiB for the Winamp app's 0.1.2; the updater plugin added 0.6 MiB.
+  per user, with no administrator rights. 1.60 MiB for 0.1.0 with ATA-115's
+  tray, single-instance and window-state, against 2.23 MiB for the Winamp
+  app's 0.1.2.
+- **The updater uses SChannel**, as ureq does for skins:
+  `default-features = false, features = ["native-tls"]`. Its defaults pull
+  in rustls, ring and zip; zip isn't needed, since with
+  `createUpdaterArtifacts: true` the signed artifact is the `-setup.exe`
+  itself. That took the installer from 1.98 to 1.54 MiB before the ATA-115
+  merge (Tirci Lama's review). Like ureq, it does not read Windows' proxy
+  settings: `system-proxy` would not resolve next to ureq.
+- **The whole update was tried before the first tag**, on a fresh runner
+  with a throwaway key: a 0.1.0 and a 0.1.1 built from this branch, the
+  0.1.1 installer and its `latest.json` served from `raw.githubusercontent.com`
+  (a real certificate, like GitHub's release downloads). The installed
+  0.1.0 updated itself to 0.1.1 within 5 s of launch, restarted and played.
+  Against `https://localhost` with a self-signed certificate in the
+  machine's root store the check failed ("error sending request") before
+  the server saw a request, so a local trial needs a real certificate. A
+  self-update saves the window position first: the installer ends the app
+  without the exit that saves it.
 - **Updates install on launch, without asking.** A release build checks
   `releases/latest/download/latest.json` once at startup; if it is newer,
   it downloads, installs in passive mode (a small progress window) and
@@ -335,8 +353,8 @@ As in the Winamp app (its `docs/decisions.md`, ATA-72), with this app's names.
   playing, which is one connection to a radiomast audio edge held for 15 s;
   the skin it downloaded, whose md5 must be a working one in
   `compatible.json`; two shots of the window 15 s apart; then a silent
-  uninstall that must leave no files, no Settings > Apps entry and no
-  shortcuts. It then installs the release before and waits for it to
+  uninstall that must leave no install folder, no Settings > Apps entry
+  and no shortcuts. It then installs the release before and waits for it to
   update itself to the new one. The evidence is the run's `install-check`
   artifact. Not over DevTools: the runner's WebView2 (153) opened no
   DevTools port for `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS` or for its
@@ -372,23 +390,23 @@ branch), each run 30 s on a hidden desktop, muted, whole process tree, on a
 20-thread machine that other jobs were also using, so runs vary by several
 points:
 
-| Skin, playing | Before | After |
-|---|---|---|
-| Classic, no visualisation | 9.5–11.9 | 6.1–6.9 |
-| anemone, Bars | 28.6–41.5 | 24.3–28.1 |
-| Halloween, Bars and a scrolling title | 39.7–49.5 | 30.3–30.4 |
-| Bootleg House, Bars and a title scrolling every 40 ms | 36.4–43.3 | 27.9–40.4 |
-| The Winamp app 0.1.2, its spectrum showing | 12.7–22.5 | |
-| The Winamp app 0.1.2, its visualiser clicked off | 5.7 | |
+| Skin, playing | Before | After | After, merged with ATA-115 (one run) |
+|---|---|---|---|
+| Classic, no visualisation | 9.5–11.9 | 6.1–6.9 | 5.3 |
+| anemone, Bars | 28.6–41.5 | 24.3–28.1 | 34.6 |
+| Halloween, Bars and a scrolling title | 39.7–49.5 | 30.3–30.4 | 37.3 |
+| Bootleg House, Bars and a title scrolling every 40 ms | 36.4–43.3 | 27.9–40.4 | 31.6 |
+| The Winamp app 0.1.2, its spectrum showing | 12.7–22.5 | | |
+| The Winamp app 0.1.2, its visualiser clicked off | 5.7 | | |
 
 What is left is mostly the frames' trip, not the drawing. Stopping the
 frames on Bootleg House took it from about 30 % to 15 %, though each frame
 now redraws a few thousand pixels: each of the 30 frames a second is an IPC
 call from the trusted page to Rust, then a script evaluated in the skin
 webview, then a composite of both webviews. The house skin also repaints in
-full 25 times a second for its title. RAM, playing: about 310 MB private
-(590 MB working set, which counts shared pages more than once), against
-280 MB (540 MB) for the Winamp app.
+full 25 times a second for its title. RAM, playing, on the merged build:
+290–310 MB private (560–610 MB working set, which counts shared pages more
+than once), against 280 MB (540 MB) for the Winamp app.
 
 ## Skins
 

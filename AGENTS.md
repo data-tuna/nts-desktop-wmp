@@ -395,7 +395,7 @@ until this one gets its own.
 build, the tests and `cargo fmt --check`.
 
 **A visualisation costs about 20 points of a core** (ATA-116). With one
-showing, the app uses about 25–30 % of a core (6–7 % without). Each frame
+showing, the app uses about 25–35 % of a core (5–7 % without). Each frame
 redraws only the visualisation, so most of that is the frames' trip: an IPC
 call from the trusted page, a script evaluated in the skin webview, a
 composite of both webviews.
