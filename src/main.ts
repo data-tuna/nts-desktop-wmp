@@ -176,9 +176,20 @@ setInterval(() => {
 const spectrum = new Uint8Array(visAnalyser.frequencyBinCount);
 const wave = new Uint8Array(visAnalyser.fftSize);
 let lastFrame = 0;
+let flatSent = false;
 function visFrame(now: number) {
   requestAnimationFrame(visFrame);
-  if (!effectsOn || player.state().playState !== "playing" || now - lastFrame < 30) return;
+  const { playState, channel } = player.state();
+  if (!effectsOn || playState !== "playing" || now - lastFrame < 30) return;
+  // A pick plays outside our Web Audio graph: one flat frame clears the last
+  // stream frame, then nothing until a stream plays. Silence, not the
+  // analyser's data, which still holds the stream's last moments.
+  if (items[channel]?.pick) {
+    if (!flatSent) void invoke("skin_send", { msg: { type: "vis", bars: Array(32).fill(0), wave: Array(96).fill(128) } }).catch(() => {});
+    flatSent = true;
+    return;
+  }
+  flatSent = false;
   lastFrame = now;
   visAnalyser.getByteFrequencyData(spectrum);
   // The scope shows the newest 2048 samples (43 ms at 48 kHz): all 8192
