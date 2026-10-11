@@ -3,7 +3,11 @@
 // state back (docs/decisions.md, ATA-107).
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { createPlayer } from "./player";
+import { fetchLive, mergeOnAir, nextPollDelay, type OnAir } from "./live";
+import { MIXTAPES_API, parseMixtapes } from "./mixtapes";
+import { PICKS_API, parsePicks, type Pick } from "./picks";
+import { CHANNELS, createPlayer, type Item } from "./player";
+import { createWidget } from "./widget";
 import { bands, samples } from "./skin/effects";
 
 const BANDS = [31, 62, 125, 250, 500, 1000, 2000, 4000, 8000, 16000];
@@ -27,10 +31,29 @@ analyser.connect(ctx.destination);
 const visAnalyser = new AnalyserNode(ctx, { fftSize: 8192, minDecibels: -90, maxDecibels: -15 });
 source.connect(visAnalyser);
 
-const player = createPlayer(audio);
+// The channels, then the Infinite Mixtapes, then the NTS Picks, once their APIs answer.
+const items: Item[] = [...CHANNELS];
+const picks = new Map<string, Pick & { uploader?: string }>();
+const widget = createWidget({
+  finish() {
+    player.step(1);
+    player.play();
+  },
+  error: () => player.stop(),
+  paused: () => player.pause(),
+  resumed: () => player.play(),
+  uploader: (url, name) => {
+    const pick = picks.get(url);
+    if (pick) pick.uploader = name;
+  },
+});
+const player = createPlayer(audio, items, widget);
+// The show on each channel; undefined where the live API gave none.
+let onAir: (OnAir | undefined)[] = [];
 
 type FromSkin =
   | { type: "play" | "pause" | "stop" | "next" | "previous" }
+  | { type: "select"; index: number }
   | { type: "volume" | "balance"; value: number }
   | { type: "mute"; value: boolean }
   | { type: "seek"; seconds: number }
@@ -63,6 +86,7 @@ let effectsOn = false;
 
 function apply() {
   gain.gain.value = settings.mute ? 0 : settings.volume;
+  widget.setVolume(gain.gain.value);
   pan.pan.value = settings.balance;
   settings.eq.forEach((g, i) => (eq[i].gain.value = g));
   localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
@@ -77,6 +101,7 @@ function onSkin(m: FromSkin) {
   else if (m.type === "next") player.step(1);
   else if (m.type === "previous") player.step(-1);
   else if (m.type === "effects") effectsOn = m.on;
+  else if (m.type === "select") player.select(m.index);
   else if (m.type === "seek") {
     // ponytail: seek is accepted but a live stream has nowhere to seek to.
     // Mixtapes are live too; revisit if a seekable source ever arrives.
@@ -100,11 +125,47 @@ function level() {
   return Math.sqrt(buf.reduce((s, v) => s + v * v, 0) / buf.length);
 }
 
+/** What a skin shows for item `i`: `title` is `player.currentMedia.name`,
+ * `author` and `location` its item info, `link` the page a double click on the
+ * title opens. SoundCloud's terms want the uploader and SoundCloud credited,
+ * with a link back, wherever a pick plays, so a pick's title carries both. */
+function info(i: number) {
+  const item = items[i];
+  const url = item.url;
+  const show = i < CHANNELS.length ? onAir[i] : undefined;
+  // The channel always leads, as in the Winamp app (Ata, 2026-10-09): "NTS 1 - <show> - <location>".
+  if (show) return { title: `${item.title} - ${show.title}`, url, author: show.show, location: show.location ?? "", link: "", artwork: show.artwork };
+  const pick = picks.get(item.url);
+  if (pick) {
+    const credit = pick.uploader ? `${pick.uploader} on SoundCloud` : "SoundCloud";
+    // Credit first, so a skin that cuts long titles still shows it.
+    return { title: `${credit} - ${pick.title}`, url, author: credit, location: "", link: pick.url, artwork: pick.artwork };
+  }
+  return { title: item.title, url, author: "", location: "", link: "", artwork: undefined };
+}
+
+// Windows' media overlay, through WebView2's Media Session.
+let overlay = "";
+function updateOverlay(i: number) {
+  const { title, author, artwork } = info(i);
+  if (!("mediaSession" in navigator) || overlay === JSON.stringify([title, author, artwork])) return;
+  overlay = JSON.stringify([title, author, artwork]);
+  navigator.mediaSession.metadata = new MediaMetadata({ title, artist: author, artwork: artwork ? [{ src: artwork, sizes: "200x200" }] : [] });
+}
+if ("mediaSession" in navigator) {
+  const actions: [MediaSessionAction, FromSkin["type"]][] = [["play", "play"], ["pause", "pause"], ["stop", "stop"], ["nexttrack", "next"], ["previoustrack", "previous"]];
+  for (const [action, type] of actions) navigator.mediaSession.setActionHandler(action, () => onSkin({ type } as FromSkin));
+}
+
 // 4 updates a second covers the clock and title. The visualisation gets its
 // own frames, below.
 setInterval(() => {
-  // duration 0: a live stream, which has no length and cannot seek (WMP's convention).
-  const state = { type: "state", ...player.state(), duration: 0, ...settings, level: level() };
+  const now = player.state();
+  const { artwork: _, ...shown } = info(now.channel);
+  updateOverlay(now.channel);
+  // duration 0: live streams have no length and cannot seek (WMP's convention).
+  // ponytail: picks have a length, and SoundCloud's widget can seek; they are shown as live too until someone asks to seek a pick.
+  const state = { type: "state", ...now, ...shown, items: items.map((_, i) => info(i).title), duration: 0, ...settings, level: level() };
   void invoke("skin_send", { msg: state }).catch(() => {});
 }, 250);
 
@@ -127,6 +188,37 @@ function visFrame(now: number) {
   void invoke("skin_send", { msg }).catch(() => {});
 }
 requestAnimationFrame(visFrame);
+
+// The show on air. Nothing here touches playback: when the API fails the
+// titles fall back to "NTS 1" and "NTS 2" and the stream plays on.
+async function poll() {
+  let fresh: (OnAir | undefined)[] = [];
+  try {
+    fresh = await fetchLive();
+  } catch (error: unknown) {
+    console.warn("NTS live API failed", error);
+  }
+  const now = Date.now();
+  onAir = mergeOnAir(onAir, fresh, CHANNELS.length, now);
+  setTimeout(() => void poll(), nextPollDelay(onAir, now));
+}
+void poll();
+
+// Mixtapes and picks, once per launch. A failure leaves just the channels.
+async function list<T>(api: string, parse: (body: unknown) => T[]): Promise<T[]> {
+  const response = await fetch(api, { signal: AbortSignal.timeout(10_000) });
+  if (!response.ok) throw new Error(`${api}: HTTP ${response.status}`);
+  return parse(await response.json());
+}
+void Promise.allSettled([list(MIXTAPES_API, parseMixtapes), list(PICKS_API, parsePicks)]).then(([mixtapes, picked]) => {
+  if (mixtapes.status === "fulfilled") items.push(...mixtapes.value);
+  else console.warn("No Infinite Mixtapes this launch", mixtapes.reason);
+  if (picked.status === "rejected") return console.warn("No NTS Picks this launch", picked.reason);
+  for (const pick of picked.value) {
+    picks.set(pick.url, pick);
+    items.push({ title: pick.title, url: pick.url, pick: true });
+  }
+});
 
 if (import.meta.env.DEV) {
   // ATA-107 comparison only: the other host the spike tried, a sandboxed

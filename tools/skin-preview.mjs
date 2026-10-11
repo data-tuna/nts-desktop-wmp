@@ -17,19 +17,22 @@ if (!wmz) {
 }
 const root = new URL("..", import.meta.url);
 
-// The trusted page's side of the protocol, in miniature: NTS 1 and NTS 2, a
-// clock while playing, and the settings the skin sends.
+// The trusted page's side of the protocol, in miniature: NTS 1, NTS 2 and a
+// stand-in mixtape and pick, a clock while playing, and the settings the skin sends.
 const fakeHost = `<script>
 (() => {
-  const titles = ["NTS 1", "NTS 2"];
-  const s = { type: "state", playState: location.search.includes("play") ? "playing" : "stopped", channel: 0, title: titles[0], time: 0, duration: 0, volume: 0.8, mute: false, balance: 0, eq: Array(10).fill(0), level: 0 };
+  const titles = ["NTS 1 - A show - London", "NTS 2", "Poolside - a mixtape", "Someone on SoundCloud - A pick"];
+  const links = ["", "", "", "https://soundcloud.com/"];
+  const go = (i) => Object.assign(s, { channel: i, title: titles[i], author: i ? "" : "A show", location: i ? "" : "London", link: links[i], url: links[i], time: 0 });
+  const s = { type: "state", playState: location.search.includes("play") ? "playing" : "stopped", channel: 0, title: titles[0], url: "", author: "A show", location: "London", link: "", items: titles, time: 0, duration: 0, volume: 0.8, mute: false, balance: 0, eq: Array(10).fill(0), level: 0 };
   const post = window.fetch.bind(window);
   window.fetch = (url, init) => {
     if (url === "/msg") {
       const m = JSON.parse(init.body);
       if (m.type === "play") s.playState = "playing";
       else if (m.type === "pause" || m.type === "stop") Object.assign(s, { playState: m.type === "pause" ? "paused" : "stopped", time: 0 });
-      else if (m.type === "next" || m.type === "previous") Object.assign(s, { channel: 1 - s.channel, title: titles[1 - s.channel], time: 0 });
+      else if (m.type === "next" || m.type === "previous") go((s.channel + (m.type === "next" ? 1 : titles.length - 1)) % titles.length);
+      else if (m.type === "select") go(m.index % titles.length);
       else if (m.type === "eq") s.eq[m.band] = m.gain;
       else if (["volume", "mute", "balance"].includes(m.type)) s[m.type] = m.value;
     }
