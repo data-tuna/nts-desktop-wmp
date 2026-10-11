@@ -754,7 +754,7 @@ export class Skin {
       if (ev.button !== 0) return;
       const found = this.at(ev);
       if (found?.interactive() && !found.enabled) return;
-      if (found?.interactive() && found.enabled) {
+      if (found?.interactive()) {
         this.pressed = found;
         this.wasDown = found.down;
         if (found.kind === "slider" || found.kind === "custom") this.slide(found, ev, false);

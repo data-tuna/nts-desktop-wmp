@@ -116,7 +116,7 @@ function openTag(text: string, start: number, stack: Node[]): number {
  * literal runs none of the script. */
 export function constants(scripts: string[]): Map<string, unknown> {
   const found = new Map<string, unknown>();
-  const line = /^var\s+([A-Za-z_$][\w$]*)\s*=\s*(-?\d+(?:\.\d+)?|"[^"\\]*"|'[^'\\]*'|true|false)\s*;?[ \t]*(?:\/\/[^\r\n]*)?\r?$/gm;
+  const line = /^var\s+([A-Za-z_$][\w$]*)\s*=\s*(-?(?:0|[1-9]\d*)(?:\.\d+)?|"[^"\\]*"|'[^'\\]*'|true|false)\s*;?[ \t]*(?:\/\/[^\r\n]*)?\r?$/gm;
   for (const script of scripts)
     for (const [, name, literal] of script.matchAll(line))
       if (!found.has(name)) found.set(name, /^['"]/.test(literal) ? literal.slice(1, -1) : literal === "true" || (literal !== "false" && Number(literal)));
