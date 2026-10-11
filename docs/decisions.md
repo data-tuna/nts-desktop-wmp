@@ -186,6 +186,59 @@ rather than through Webamp. WMP skins matter as much as the Winamp app does.
 
 ## Skins
 
+### The house skin: Bootleg House (ATA-111, 2026-10-11)
+
+The one skin that ships, drawn for this project. It is what the app shows
+until the skin cache (ATA-112) has something better, and the skin the engine
+can always be tested on. It needs no network: `house.wmz` is built into the
+binary, and Rust serves it whenever `NTS_WMP_SKIN` is unset or unreadable.
+On a release build behind `tools/proxy.mjs`, the app drew it and played
+NTS 1, and the only hosts it reached were `streams.radiomast.io`, the
+radiomast edge, and WebView2's own `config.edge.skype.com`, which `main`
+reaches too.
+
+**The design.** A table radio drawn the way WMP 7 to 9 skins were drawn:
+- **A dial on the left**, a slate disc with a brushed-metal ring and tick
+  marks, holds the visualiser in a round window under a glass highlight.
+  The disc hangs off the end of a capsule, so the window is not a rectangle.
+- **An amber display**, like a backlit radio's, holds the title (scrolling
+  when it is long) over the status and the clock. Amber reads as a radio
+  and stays away from NTS's own black and white.
+- **The controls are metal beads in sockets.** Play and pause are one amber
+  bead in one place: the skin shows whichever the player can do now
+  (`visible="wmpenabled:player.controls.play"`), as WMP's own skins do.
+  Previous, stop, next and mute are a button group with a mapping image.
+  Hover tints the icon amber; pressed beads light from below and their icon
+  drops a pixel; muted shows a crossed speaker.
+- **The playlist drawer** under the capsule lists the two channels, the
+  current one in amber. A click on the other row switches to it.
+- No NTS logo and no wordmark: the only "NTS" on the skin is the channel
+  name the player reports.
+
+It uses most of the element kinds the engine draws: subviews with a
+`clippingColor` and a `transparencyColor`, `alphaBlend`, a button group
+with hover, down and disabled images, buttons bound with `wmpenabled:`,
+text bound with `wmpprop:` (with scrolling), a slider with a fill and thumb
+states, an `effects` area and a `playlist`; not a progress bar or a custom
+slider. It has no close or minimize button, since the skin protocol has
+no message for them yet.
+
+**The sources.** Layered SVGs in `skins/house/art/`, one Inkscape layer per
+state, rendered by `build.mjs` with resvg (`@resvg/resvg-js`, a dev
+dependency under MPL-2.0 that never ships) into 24-bit BMPs, then zipped
+with fixed timestamps so the same sources give the same bytes. The
+silhouette and anything touching the key colour are drawn with crisp edges,
+and everything else sits at least 1.5 px inside them, so smoothing never
+blends into `#FF00FF`. A test rebuilds the skin and compares it with the
+committed `house.wmz`.
+
+**The engine draws `<playlist>` now.** Only for this one case: its rows are
+the player's channels (`CHANNELS` in `player.ts`), in `foregroundColor`,
+with the current one in `itemPlayingColor` on
+`itemPlayingBackgroundColor`. A click on a row sends `next` as many times
+as it takes to reach that channel, so no new message was needed. Like text,
+the playlist is drawn inside the window shape and does not add to it.
+
 ### The engine: one canvas, static first (ATA-108, 2026-10-11)
 
 Written for this project, reading Microsoft's skin reference and checking

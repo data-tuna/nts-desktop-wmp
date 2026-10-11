@@ -11,8 +11,9 @@ the sister app to
 you listen a lot, support the station directly:
 [nts.live/supporters](https://www.nts.live/supporters).
 
-Status: a scaffold. `npm run tauri dev` opens an empty window. Nothing plays
-yet. Windows comes first, then macOS.
+Status: in progress. `npm run tauri dev` opens the player on NTS 1 in Bootleg
+House, the one skin drawn for this project. Skins from the archive come
+next. Windows comes first, then macOS.
 
 ## Credits
 
@@ -21,7 +22,8 @@ yet. Windows comes first, then macOS.
   time from the
   [Windows Media Player Skins Archive](https://archive.org/details/windowsmediaplayerskinsarchive)
   on archive.org and cache them on your machine. None are included in this
-  repository or the installer.
+  repository or the installer. The one skin that ships, Bootleg House
+  (`skins/house/`), was drawn for this project.
 - [Tauri](https://tauri.app/) is the desktop shell.
 - Streams come from NTS via `streams.radiomast.io`.
 

@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" width="104" height="104" viewBox="0 0 104 104">
+  <!-- The round window in the dial. "Mask" is the visualiser subview's
+       background: its clippingColor cuts the visualiser to the circle.
+       "Gloss" is the glass highlight drawn over it, alpha-blended. -->
+  <g inkscape:groupmode="layer" id="key" inkscape:label="Key colour">
+    <rect width="104" height="104" fill="#ff00ff"/>
+  </g>
+  <g inkscape:groupmode="layer" id="mask" inkscape:label="Mask" shape-rendering="crispEdges">
+    <circle cx="52" cy="52" r="52" fill="#05080a"/>
+  </g>
+  <g inkscape:groupmode="layer" id="gloss" inkscape:label="Gloss" shape-rendering="crispEdges">
+    <path fill="#ffffff" fill-rule="evenodd" d="M52 4a48 48 0 0 1 46 34a52 52 0 0 0-92 0a48 48 0 0 1 46-34z"/>
+  </g>
+</svg>

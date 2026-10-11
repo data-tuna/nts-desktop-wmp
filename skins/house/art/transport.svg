@@ -1,0 +1,128 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" width="156" height="32" viewBox="0 0 156 32">
+  <!-- The transport button group: previous, stop, next and mute. One layer
+       per state, plus the mapping image whose colours tell the elements
+       apart. The gap at x 48 is the play/pause socket (playpause.svg). -->
+  <defs>
+    <radialGradient id="alu" cx="0.42" cy="0.3" r="0.8">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="0.45" stop-color="#d3dadd"/>
+      <stop offset="1" stop-color="#7f8d93"/>
+    </radialGradient>
+    <radialGradient id="aluHover" cx="0.42" cy="0.3" r="0.8">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="0.5" stop-color="#e8edef"/>
+      <stop offset="1" stop-color="#9aa8ae"/>
+    </radialGradient>
+    <radialGradient id="aluDown" cx="0.5" cy="0.75" r="0.8">
+      <stop offset="0" stop-color="#c6ced2"/>
+      <stop offset="1" stop-color="#6c7a80"/>
+    </radialGradient>
+    <radialGradient id="aluOff" cx="0.42" cy="0.3" r="0.8">
+      <stop offset="0" stop-color="#9aa6ab"/>
+      <stop offset="1" stop-color="#5d6a70"/>
+    </radialGradient>
+    <g id="bead11">
+      <circle r="11" fill="#0a1114" shape-rendering="crispEdges"/>
+      <circle r="10"/>
+    </g>
+    <g id="bead10">
+      <circle r="10" fill="#0a1114" shape-rendering="crispEdges"/>
+      <circle r="9"/>
+    </g>
+    <ellipse id="shine11" cy="-5.5" rx="6" ry="3" fill="#ffffff" fill-opacity="0.6"/>
+    <ellipse id="shine10" cy="-5" rx="5" ry="2.5" fill="#ffffff" fill-opacity="0.6"/>
+    <path id="prev" fill="currentColor" d="M-5.5-4.5h1.8v9h-1.8zM-3.2 0 1-4.5v9zM1 0l4.2-4.5v9z"/>
+    <path id="next" fill="currentColor" d="M5.5-4.5h-1.8v9h1.8zM3.2 0-1-4.5v9zM-1 0l-4.2-4.5v9z"/>
+    <rect id="stop" x="-3.75" y="-3.75" width="7.5" height="7.5" rx="1" fill="currentColor"/>
+    <g id="speaker">
+      <path fill="currentColor" d="M-5.5-2H-3l3.5-3.5v11L-3 2h-2.5z"/>
+    </g>
+    <g id="sound">
+      <use href="#speaker"/>
+      <path fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" d="M2.3-2.3a3.3 3.3 0 0 1 0 4.6M4.4-4.4a6.2 6.2 0 0 1 0 8.8"/>
+    </g>
+    <g id="muted">
+      <use href="#speaker"/>
+      <path fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" d="M2.2-2.3l4.6 4.6M6.8-2.3 2.2 2.3"/>
+    </g>
+  </defs>
+
+  <g inkscape:groupmode="layer" id="key" inkscape:label="Key colour">
+    <rect width="156" height="32" fill="#ff00ff"/>
+  </g>
+
+  <g inkscape:groupmode="layer" id="up" inkscape:label="Up">
+    <g fill="url(#alu)">
+      <use href="#bead11" x="14" y="16"/>
+      <use href="#bead11" x="82" y="16"/>
+      <use href="#bead11" x="112" y="16"/>
+      <use href="#bead10" x="144" y="16"/>
+    </g>
+    <use href="#shine11" x="14" y="16"/>
+    <use href="#shine11" x="82" y="16"/>
+    <use href="#shine11" x="112" y="16"/>
+    <use href="#shine10" x="144" y="16"/>
+    <g color="#1b262c">
+      <use href="#prev" x="14" y="16.5"/>
+      <use href="#stop" x="82" y="16.5"/>
+      <use href="#next" x="112" y="16.5"/>
+      <use href="#sound" x="144" y="16.5"/>
+    </g>
+  </g>
+
+  <g inkscape:groupmode="layer" id="hover" inkscape:label="Hover">
+    <g fill="url(#aluHover)">
+      <use href="#bead11" x="14" y="16"/>
+      <use href="#bead11" x="82" y="16"/>
+      <use href="#bead11" x="112" y="16"/>
+      <use href="#bead10" x="144" y="16"/>
+    </g>
+    <use href="#shine11" x="14" y="16"/>
+    <use href="#shine11" x="82" y="16"/>
+    <use href="#shine11" x="112" y="16"/>
+    <use href="#shine10" x="144" y="16"/>
+    <g color="#b25f00">
+      <use href="#prev" x="14" y="16.5"/>
+      <use href="#stop" x="82" y="16.5"/>
+      <use href="#next" x="112" y="16.5"/>
+      <use href="#sound" x="144" y="16.5"/>
+    </g>
+  </g>
+
+  <g inkscape:groupmode="layer" id="down" inkscape:label="Down">
+    <g fill="url(#aluDown)">
+      <use href="#bead11" x="14" y="16"/>
+      <use href="#bead11" x="82" y="16"/>
+      <use href="#bead11" x="112" y="16"/>
+      <use href="#bead10" x="144" y="16"/>
+    </g>
+    <g color="#1b262c">
+      <use href="#prev" x="14" y="17.5"/>
+      <use href="#stop" x="82" y="17.5"/>
+      <use href="#next" x="112" y="17.5"/>
+      <use href="#muted" x="144" y="17.5"/>
+    </g>
+  </g>
+
+  <g inkscape:groupmode="layer" id="disabled" inkscape:label="Disabled">
+    <g fill="url(#aluOff)">
+      <use href="#bead11" x="14" y="16"/>
+      <use href="#bead11" x="82" y="16"/>
+      <use href="#bead11" x="112" y="16"/>
+      <use href="#bead10" x="144" y="16"/>
+    </g>
+    <g color="#3f4b51">
+      <use href="#prev" x="14" y="16.5"/>
+      <use href="#stop" x="82" y="16.5"/>
+      <use href="#next" x="112" y="16.5"/>
+      <use href="#sound" x="144" y="16.5"/>
+    </g>
+  </g>
+
+  <g inkscape:groupmode="layer" id="map" inkscape:label="Mapping" shape-rendering="crispEdges">
+    <circle cx="14" cy="16" r="11" fill="#ff0000"/>
+    <circle cx="82" cy="16" r="11" fill="#00ff00"/>
+    <circle cx="112" cy="16" r="11" fill="#0000ff"/>
+    <circle cx="144" cy="16" r="10" fill="#ffff00"/>
+  </g>
+</svg>

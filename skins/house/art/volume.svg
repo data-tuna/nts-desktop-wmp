@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" width="62" height="20" viewBox="0 0 62 20">
+  <!-- The volume slider's track and its fill, which the engine shows up to
+       the thumb. They sit in the socket drawn on the body. -->
+  <defs>
+    <linearGradient id="amber" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffd089"/>
+      <stop offset="1" stop-color="#d9801f"/>
+    </linearGradient>
+  </defs>
+  <g inkscape:groupmode="layer" id="key" inkscape:label="Key colour">
+    <rect width="62" height="20" fill="#ff00ff"/>
+  </g>
+  <g inkscape:groupmode="layer" id="track" inkscape:label="Track" shape-rendering="crispEdges">
+    <rect x="3" y="8" width="56" height="4" fill="#1c272d"/>
+  </g>
+  <g inkscape:groupmode="layer" id="fill" inkscape:label="Fill" shape-rendering="crispEdges">
+    <rect x="3" y="8" width="56" height="4" fill="url(#amber)"/>
+  </g>
+</svg>

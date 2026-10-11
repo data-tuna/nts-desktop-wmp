@@ -126,13 +126,21 @@ fn respond(app: &AppHandle, from: &str, req: Request<Vec<u8>>) -> Response<Vec<u
     }
 }
 
-// ponytail: serves the .wmz named by NTS_WMP_SKIN. The skin cache (ATA-112)
-// serves the cached skin instead, and the house skin (ATA-111) when there is none.
+/// The house skin, built from skins/house/ by `npm run build:house`. It ships
+/// in the binary, so the app has a skin with no network at all.
+const HOUSE_SKIN: &[u8] = include_bytes!("../../skins/house/house.wmz");
+
+// ponytail: serves the .wmz named by NTS_WMP_SKIN, or the house skin. The
+// skin cache (ATA-112) serves the cached skin instead.
 fn skin_file() -> Response<Vec<u8>> {
-    match std::env::var_os("NTS_WMP_SKIN").map(std::fs::read) {
-        Some(Ok(bytes)) => Response::builder().body(bytes).unwrap(),
-        _ => status(StatusCode::NOT_FOUND),
-    }
+    let bytes = std::env::var_os("NTS_WMP_SKIN")
+        .and_then(|path| {
+            std::fs::read(&path)
+                .inspect_err(|e| eprintln!("NTS_WMP_SKIN {path:?}: {e}; using the house skin"))
+                .ok()
+        })
+        .unwrap_or_else(|| HOUSE_SKIN.to_vec());
+    Response::builder().body(bytes).unwrap()
 }
 
 /// A view of at most 4096 px a side, with runs that are non-empty, inside it,
