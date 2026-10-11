@@ -46,6 +46,10 @@ enum FromSkin {
     Stop {},
     Next {},
     Previous {},
+    /// A click on a playlist row: play that item (ATA-113).
+    Select {
+        index: u32,
+    },
     Volume {
         value: f64,
     },
@@ -405,7 +409,7 @@ pub fn run() {
         .expect("error while running tauri application");
 }
 
-const BROWSER_ARGS: &str = "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection --autoplay-policy=no-user-gesture-required";
+const BROWSER_ARGS: &str = "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection --autoplay-policy=no-user-gesture-required --enable-features=HardwareMediaKeyHandling";
 
 #[cfg(test)]
 mod tests {
@@ -458,6 +462,12 @@ mod tests {
         assert_eq!(parse(r#"{"type":"volume","value":0.5,"evil":1}"#), None);
         assert_eq!(parse(r#"{"type":"bogus"}"#), None);
         assert_eq!(parse(r#"{"type":"next"}"#), Some(FromSkin::Next {}));
+        assert_eq!(
+            parse(r#"{"type":"select","index":3}"#),
+            Some(FromSkin::Select { index: 3 })
+        );
+        assert_eq!(parse(r#"{"type":"select","index":-1}"#), None);
+        assert_eq!(parse(r#"{"type":"select","index":3,"evil":1}"#), None);
         assert_eq!(
             parse(r#"{"type":"mute","value":true}"#),
             Some(FromSkin::Mute { value: true })
