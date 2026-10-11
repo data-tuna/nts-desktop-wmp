@@ -28,8 +28,9 @@ Written in English.
 ## Layout
 
     src/                  The frontend: Vite + TypeScript. main.ts is the
-                          trusted page: it owns the audio and answers the
-                          skin. skin/stub.html stands in for the skin engine
+                          trusted page: it owns the audio, saves the
+                          settings and answers the skin. player.ts keeps a
+                          channel playing and reconnects. skin/stub.html stands in for the skin engine
                           until ATA-108. live.ts reads the NTS live API; picks.ts and
                           mixtapes.ts parse the NTS Picks and Infinite
                           Mixtapes APIs. All three are copied from
@@ -81,7 +82,11 @@ APIs are undocumented too: when they fail, the app plays just the channels.
 
 **A dropped stream reconnects to the same channel.** Retry with backoff; never
 skip to the next channel on a drop. Pause and stop are never undone by a
-retry.
+retry. `player.ts` does this, and treats an error, an `ended` event and a
+clock stuck for 10 s alike.
+
+**The app always opens on NTS 1 and plays it.** Volume, mute, balance and the
+EQ are remembered (`localStorage` in the trusted page); the channel is not.
 
 **Skins are fetched at runtime and never committed.** `.wmz` skins are
 third-party works, and many of the classic ones are Microsoft's own. They
@@ -193,10 +198,20 @@ hidden desktop (a debug build needs `npx vite` running for its pages):
     powershell -File tools/window-shot.ps1 "NTS Radio Bootleg Media Player" shot.png
     powershell -File tools/region-shot.ps1 "NTS Radio Bootleg Media Player" shot.png
     powershell -File tools/ram.ps1 nts-desktop-wmp
+    node tools/proxy.mjs 8899                    A CONNECT proxy you can cut; see below
 
 `region-shot.ps1` greys out what the window region cuts away, as Windows
 reports it. `escape.mjs` reloads the trusted page when it finishes, since its
 forced-fallback test leaves that page on `postMessage` IPC.
+
+**Testing reconnect.** Add `--proxy-server=http://127.0.0.1:8899` to the
+browser arguments, run `node tools/proxy.mjs 8899`, and cut it with
+`curl "http://127.0.0.1:8899/cut?seconds=30"`. Its log shows each tunnel
+opening and closing. DevTools' offline emulation does not interrupt a stream
+that is already playing, so it proves nothing here. Add `--mute-audio` too:
+the stream plays and the analyser still reads its level, but nothing comes
+out of the speakers. Give the run its own `WEBVIEW2_USER_DATA_FOLDER` and
+DevTools port if another copy of the app may be running.
 
 **Never drive the real mouse or keyboard, and keep the app off the screen.**
 The machine is in use. Use `hidden-run.ps1`, and keep the volume at 0 if you

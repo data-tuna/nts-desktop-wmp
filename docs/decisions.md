@@ -6,6 +6,25 @@ the evidence.
 
 ## Stack
 
+### The core player (ATA-109, 2026-10-11)
+
+- **The playlist is NTS 1 and NTS 2.** On launch NTS 1 plays, whatever was
+  playing at exit. Next and previous switch channels and wrap around; while
+  stopped or paused they select the channel without playing it.
+- **Pause drops the connection, as stop does.** Resuming a paused live
+  stream would play from minutes ago; Play always reloads the stream.
+- **Reconnect** (`player.ts`): an `error`, an `ended`, or a clock that has
+  not moved for 10 s while playing reloads the same channel after 1, 2, 4,
+  then every 8 s, until it plays again; a moving clock resets the backoff.
+  Pause and stop cancel a pending retry. Checked on a release build through
+  `tools/proxy.mjs`: a 30 s cut on NTS 1 showed `reconnecting` within 3 s
+  (the buffer played out first), six retries all to `/nts1`, and playback
+  5 s after the cut ended. A pause during a cut stayed paused: no tunnel
+  opened after the cut ended.
+- **Remembered:** volume, mute, balance and the EQ, in the trusted page's
+  `localStorage`, clamped on load. **Not yet:** the last skin. Nothing
+  chooses a skin until ATA-112, so it is left to that issue.
+
 ### Skin code runs in its own webview, with no capabilities (ATA-107, 2026-10-11)
 
 **The host.** The main window holds two webviews. `main` is the trusted
@@ -86,7 +105,9 @@ unknown fields included, and refuses requests from any webview but `skin`
 
 | Message | Handled by |
 |---|---|
-| `{ "type": "play" }`, `{ "type": "stop" }` | the trusted page |
+| `{ "type": "play" }`, `{ "type": "pause" }`, `{ "type": "stop" }` | the trusted page |
+| `{ "type": "next" }`, `{ "type": "previous" }` | the trusted page: the other channel, wrapping around |
+| `{ "type": "mute", "value": true \| false }` | the trusted page |
 | `{ "type": "volume", "value": 0..1 }`, `{ "type": "balance", "value": -1..1 }` | the trusted page, clamped |
 | `{ "type": "eq", "band": 0..9, "gain": -15..15 }` | the trusted page, clamped |
 | `{ "type": "seek", "seconds": n }` | accepted, ignored: live streams cannot seek |
@@ -94,9 +115,17 @@ unknown fields included, and refuses requests from any webview but `skin`
 | `{ "type": "shape", "width", "height", "rects": [[x, y, w, h], …] }` | Rust: sizes the window and sets its region. Ignored unless the view is 1–4096 px a side and every run is non-empty and inside it, with at most ceil(width / 2) runs per row |
 
 Host to skin: the trusted page calls the `skin_send` command, and Rust
-dispatches a `message` event in the skin webview. Today that is
-`{ "type": "state", "playing", "time", "title", "level" }`, four times a
-second. The skin also gets `GET /` (the engine page) and `GET /files/<name>`
+dispatches a `message` event in the skin webview. Today that is, four times
+a second (ATA-109):
+
+    { "type": "state", "playState", "channel", "title", "time", "duration",
+      "volume", "mute", "balance", "eq", "level" }
+
+`playState` is `playing`, `buffering`, `reconnecting`, `paused` or
+`stopped`. `duration` is 0 for a live stream, as in WMP: a skin shows its
+seek bar disabled. `volume`, `mute`, `balance` and `eq` (ten gains in dB)
+are the saved settings, so a skin's controls start where the listener left
+them. The skin also gets `GET /` (the engine page) and `GET /files/<name>`
 (the skin's own files) from the protocol, and nothing of the app's.
 
 **Window shape.** The skin computes its opaque runs from the view's
