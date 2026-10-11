@@ -325,6 +325,7 @@ points:
 | Halloween, Bars and a scrolling title | 39.7–49.5 | 30.3–30.4 |
 | Bootleg House, Bars and a title scrolling every 40 ms | 36.4–43.3 | 27.9–40.4 |
 | The Winamp app 0.1.2, its spectrum showing | 12.7–22.5 | |
+| The Winamp app 0.1.2, its visualiser clicked off | 5.7 | |
 
 What is left is mostly the frames' trip, not the drawing. Stopping the
 frames on Bootleg House took it from about 30 % to 15 %, though each frame
