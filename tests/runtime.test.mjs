@@ -204,7 +204,7 @@ test("the view timer and moveTo run their handlers", async () => {
     `<theme><view width="100" height="100" timerInterval="10" onTimer="ticks++;">
        <subview id="m" left="0" top="40" width="10" height="10" onEndMove="moved = [left, top];"/>
      </view></theme>`,
-    {},
+    { "c.js": "" },
   );
   js("(ticks = 0, moved = null, m.moveTo(20, 0, 30))");
   await new Promise((r) => setTimeout(r, 120));

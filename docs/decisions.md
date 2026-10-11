@@ -206,7 +206,8 @@ WMP or from the GPL WMP 8 clone. `src/skin/effects.ts` has them.
 
 - **Data.** The trusted page reads a second analyser, tapped from the
   stream before the volume, so the visualisation moves at any volume and
-  when muted, as WMP's does. About 30 times a second it sends
+  when muted, as WMP's does. It has 8192 points (6 Hz bins), so the lowest
+  bars, 8 Hz apart, each read their own bin. About 30 times a second it sends
   `{ "type": "vis", "bars": [32 × 0..255], "wave": [96 × 0..255] }` through
   `skin_send`, but only while the skin has said a visualisation is on screen
   (`effects` message) and the stream is playing. Each frame repaints the

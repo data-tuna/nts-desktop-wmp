@@ -22,8 +22,9 @@ const source = ctx.createMediaElementSource(audio);
 analyser.connect(ctx.destination);
 // The visualisations read the stream before the volume, as WMP's do, so
 // they move at any volume and when muted. Loud music tops out near -15 dB,
-// which leaves the bars some headroom.
-const visAnalyser = new AnalyserNode(ctx, { minDecibels: -90, maxDecibels: -15 });
+// which leaves the bars some headroom. 8192 points give 6 Hz bins, so the
+// lowest bars, 8 Hz apart, each read their own.
+const visAnalyser = new AnalyserNode(ctx, { fftSize: 8192, minDecibels: -90, maxDecibels: -15 });
 source.connect(visAnalyser);
 
 const player = createPlayer(audio);
@@ -112,7 +113,8 @@ setInterval(() => {
 // while the window is minimised, so requestAnimationFrame, and the frames,
 // stop then.
 const spectrum = new Uint8Array(visAnalyser.frequencyBinCount);
-const wave = new Uint8Array(visAnalyser.fftSize);
+// The scope shows the first 2048 samples (43 ms): the whole 8192 would alias at 96 points.
+const wave = new Uint8Array(2048);
 let lastFrame = 0;
 function visFrame(now: number) {
   requestAnimationFrame(visFrame);
