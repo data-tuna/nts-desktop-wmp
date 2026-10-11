@@ -124,3 +124,43 @@ test("play while playing keeps the stream; a refused autoplay stops instead of l
   mock.timers.tick(60_000);
   assert.equal(blocked.state().playState, "stopped");
 });
+
+/** A SoundCloud widget stand-in that records what it was told. */
+function fakeWidget() {
+  const w = { calls: [], playing: false, time: 0 };
+  for (const name of ["play", "pause", "stop", "unload"]) w[name] = (url) => w.calls.push(url ? `${name} ${url}` : name);
+  return w;
+}
+
+test("mixtapes and picks join the playlist; a pick plays through the widget, a stream lets go of it", () => {
+  const audio = fakeAudio();
+  const widget = fakeWidget();
+  const items = [...CHANNELS, { title: "Poolside", url: "https://streams.radiomast.io/poolside" }, { title: "A pick", url: "https://soundcloud.com/a/b", pick: true }];
+  const player = createPlayer(audio, items, widget);
+  player.play();
+  player.select(3);
+  assert.equal(player.state().playState, "buffering");
+  widget.playing = true;
+  widget.time = 12;
+  assert.deepEqual(player.state(), { playState: "playing", channel: 3, title: "A pick", time: 12 });
+  assert.equal(audio.src, "", "the stream stops while a pick plays");
+  player.pause();
+  player.play();
+  player.step(1);
+  assert.deepEqual(audio.loads, [NTS1, NTS1]);
+  assert.deepEqual(widget.calls, ["unload", "play https://soundcloud.com/a/b", "pause", "play https://soundcloud.com/a/b", "unload"]);
+  player.step(-2);
+  assert.deepEqual(audio.loads.at(-1), "https://streams.radiomast.io/poolside");
+});
+
+test("a stalled pick is not reloaded", () => {
+  const audio = fakeAudio();
+  const widget = fakeWidget();
+  const player = createPlayer(audio, [...CHANNELS, { title: "A pick", url: "https://soundcloud.com/a/b", pick: true }], widget);
+  player.select(2);
+  player.play();
+  audio.fire("error");
+  mock.timers.tick(60_000);
+  assert.deepEqual(widget.calls, ["play https://soundcloud.com/a/b"]);
+  assert.equal(player.state().playState, "buffering");
+});

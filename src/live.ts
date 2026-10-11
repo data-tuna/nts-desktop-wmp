@@ -1,7 +1,8 @@
 // The NTS live API: undocumented, no key, and free to change or vanish.
 // Nothing here may throw into playback; see AGENTS.md, Invariants.
 // Copied from nts-desktop-winamp's src/live.ts at 6379c0e (PR #9, which
-// exports `text`); fix a bug in both copies.
+// exports `text`); fix a bug in both copies. Since then this copy also keeps
+// the show and the location apart (`show`, `location`), for WMP's item info.
 
 export const LIVE_API = "https://www.nts.live/api/v2/live";
 
@@ -12,6 +13,8 @@ export type OnAir = {
    * A hyphen, not an em dash: Winamp's bitmap font has no `—`.
    */
   title: string;
+  show: string;
+  location?: string;
   artwork?: string;
   /** Epoch ms; undefined when the API's timestamp does not parse. */
   endsAt?: number;
@@ -76,6 +79,8 @@ export function parseLive(body: unknown): (OnAir | undefined)[] {
     const next = asBroadcast(result?.next);
     return {
       title: location ? `${show.title} - ${location}` : show.title,
+      show: show.title,
+      location,
       artwork: url(details?.media?.picture_small),
       endsAt: time(show.end_timestamp),
       next: next && { title: next.title, startsAt: time(next.start_timestamp) },

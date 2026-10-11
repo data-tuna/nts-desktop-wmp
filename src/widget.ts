@@ -1,0 +1,156 @@
+// NTS Picks play through SoundCloud's embed widget, out of sight in the
+// trusted page, as nts.live and the Winamp app play them. Never through
+// `/api/v2/resolve-stream`. The widget's audio does not pass through our Web
+// Audio graph (it is another origin's frame), so the EQ, balance and the
+// visualiser's level do not follow a pick; volume and mute do.
+// Adapted from nts-desktop-winamp's src/picks.ts at bdc0f10, which drives
+// Webamp's media layer instead of player.ts.
+import type { Widget } from "./player";
+
+const WIDGET = "https://w.soundcloud.com/player/";
+const WIDGET_ORIGIN = "https://w.soundcloud.com";
+// A pick asked to play that has not started by then is given up on.
+const START_TIMEOUT_MS = 15_000;
+
+type Events = {
+  /** The pick played to its end. */
+  finish(): void;
+  /** Unreachable, removed, blocked, or not started in time. */
+  error(reason: unknown): void;
+  /** The widget paused itself (Windows' media overlay reaches it directly). */
+  paused(): void;
+  /** The uploader's SoundCloud name, once the pick has loaded. */
+  uploader(url: string, name: string): void;
+};
+
+export function createWidget(on: Events): Widget & { setVolume(volume: number): void } {
+  const frame = document.createElement("iframe");
+  frame.title = "SoundCloud player";
+  frame.allow = "autoplay";
+  frame.tabIndex = -1;
+  frame.setAttribute("aria-hidden", "true");
+  frame.style.display = "none";
+  document.body.append(frame);
+
+  let url = "";
+  let ready = false;
+  let playing = false;
+  let wanted = false;
+  let time = 0;
+  let volume = 100;
+  let startTimer: ReturnType<typeof setTimeout> | undefined;
+
+  const send = (method: string, value?: unknown) => frame.contentWindow?.postMessage(JSON.stringify({ method, value }), WIDGET_ORIGIN);
+  const started = () => {
+    clearTimeout(startTimer);
+    startTimer = undefined;
+  };
+  const expectStart = () => {
+    started();
+    startTimer = setTimeout(() => giveUp("timeout"), START_TIMEOUT_MS);
+  };
+  const giveUp = (reason: unknown) => {
+    started();
+    if (!url) return;
+    console.warn("SoundCloud widget gave up", url, reason);
+    wanted = false;
+    // Play loads it again from the start.
+    widget.unload();
+    on.error(reason);
+  };
+
+  window.addEventListener("message", (event) => {
+    if (event.origin !== WIDGET_ORIGIN || event.source !== frame.contentWindow || !url) return;
+    let message: { method?: string; value?: unknown };
+    try {
+      message = JSON.parse(String(event.data));
+    } catch {
+      return;
+    }
+    // The frame keeps its window across src changes, so the previous pick's
+    // page can still talk after a switch. The new page always sends ready first.
+    if (!ready && message.method !== "ready") return;
+    const value = message.value as Record<string, unknown> | undefined;
+    switch (message.method) {
+      case "ready":
+        ready = true;
+        for (const name of ["playProgress", "play", "pause", "finish", "error"]) send("addEventListener", name);
+        send("setVolume", volume);
+        send("getCurrentSound");
+        if (wanted) send("play");
+        break;
+      case "getCurrentSound": {
+        const user = (value?.user as { username?: unknown } | undefined)?.username;
+        if (typeof user === "string" && user.trim()) on.uploader(url, user.trim());
+        break;
+      }
+      case "playProgress":
+        time = Number(value?.currentPosition) / 1000 || 0;
+        break;
+      case "play":
+        started();
+        playing = true;
+        break;
+      case "pause":
+        playing = false;
+        if (wanted) {
+          wanted = false;
+          on.paused();
+        }
+        break;
+      case "finish":
+        playing = wanted = false;
+        on.finish();
+        break;
+      case "error":
+        giveUp(value);
+        break;
+    }
+  });
+
+  const widget = {
+    play(next: string) {
+      wanted = true;
+      expectStart();
+      if (next === url && ready) {
+        send("play");
+        return;
+      }
+      url = next;
+      ready = playing = false;
+      time = 0;
+      frame.src = `${WIDGET}?url=${encodeURIComponent(url)}&auto_play=false&visual=false`;
+    },
+    pause() {
+      started();
+      wanted = false;
+      send("pause");
+    },
+    stop() {
+      widget.pause();
+      send("seekTo", 0);
+      time = 0;
+    },
+    unload() {
+      started();
+      if (!url) return;
+      url = "";
+      ready = playing = wanted = false;
+      time = 0;
+      // Removing the src attribute would leave the widget's page running, and playing.
+      frame.src = "about:blank";
+    },
+    get playing() {
+      return playing;
+    },
+    get time() {
+      return time;
+    },
+    /** 0..1, mute included. */
+    setVolume(v: number) {
+      volume = Math.round(v * 100);
+      send("setVolume", volume);
+    },
+  };
+  return widget;
+}
