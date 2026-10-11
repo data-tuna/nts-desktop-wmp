@@ -30,8 +30,9 @@ Written in English.
     src/                  The frontend: Vite + TypeScript. main.ts is the
                           trusted page: it owns the audio, saves the
                           settings and answers the skin. player.ts keeps a
-                          channel playing and reconnects. skin/stub.html stands in for the skin engine
-                          until ATA-108. live.ts reads the NTS live API; picks.ts and
+                          channel playing and reconnects. skin/stub.html
+                          stands in for the skin engine until ATA-108.
+                          live.ts reads the NTS live API; picks.ts and
                           mixtapes.ts parse the NTS Picks and Infinite
                           Mixtapes APIs. All three are copied from
                           nts-desktop-winamp; see Gotchas.

@@ -25,7 +25,8 @@ the evidence.
   opened after the cut ended.
 - **Remembered:** volume, mute, balance and the EQ, in the trusted page's
   `localStorage`, clamped on load. **Not yet:** the last skin. Nothing
-  chooses a skin until ATA-112, so it is left to that issue.
+  chooses a skin until ATA-112, so it is left to that issue (noted on
+  ATA-112, with its conflict with a random skin on launch, for Ata).
 
 ### Skin code runs in its own webview, with no capabilities (ATA-107, 2026-10-11)
 
