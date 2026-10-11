@@ -6,6 +6,59 @@ the evidence.
 
 ## Stack
 
+### Windows behaviour: tray, single instance, window memory, media keys, credit (ATA-115, 2026-10-11)
+
+- **Tray icon:** Play, Stop, NTS 1, NTS 2, the pick's credit while one
+  plays, and Quit. A left click brings the player forward; the tooltip is
+  the current title, cut to the 127 UTF-16 units Windows keeps. The menu
+  ids reach `main.ts` as a `tray` event, as in the Winamp app.
+- **One copy runs at a time** (`tauri-plugin-single-instance`, first in the
+  builder). A second launch brings the first copy forward, unminimised, and
+  exits before it creates a webview: plugins start in `Builder::build`,
+  windows only later in `run`. The lock is named after the identifier, so
+  the Winamp app keeps its own; checked with both running.
+- **The position is remembered** (`tauri-plugin-window-state`, position
+  only; the skin sets the size). It is restored in setup, and the window is
+  pulled into its monitor's work area when any corner is off every
+  monitor, at launch and whenever a skin changes the window's size (not on
+  every shape message, so a window parked partly off screen stays put). `pull_on_screen`,
+  `fully_visible` and `fit_into` come from the Winamp app (ATA-71).
+- **A pick's credit belongs to the app.** While a pick plays and is not
+  stopped, a `credit` webview (our `credit.html`, whose capability allows
+  only `credit`, `credit_size` and `open_credit`) shows "<uploader> on
+  SoundCloud ↗" over the skin's top-left corner, at 16 px, white on
+  `#c43c00` (5.3:1). It measures
+  itself, Rust sizes it and adds its rectangle to the window's shape, and a
+  click opens the track's page, which Rust holds and accepts only as an
+  `https://soundcloud.com/` URL. The tray lists the same credit. A webview
+  of its own, because the skin webview runs the skin's code, which could
+  hide or fake anything drawn there. It costs one renderer, about 23 MB
+  private, only while a pick plays (389 MB against 366 MB without it,
+  measured with a pick playing).
+- **Pause and stop swap the stream for a silent clip** (reverses part of
+  ATA-109's "pause drops the connection"). Removing the src destroys
+  WebView2's media player, and with it the media session: after a pause
+  from the media keys Windows listed no session, so Play could not reach the
+  app. Keeping the stream paused kept the session but also its connection
+  (Tirci Lama found the edge server still holding a stalled one after
+  270 s), which would still count as a listener. So pause and stop load a
+  6 s silent WAV built in memory (`silence()` in `player.ts`), play it for
+  a moment and pause it: no network, and Play sets the stream's src afresh.
+  Both halves matter: a clip that never plays, or one shorter than about
+  5 s, is left out of the session, and Windows dropped the app as before.
+  Checked through a proxy: the stream's connection closed within seconds
+  of each pause and stop, and the session stayed, Paused. The media keys and the overlay already
+  went through `navigator.mediaSession` handlers to `player.pause()`,
+  `play()` and `stop()`, so a pause from them is the player's own: it
+  stayed paused for 30 s, with no watchdog reload.
+- **Launch exits explained.** Copies of the app built by different agents
+  share one WebView2 profile, since the identifier names it. A copy whose
+  browser arguments differ panics in setup with `0x800700AA` and exits with
+  `0xC0000409`, seen in the event log as a BEX64 fault in
+  `nts-desktop-wmp.exe`; copies with the same arguments share a browser
+  process that dies with the first copy closed. AGENTS.md, Gotchas, has the
+  testing rules that follow.
+
 ### Now playing, Infinite Mixtapes and NTS Picks (ATA-113, 2026-10-11)
 
 - **One playlist:** NTS 1, NTS 2, then the Infinite Mixtapes, then the
@@ -58,7 +111,8 @@ the evidence.
 - **The playlist is NTS 1 and NTS 2.** On launch NTS 1 plays, whatever was
   playing at exit. Next and previous switch channels and wrap around; while
   stopped or paused they select the channel without playing it.
-- **Pause drops the connection, as stop does.** Resuming a paused live
+- **Pause drops the connection, as stop does.** (Reversed by ATA-115:
+  pause and stop now load a silent clip, so the media session survives.) Resuming a paused live
   stream would play from minutes ago, so Play after a pause reloads it.
   Play while playing does nothing. If WebView2 refuses autoplay, the player
   goes to `stopped` and waits for Play rather than retrying.

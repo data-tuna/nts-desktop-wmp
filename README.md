@@ -13,7 +13,9 @@ you listen a lot, support the station directly:
 
 Status: in progress. The app opens on NTS 1 in a
 random skin from the archive, one of the 59 the engine draws well so far.
-Right-click the skin to pick another; the app keeps your pick. Without a
+Right-click the skin to pick another; the app keeps your pick. The tray icon
+plays, stops and switches channels, the media keys work, and only one copy
+runs at a time. The window opens where you left it. Without a
 network it wears Bootleg House, the one skin drawn for this project.
 Windows comes first, then macOS.
 

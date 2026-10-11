@@ -2,7 +2,7 @@
 // a stand-in for the <audio> element and mocked timers.
 import assert from "node:assert/strict";
 import { afterEach, beforeEach, mock, test } from "node:test";
-import { CHANNELS, createPlayer } from "../src/player.ts";
+import { CHANNELS, createPlayer, silence } from "../src/player.ts";
 
 beforeEach(() => mock.timers.enable({ apis: ["setTimeout", "setInterval", "Date"] }));
 afterEach(() => mock.timers.reset());
@@ -17,6 +17,8 @@ function fakeAudio() {
     readyState: 0,
     loads: [],
     play() {
+      // The silent clip pause and stop hold is not a stream load.
+      if (audio.src === silence()) return Promise.resolve();
       audio.loads.push(audio.src);
       audio.paused = false;
       audio.readyState = 4;
@@ -105,6 +107,31 @@ test("pause and stop cancel a pending retry", () => {
     mock.timers.tick(60_000);
     assert.equal(audio.loads.length, 1, action);
     assert.equal(player.state().playState, action === "pause" ? "paused" : "stopped");
+  }
+});
+
+test("the silent clip is a 6 s WAV", async () => {
+  const wav = new Uint8Array(await (await fetch(silence())).arrayBuffer());
+  const text = (a, b) => String.fromCharCode(...wav.slice(a, b));
+  assert.equal(text(0, 4) + text(8, 16) + text(36, 40), "RIFFWAVEfmt data");
+  assert.equal(wav.length, 44 + 6 * 8000);
+  assert.ok(wav.slice(44).every((b) => b === 128));
+});
+
+test("pause and stop hold a silent clip, not the stream; play loads afresh", () => {
+  for (const action of ["pause", "stop"]) {
+    const audio = fakeAudio();
+    const player = createPlayer(audio);
+    player.play();
+    player[action]();
+    assert.equal(audio.src, silence(), action);
+    assert.equal(audio.loop, true, action);
+    assert.equal(audio.paused, true, action);
+    // Paused, a stalled clock is not a drop.
+    mock.timers.tick(30_000);
+    assert.equal(audio.loads.length, 1, action);
+    player.play();
+    assert.deepEqual(audio.loads, [NTS1, NTS1], action);
   }
 });
 

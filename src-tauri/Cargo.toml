@@ -19,14 +19,17 @@ tauri-build = { version = "2", features = [] }
 [dependencies]
 # `unstable` for Window::add_child, which the skin webview rests on and semver
 # does not cover: pinned to the minor version it was checked on (ATA-107).
-tauri = { version = "~2.12.3", features = ["unstable"] }
+tauri = { version = "~2.12.3", features = ["unstable", "tray-icon"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 # Skins come from archive.org, which sends no CORS headers (ATA-112). The
 # system's TLS (SChannel on Windows) keeps the binary small.
 ureq = { version = "3", default-features = false, features = ["native-tls"] }
 md-5 = "0.11"
-tauri-plugin-updater = "2"
+tauri-plugin-single-instance = "2"
+tauri-plugin-window-state = "2"
+# No rustls or zip: SChannel, as for ureq; the signed artifact is the -setup.exe itself.
+tauri-plugin-updater = { version = "2", default-features = false, features = ["native-tls"] }
 
 # Size over speed: https://tauri.app/concept/size/#cargo-configuration
 [profile.release]
