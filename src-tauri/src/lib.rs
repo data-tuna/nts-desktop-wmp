@@ -134,7 +134,11 @@ const HOUSE_SKIN: &[u8] = include_bytes!("../../skins/house/house.wmz");
 // skin cache (ATA-112) serves the cached skin instead.
 fn skin_file() -> Response<Vec<u8>> {
     let bytes = std::env::var_os("NTS_WMP_SKIN")
-        .and_then(|path| std::fs::read(path).ok())
+        .and_then(|path| {
+            std::fs::read(&path)
+                .inspect_err(|e| eprintln!("NTS_WMP_SKIN {path:?}: {e}; using the house skin"))
+                .ok()
+        })
         .unwrap_or_else(|| HOUSE_SKIN.to_vec());
     Response::builder().body(bytes).unwrap()
 }

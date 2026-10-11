@@ -281,6 +281,7 @@ call script functions are left as the markup has them until the script
 runtime (ATA-110). The engine logs each attribute it skips.
 
 **Some controls do nothing yet.** Minimize and close have no message in the
-skin protocol (the house skin has neither button yet), and other `onClick` handlers need scripts; they are logged.
+skin protocol (the house skin has neither button yet), and other `onClick`
+handlers need scripts; they are logged.
 Fast forward, rewind and seek sliders are drawn disabled: a live stream has
 no length. EQ sliders show the saved gains but do not send changes yet.

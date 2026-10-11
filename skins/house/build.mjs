@@ -4,8 +4,9 @@
 //
 //   npm run build:house
 //
-// The output is byte-for-byte reproducible, and tests/house.test.mjs checks
-// that the committed house.wmz matches its sources.
+// The same sources give the same files (the zip bytes may differ with
+// Node's zlib), and tests/house.test.mjs checks that the files in the
+// committed house.wmz match what its sources build.
 import { Resvg } from "@resvg/resvg-js";
 import { readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -43,7 +44,8 @@ export function showLayers(svg, layers) {
   const out = svg.replace(/<g\b[^>]*\binkscape:groupmode="layer"[^>]*>/g, (tag) => {
     const id = /\bid="([^"]+)"/.exec(tag)?.[1];
     found.add(id);
-    return !layers.length || shown.has(id) ? tag : tag.replace("<g", '<g style="display:none"');
+    // Inkscape may have written its own style (display:inline): replace it.
+    return !layers.length || shown.has(id) ? tag : tag.replace(/\sstyle="[^"]*"/, "").replace("<g", '<g style="display:none"');
   });
   for (const id of shown) if (!found.has(id)) throw new Error(`no layer "${id}"`);
   return out;

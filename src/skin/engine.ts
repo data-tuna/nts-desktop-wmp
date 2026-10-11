@@ -433,8 +433,14 @@ class El {
   }
 
   /** The playlist's row height, in px. */
-  rowHeight(): number {
+  private rowHeight(): number {
     return Math.round(this.fontPx() * 2);
+  }
+
+  /** The playlist row under a point in the parent's coordinates, or -1. */
+  rowAt(py: number): number {
+    const i = Math.floor((py - this.y) / this.rowHeight());
+    return i >= 0 && i < CHANNELS.length ? i : -1;
   }
 
   /** The playlist: the channels, one row each, the current one in the
@@ -895,11 +901,13 @@ export class Skin {
   /** A click on a playlist row selects that channel: the player's next and
    * previous step through the channels, playing if it was playing. */
   private pick(list: El, ev: MouseEvent) {
-    const [, y] = this.point(ev);
-    const i = Math.floor((y - list.origin()[1] - list.y) / list.rowHeight());
-    if (i < 0 || i >= CHANNELS.length) return;
+    const i = list.rowAt(this.point(ev)[1] - list.origin()[1]);
+    if (i < 0) return;
     const steps = (i - this.state.channel + CHANNELS.length) % CHANNELS.length;
     for (let n = 0; n < steps; n++) this.send({ type: "next" });
+    // Set locally too, so a second click before the host's next state does not step again.
+    this.state.channel = i;
+    this.paint();
   }
 
   private click(e: El) {
