@@ -17,7 +17,11 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-tauri = { version = "2", features = [] }
+# `unstable` for Window::add_child, which the skin webview rests on and semver
+# does not cover: pinned to the minor version it was checked on (ATA-107).
+tauri = { version = "~2.12.3", features = ["unstable"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
 
 # Size over speed: https://tauri.app/concept/size/#cargo-configuration
 [profile.release]

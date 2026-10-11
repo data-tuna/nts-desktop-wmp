@@ -15,9 +15,13 @@
       {
         "label": "main",
         "title": "NTS Radio Bootleg Media Player",
-        "width": 480,
-        "height": 320,
-        "center": true
+        "width": 234,
+        "height": 201,
+        "center": true,
+        "decorations": false,
+        "shadow": false,
+        "resizable": false,
+        "additionalBrowserArgs": "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection --autoplay-policy=no-user-gesture-required"
       }
     ],
     "security": {

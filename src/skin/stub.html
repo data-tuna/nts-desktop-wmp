@@ -1,0 +1,81 @@
+<!doctype html>
+<!--
+  ATA-107 stub skin. Stands in for the skin engine (ATA-108): it runs where
+  skin code will run, in the "skin" webview at http://skin.localhost, and
+  talks to the trusted page only through the protocol in docs/decisions.md.
+  It draws the skin's background.bmp, cuts the window to its
+  transparencyColor, and sends play, stop and volume.
+-->
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <style>
+      html, body { margin: 0; overflow: hidden; background: #000; user-select: none; }
+      canvas { display: block; }
+      #controls { position: absolute; left: 50px; top: 150px; display: flex; gap: 4px; align-items: center; }
+      #state { position: absolute; left: 50px; top: 178px; color: #9cf; font: 11px/1.4 Tahoma, sans-serif; white-space: pre; }
+      button { font: 11px Tahoma, sans-serif; }
+      input { width: 60px; }
+    </style>
+  </head>
+  <body>
+    <canvas id="bg"></canvas>
+    <div id="state">waiting for the host</div>
+    <div id="controls">
+      <button id="play">Play</button>
+      <button id="stop">Stop</button>
+      <input id="volume" type="range" min="0" max="100" value="80" aria-label="Volume" />
+    </div>
+    <script>
+      // Skin to host: a POST the Rust protocol handler checks against a fixed
+      // list of messages. Host to skin: "message" events with { type: "state" }.
+      const send = (msg) => fetch("/msg", { method: "POST", body: JSON.stringify(msg) });
+
+      document.getElementById("play").onclick = () => send({ type: "play" });
+      document.getElementById("stop").onclick = () => send({ type: "stop" });
+      document.getElementById("volume").oninput = (e) => send({ type: "volume", value: e.target.value / 100 });
+
+      // Dragging by the body: anywhere that is not a control.
+      document.addEventListener("mousedown", (e) => {
+        if (e.button === 0 && !e.target.closest("#controls")) send({ type: "drag" });
+      });
+
+      window.addEventListener("message", (e) => {
+        const s = e.data;
+        if (s?.type !== "state") return;
+        document.getElementById("state").textContent =
+          `${s.title}  ${s.playing ? "Playing" : "Stopped"} ${fmt(s.time)}  level ${s.level.toFixed(2)}`;
+      });
+      const fmt = (t) => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, "0")}`;
+
+      // The view's shape: every pixel that is not transparencyColor, as
+      // one rectangle per horizontal run.
+      const TRANSPARENT = [0xff, 0x00, 0xff];
+      const img = new Image();
+      img.onload = () => {
+        const c = document.getElementById("bg");
+        c.width = img.width;
+        c.height = img.height;
+        const g = c.getContext("2d");
+        g.drawImage(img, 0, 0);
+        const px = g.getImageData(0, 0, c.width, c.height).data;
+        const rects = [];
+        for (let y = 0; y < c.height; y++) {
+          let start = -1;
+          for (let x = 0; x <= c.width; x++) {
+            const i = (y * c.width + x) * 4;
+            const clear = x === c.width || (px[i] === TRANSPARENT[0] && px[i + 1] === TRANSPARENT[1] && px[i + 2] === TRANSPARENT[2]);
+            if (!clear && start < 0) start = x;
+            if (clear && start >= 0) {
+              rects.push([start, y, x - start, 1]);
+              start = -1;
+            }
+          }
+        }
+        send({ type: "shape", width: c.width, height: c.height, rects });
+      };
+      img.onerror = () => (document.getElementById("state").textContent = "no background.bmp: set NTS_WMP_SKIN_DIR");
+      img.src = "/files/background.bmp";
+    </script>
+  </body>
+</html>
