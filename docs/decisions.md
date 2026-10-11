@@ -12,7 +12,9 @@ the evidence.
   playing at exit. Next and previous switch channels and wrap around; while
   stopped or paused they select the channel without playing it.
 - **Pause drops the connection, as stop does.** Resuming a paused live
-  stream would play from minutes ago; Play always reloads the stream.
+  stream would play from minutes ago, so Play after a pause reloads it.
+  Play while playing does nothing. If WebView2 refuses autoplay, the player
+  goes to `stopped` and waits for Play rather than retrying.
 - **Reconnect** (`player.ts`): an `error`, an `ended`, or a clock that has
   not moved for 10 s while playing reloads the same channel after 1, 2, 4,
   then every 8 s, until it plays again; a moving clock resets the backoff.

@@ -14,7 +14,7 @@ const RETRY_MAX_MS = 8000;
 const STALL_MS = 10_000;
 
 /** WMP's play states, as far as a radio needs them. */
-export type PlayState = "playing" | "paused" | "stopped" | "buffering" | "reconnecting";
+type PlayState = "playing" | "paused" | "stopped" | "buffering" | "reconnecting";
 
 type Media = Pick<
   HTMLMediaElement,
@@ -38,8 +38,11 @@ export function createPlayer(audio: Media) {
     lastTime = 0;
     movedAt = Date.now();
     audio.src = CHANNELS[channel].url;
-    // A failed load also fires "error", which reconnects.
-    audio.play().catch(() => {});
+    audio.play().catch((e: Error) => {
+      // Autoplay refused: wait for the listener's Play rather than retry forever.
+      // A failed load fires "error" instead, which reconnects.
+      if (e.name === "NotAllowedError") mode = "stopped";
+    });
   };
   // A live stream has nothing to resume, so pause drops the connection too.
   const disconnect = () => {
@@ -72,12 +75,17 @@ export function createPlayer(audio: Media) {
     } else if (Date.now() - movedAt >= STALL_MS) drop();
   }, 1000);
 
-  const player = {
+  const start = () => {
+    cancel();
+    retryMs = RETRY_MIN_MS;
+    mode = "playing";
+    load();
+  };
+
+  return {
+    /** Does nothing while playing; during a retry it reloads now. */
     play() {
-      cancel();
-      retryMs = RETRY_MIN_MS;
-      mode = "playing";
-      load();
+      if (mode !== "playing" || timer !== undefined) start();
     },
     pause() {
       cancel();
@@ -92,7 +100,7 @@ export function createPlayer(audio: Media) {
     /** Next (1) or previous (-1) channel, wrapping around. */
     step(by: number) {
       channel = (channel + by + CHANNELS.length) % CHANNELS.length;
-      if (mode === "playing") player.play();
+      if (mode === "playing") start();
     },
     state() {
       const playState: PlayState =
@@ -106,5 +114,4 @@ export function createPlayer(audio: Media) {
       return { playState, channel, title: CHANNELS[channel].title, time: audio.currentTime };
     },
   };
-  return player;
 }

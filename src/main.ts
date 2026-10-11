@@ -64,13 +64,16 @@ function onSkin(m: FromSkin) {
   else if (m.type === "stop") player.stop();
   else if (m.type === "next") player.step(1);
   else if (m.type === "previous") player.step(-1);
-  else if (m.type === "volume") settings.volume = clamp(m.value, 0, 1, settings.volume);
-  else if (m.type === "balance") settings.balance = clamp(m.value, -1, 1, settings.balance);
-  else if (m.type === "mute") settings.mute = m.value;
-  else if (m.type === "eq" && settings.eq[m.band] !== undefined) settings.eq[m.band] = clamp(m.gain, -15, 15, 0);
-  // ponytail: seek is accepted but a live stream has nowhere to seek to.
-  // Mixtapes are live too; revisit if a seekable source ever arrives.
-  apply();
+  else if (m.type === "seek") {
+    // ponytail: seek is accepted but a live stream has nowhere to seek to.
+    // Mixtapes are live too; revisit if a seekable source ever arrives.
+  } else {
+    if (m.type === "volume") settings.volume = clamp(m.value, 0, 1, settings.volume);
+    else if (m.type === "balance") settings.balance = clamp(m.value, -1, 1, settings.balance);
+    else if (m.type === "mute") settings.mute = m.value;
+    else if (m.type === "eq" && settings.eq[m.band] !== undefined) settings.eq[m.band] = clamp(m.gain, -15, 15, settings.eq[m.band]);
+    apply();
+  }
 }
 
 apply();

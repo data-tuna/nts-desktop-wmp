@@ -107,3 +107,20 @@ test("pause and stop cancel a pending retry", () => {
     assert.equal(player.state().playState, action === "pause" ? "paused" : "stopped");
   }
 });
+
+test("play while playing keeps the stream; a refused autoplay stops instead of looping", async () => {
+  const audio = fakeAudio();
+  const player = createPlayer(audio);
+  player.play();
+  player.play();
+  assert.equal(audio.loads.length, 1);
+
+  const refused = fakeAudio();
+  refused.play = () => Promise.reject(Object.assign(new Error("autoplay"), { name: "NotAllowedError" }));
+  const blocked = createPlayer(refused);
+  blocked.play();
+  await Promise.resolve();
+  assert.equal(blocked.state().playState, "stopped");
+  mock.timers.tick(60_000);
+  assert.equal(blocked.state().playState, "stopped");
+});
