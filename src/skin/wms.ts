@@ -7,7 +7,7 @@
 export type Node = {
   /** Lower-cased. */
   tag: string;
-  /** Lower-cased names. When a name repeats, the first value wins. */
+  /** Lower-cased names. When a name repeats, the last value wins, as in WMP. */
   attrs: Record<string, string>;
   children: Node[];
 };
@@ -107,7 +107,7 @@ function openTag(text: string, start: number, stack: Node[]): number {
         value = text.slice(vStart, i);
       }
     }
-    if (!(name in node.attrs)) node.attrs[name] = unescape(value);
+    node.attrs[name] = unescape(value);
   }
 }
 

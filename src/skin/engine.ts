@@ -1,7 +1,5 @@
-// The skin engine, static half: draws a skin's first view as it looks before
-// any of its scripts run, and drives the player through the named controls.
-// Scripts, `wmpprop:` bindings beyond the player's own state, and the WMP
-// object model come with the script runtime (ATA-110).
+// The skin engine: draws a skin's first view, runs its scripts against the
+// WMP object model (runtime.ts), and drives the player through its controls.
 //
 // Everything is painted back to front on one canvas the size of the view, so
 // the window shape is the opaque pixels of the skin's images, and a subview's
@@ -9,6 +7,7 @@
 // skin reference (learn.microsoft.com/windows/win32/wmp/skin-programming-reference).
 import { constants, type Node } from "./wms.ts";
 import { css, keyed, mappedElement, parseColor, rgbAt, runs, type Pixels } from "./pixels.ts";
+import { CONSTANTS, OS_MEDIA_CHANGING, OS_MEDIA_OPEN, objects, playState, resImage, resScript, resString, wmpObject, type Host } from "./runtime.ts";
 
 export type Img = Pixels & { bitmap: CanvasImageSource };
 /** The host's state message (docs/decisions.md, ATA-109). */
@@ -28,7 +27,7 @@ export type Send = (msg: { type: string; [k: string]: unknown }) => void;
 
 type Kind = "container" | "button" | "group" | "element" | "slider" | "custom" | "progress" | "text" | "effects" | "none";
 
-// Drawn later or never: video and playlists need media, popups need scripts.
+// Drawn later or never: video and playlists need media, popups need menus.
 const NOT_YET = new Set(["video", "wmpvideo", "playlist", "itemsplaylist", "dropdownplaylist", "popup"]);
 // Elements with nothing to draw.
 const SILENT = new Set(["player", "network", "mediacenter", "equalizersettings", "videosettings", "theme"]);
@@ -47,6 +46,8 @@ function kindOf(tag: string): Kind {
 }
 
 const fmt = (t: number) => `${String(Math.floor(t / 60)).padStart(2, "0")}:${String(Math.floor(t % 60)).padStart(2, "0")}`;
+const HANDLER = /^on|_onchange$|^(playstatechange|openstatechange|statuschange|mediachange|modechange|disconnect)$/;
+const BINDING = /^\s*(jscript|wmpprop|wmpenabled|wmpdisabled):\s*([\s\S]*?)[\s;]*$/i;
 
 class El {
   readonly kind: Kind;
@@ -57,18 +58,30 @@ class El {
    * its transparencyColor. */
   readonly z: number;
   hover = false;
+  /** Held down by the pointer. */
   down = false;
   /** A slider's value while the user drags it. */
   dragValue: number | null = null;
+  /** Properties set by script, lower-case. They win over the markup. */
+  readonly props = new Map<string, unknown>();
+  /** Geometry as it was at load, before any script ran: alignment moves
+   * and stretches elements by how far their parent has grown since. */
+  readonly design = new Map<string, number>();
   private memo = new Map<string, number>();
+  private memoGen = -1;
   // Reused offscreen canvases, one per purpose.
   private canvases = new Map<string, HTMLCanvasElement>();
+  api: object | null = null;
+  move: ReturnType<typeof setTimeout> | null = null;
 
-  constructor(
-    readonly node: Node,
-    readonly parent: El | null,
-    readonly skin: Skin,
-  ) {
+  readonly node: Node;
+  readonly parent: El | null;
+  readonly skin: Skin;
+
+  constructor(node: Node, parent: El | null, skin: Skin) {
+    this.node = node;
+    this.parent = parent;
+    this.skin = skin;
     this.kind = kindOf(node.tag);
     this.z = skin.num(this, "zindex") ?? 0;
     // A plain slider bound to the volume is a volume slider, and so on.
@@ -93,13 +106,18 @@ class El {
     return this.node.attrs[name];
   }
 
+  /** Whether a property is set, by the markup or by script. */
+  has(name: string): boolean {
+    return this.props.has(name) || this.attr(name) !== undefined;
+  }
+
   /** A colour attribute, evaluated like any other (`jscript:NormalTextColor`). */
   color(name: string): number | null {
     return parseColor(this.skin.str(this, name) || undefined);
   }
 
   img(name: string): Img | undefined {
-    return this.skin.image(this.attr(name));
+    return this.skin.image(this.skin.str(this, name));
   }
 
   canvas(purpose: string, w: number, h: number): CanvasRenderingContext2D {
@@ -114,15 +132,25 @@ class El {
     return g;
   }
 
-  // Geometry, worked out on first use: `jscript:` expressions in one
-  // element's attributes may read another's.
+  // Geometry. A number set by script wins; a `jscript:` expression is worked
+  // out again whenever anything has changed, since it may read other
+  // elements; a plain number moves with its alignment as the parent grows.
   geo(name: "left" | "top" | "width" | "height"): number {
+    const set = Number(this.props.get(name) ?? NaN);
+    if (Number.isFinite(set)) return Math.round(set);
     // Text with no width fits what it shows now, which changes (the clock).
     if (name === "width" && this.kind === "text" && this.attr("width") === undefined) return this.natural(name);
+    if (this.memoGen !== this.skin.gen) {
+      this.memo.clear();
+      this.memoGen = this.skin.gen;
+    }
     let v = this.memo.get(name);
     if (v === undefined) {
       this.memo.set(name, 0); // an expression that loops back to itself reads 0
+      const raw = this.attr(name);
       v = Math.round(this.skin.num(this, name) ?? this.natural(name));
+      if (!this.design.has(name)) this.design.set(name, v);
+      else if (raw !== undefined && !BINDING.test(raw)) v += this.shift(name);
       this.memo.set(name, v);
     }
     return v;
@@ -132,9 +160,30 @@ class El {
   get w() { return this.geo("width"); }
   get h() { return this.geo("height"); }
 
+  private alignment(name: string): string {
+    const horizontal = name === "left" || name === "width";
+    return this.skin.str(this, horizontal ? "horizontalalignment" : "verticalalignment").trim().toLowerCase();
+  }
+
+  /** How far `horizontalAlignment` or `verticalAlignment` moves or
+   * stretches this element, given how much its parent has grown since load. */
+  private shift(name: "left" | "top" | "width" | "height"): number {
+    const p = this.parent;
+    if (!p) return 0;
+    const size = name === "left" || name === "width" ? "width" : "height";
+    const grown = p.geo(size) - (p.design.get(size) ?? p.geo(size));
+    const align = this.alignment(name);
+    if (name === size) return align === "stretch" ? grown : 0;
+    return align === "right" || align === "bottom" ? grown : align === "center" ? Math.round(grown / 2) : 0;
+  }
+
   /** The size an element takes when its attributes do not give one. */
   private natural(name: string): number {
-    if (name === "left" || name === "top") return 0;
+    if (name === "left" || name === "top") {
+      // Centred, with no position given: in the middle of the parent (Classic's logo).
+      const size = name === "left" ? "width" : "height";
+      return this.parent && this.alignment(name) === "center" ? Math.round((this.parent.geo(size) - this.geo(size)) / 2) : 0;
+    }
     const pick = (img: Img | undefined) => img && (name === "width" ? img.width : img.height);
     let size: number | undefined;
     if (this.kind === "container" || this.kind === "slider" || this.kind === "progress")
@@ -142,13 +191,15 @@ class El {
     else if (this.kind === "button") size = pick(this.img("image"));
     else if (this.kind === "group") size = pick(this.img("mappingimage")) ?? pick(this.img("image"));
     else if (this.kind === "custom") size = pick(this.img("positionimage"));
-    else if (this.kind === "text") {
-      const g = this.skin.measure;
-      g.font = this.font();
-      size = name === "width" ? Math.ceil(g.measureText(this.text()).width) + 2 : Math.ceil(this.fontPx() * 1.25);
-    }
+    else if (this.kind === "text") size = name === "width" ? this.textWidth() + 2 : Math.ceil(this.fontPx() * 1.25);
     // Anything else, and a subview with no image, fills its parent.
     return size ?? (this.parent ? this.parent.geo(name as "width" | "height") : 0);
+  }
+
+  textWidth(): number {
+    const g = this.skin.measure;
+    g.font = this.font();
+    return Math.ceil(g.measureText(this.text()).width);
   }
 
   get visible(): boolean {
@@ -169,8 +220,8 @@ class El {
   }
 
   font(): string {
-    const style = (this.attr("fontstyle") ?? "").toLowerCase();
-    const face = this.attr("fontface") ?? this.attr("fonttype") ?? "Tahoma";
+    const style = this.skin.str(this, this.hover && this.has("hoverfontstyle") ? "hoverfontstyle" : "fontstyle").toLowerCase();
+    const face = this.skin.str(this, "fontface") || this.skin.str(this, "fonttype") || "Tahoma";
     return `${style.includes("italic") ? "italic " : ""}${style.includes("bold") ? "bold " : ""}${this.fontPx()}px "${face}", Tahoma, sans-serif`;
   }
 
@@ -198,7 +249,7 @@ class El {
   }
 
   vertical(): boolean {
-    return (this.attr("direction") ?? "").toLowerCase() === "vertical";
+    return this.skin.str(this, "direction").toLowerCase() === "vertical";
   }
 
   /** The slider track: where the thumb's leading edge can go, and its size. */
@@ -210,19 +261,21 @@ class El {
     return { from: border, span: Math.max(0, length - 2 * border - t), thumb };
   }
 
-  /** Pressed, or held down: by a sticky click, or by the player's mute or a
-   * `down` binding, which then win over clicks. */
+  /** Pressed, or held down: by the pointer, by its `down` property (a sticky
+   * click, a script, a binding), or by the player's mute. */
   shownDown(): boolean {
-    if (this.role === "mute") return this.down || this.skin.state.mute;
-    return this.down || (this.attr("down") !== undefined && this.skin.bool(this, "down", false));
+    if (this.role === "mute" && !this.has("down")) return this.down || this.skin.state.mute;
+    return this.down || this.skin.bool(this, "down", false);
   }
 
   tooltip(): string {
-    return (this.shownDown() && this.attr("downtooltip")) || this.attr("uptooltip") || this.attr("tooltip") || "";
+    const pick = (name: string) => this.skin.str(this, name);
+    return (this.shownDown() && pick("downtooltip")) || pick("uptooltip") || pick("tooltip");
   }
 
   interactive(): boolean {
-    return ["button", "element", "slider", "custom"].includes(this.kind);
+    // Text and visualisations take clicks only if the skin handles them.
+    return ["button", "element", "slider", "custom"].includes(this.kind) || ((this.kind === "text" || this.kind === "effects") && this.has("onclick"));
   }
 
   /** The image to show for the element's state; falls back to `image`. */
@@ -266,46 +319,72 @@ class El {
   private paintContainer(g: CanvasRenderingContext2D) {
     const { w, h } = this;
     if (w <= 0 || h <= 0) return;
-    const layer = this.canvas("layer", w, h);
-    const behind = this.kids.filter((k) => k.z < 0);
-    for (const kid of behind) kid.paint(layer);
-    const bg = this.img("backgroundimage");
-    const color = this.color("backgroundcolor");
-    if (color !== null || bg) {
-      const back = this.canvas("back", w, h);
-      if (color !== null) {
-        back.fillStyle = css(color);
-        back.fillRect(0, 0, w, h);
-      }
-      if (bg) {
-        const tiled = this.skin.bool(this, "backgroundtiled", false);
-        const fill = (src: CanvasImageSource) => {
-          if (tiled) {
-            back.fillStyle = back.createPattern(src, "repeat")!;
-            back.fillRect(0, 0, w, h);
-          } else back.drawImage(src, 0, 0);
-        };
-        fill(bg.bitmap);
-        // transparencyColor shows what is behind the background, children
-        // with a negative zIndex included.
-        const clear = [this.color("transparencycolor"), this.color("clippingcolor")].filter((c) => c !== null);
-        if (clear.length) {
-          back.globalCompositeOperation = "destination-out";
-          fill(this.skin.maskImage(bg, clear));
-          back.globalCompositeOperation = "source-over";
-        }
-      }
-      layer.drawImage(back.canvas, 0, 0);
+    // Back to front: the backgroundColor, which shows through the
+    // background's transparencyColor (bluegrid's black screen; with a
+    // clippingColor and no backgroundColor it is black, as circle's digit
+    // slots show); children with a negative zIndex, on the parent's surface
+    // and not clipped to this one (Asimov_Radio's head hangs below the radio
+    // that holds it); the background with its holes; the other children.
+    const color = !this.has("backgroundcolor") && this.has("clippingcolor") && this.has("backgroundimage") ? 0 : this.color("backgroundcolor");
+    g.save();
+    g.translate(this.x, this.y);
+    if (color !== null) {
+      g.fillStyle = css(color);
+      g.fillRect(0, 0, w, h);
     }
-    for (const kid of this.kids) if (kid.z >= 0) kid.paint(layer);
-    // clippingColor cuts the children too.
+    for (const kid of this.kids) if (kid.z < 0) kid.paint(g);
+    g.restore();
+    const bg = this.img("backgroundimage");
     const clipColor = this.color("clippingcolor");
     const clipImg = this.img("clippingimage") ?? bg;
-    if (clipColor !== null && clipImg) {
-      layer.globalCompositeOperation = "destination-out";
-      layer.drawImage(this.skin.maskImage(clipImg, [clipColor]), 0, 0);
-      layer.globalCompositeOperation = "source-over";
+    const clip = clipColor !== null && clipImg ? this.skin.maskImage(clipImg, [clipColor]) : null;
+    const cut = (c: CanvasRenderingContext2D, x = 0, y = 0) => {
+      if (!clip) return;
+      c.save();
+      c.globalCompositeOperation = "destination-out";
+      c.drawImage(clip, x, y);
+      c.restore();
+    };
+    // clippingColor cuts the window: whatever lies beneath (anemone's
+    // visualiser, under the subview whose ring clips it), the background,
+    // and the plain children (circle's arrow buttons carry the colour). A
+    // child subview has a region of its own and is not cut (circle's
+    // digits sit in a clipped slot). Children are painted in order, the
+    // plain ones in runs that are cut before the next subview goes on.
+    cut(g, this.x, this.y);
+    const layer = this.canvas("layer", w, h);
+    const run = this.canvas("run", w, h);
+    const flush = () => {
+      cut(run);
+      layer.drawImage(run.canvas, 0, 0);
+      run.clearRect(0, 0, w, h);
+    };
+    if (bg) {
+      const tiled = this.skin.bool(this, "backgroundtiled", false);
+      const fill = (src: CanvasImageSource) => {
+        if (tiled) {
+          run.fillStyle = run.createPattern(src, "repeat")!;
+          run.fillRect(0, 0, w, h);
+        } else run.drawImage(src, 0, 0);
+      };
+      fill(bg.bitmap);
+      // transparencyColor shows what is behind the background, children
+      // with a negative zIndex included.
+      const clear = this.color("transparencycolor");
+      if (clear !== null) {
+        run.globalCompositeOperation = "destination-out";
+        fill(this.skin.maskImage(bg, [clear]));
+        run.globalCompositeOperation = "source-over";
+      }
     }
+    for (const kid of this.kids) {
+      if (kid.z < 0) continue;
+      if (kid.kind === "container") {
+        flush();
+        kid.paint(layer);
+      } else kid.paint(run);
+    }
+    flush();
     g.drawImage(layer.canvas, this.x, this.y);
   }
 
@@ -410,10 +489,10 @@ class El {
     g.clip();
     g.font = this.font();
     g.textBaseline = "top";
-    const fgName = !this.enabled && this.attr("disabledforegroundcolor") ? "disabledforegroundcolor" : this.hover && this.attr("hoverforegroundcolor") ? "hoverforegroundcolor" : "foregroundcolor";
+    const fgName = !this.enabled && this.has("disabledforegroundcolor") ? "disabledforegroundcolor" : this.hover && this.has("hoverforegroundcolor") ? "hoverforegroundcolor" : "foregroundcolor";
     g.fillStyle = css(this.color(fgName) ?? 0);
     const width = g.measureText(text).width;
-    const justify = (this.attr("justification") ?? "left").toLowerCase();
+    const justify = (this.skin.str(this, "justification") || "left").toLowerCase();
     let left = justify === "center" ? x + (w - width) / 2 : justify === "right" ? x + w - width : x;
     const scroll = this.skin.bool(this, "scrolling", false) && width > w;
     if (scroll) {
@@ -426,7 +505,7 @@ class El {
       this.skin.animate();
     }
     g.fillText(text, left, y + 1);
-    if ((this.attr("fontstyle") ?? "").toLowerCase().includes("underline")) g.fillRect(left, y + this.fontPx() + 1, width, 1);
+    if (this.skin.str(this, "fontstyle").toLowerCase().includes("underline")) g.fillRect(left, y + this.fontPx() + 1, width, 1);
   }
 
   // Hit testing, in the parent's coordinates. Returns the topmost interactive
@@ -506,43 +585,106 @@ class El {
     }
     return [x, y];
   }
+
+  /** Every element in the tree, this one first. */
+  *all(): Generator<El> {
+    yield this;
+    for (const kid of this.kids) yield* kid.all();
+  }
 }
+
+// Members every element has, beyond its attributes.
+const COMMON = new Set(["left", "top", "width", "height", "visible", "enabled", "value", "down", "id", "textwidth", "moveto", "alphablendto", "setfocus"]);
+// Methods by tag, for what the engine does not draw yet. Effects' next and
+// previous change the visualisation (ATA-114).
+const IDLE_METHODS: Record<string, string[]> = {
+  effects: ["next", "previous", "setfocus"],
+  wmpeffects: ["next", "previous", "setfocus"],
+  playlist: ["setcolumnresizemode", "getcolumnresizemode"],
+  itemsplaylist: ["setcolumnresizemode", "getcolumnresizemode"],
+  popup: ["appenditem", "deleteitem", "show"],
+};
 
 export class Skin {
   readonly canvas = document.createElement("canvas");
   readonly measure = document.createElement("canvas").getContext("2d")!;
   readonly view: El;
   state: State = { playState: "stopped", channel: 0, title: "", time: 0, duration: 0, volume: 1, mute: false, balance: 0, eq: [], level: 0 };
+  /** Bumped by every change scripts or the player make; geometry is cached per generation. */
+  gen = 0;
   private byId = new Map<string, El>();
-  private constants: Map<string, unknown>;
   private scope: object;
+  private globals: Record<string, unknown>;
+  private extras: Record<string, Record<string, any>>;
+  /** player.openState: open once the host names a channel. */
+  openState = 0;
+  private started = false;
+  private compiled = new Map<string, (...args: unknown[]) => unknown>();
   private keyCache = new WeakMap<Img, Map<string, HTMLCanvasElement>>();
+  private resImages = new Map<string, Img | undefined>();
   private logged = new Set<string>();
   private pressed: El | null = null;
-  /** Whether the pressed button was down before the press (sticky buttons). */
+  /** Whether the pressed button showed down before the press (sticky buttons). */
   private wasDown = false;
   private hovered: El | null = null;
   private animating = false;
+  private painting = false;
+  private timer: ReturnType<typeof setInterval> | null = null;
   /** True while painting the window shape. */
   shaping = false;
   private shapeMask: HTMLCanvasElement | null = null;
+  private lastShape = "";
 
-  constructor(
-    theme: Node,
-    private images: Map<string, Img>,
-    private send: Send,
-    scripts: string[] = [],
-  ) {
-    this.constants = constants(scripts);
+  private images: Map<string, Img>;
+  private send: Send;
+  /** The skin's .js files, by lower-cased name. */
+  private scripts: Map<string, string>;
+
+  /** `prefix` is where the skin's preferences live in localStorage. */
+  constructor(theme: Node, images: Map<string, Img>, send: Send, scripts: Map<string, string> = new Map(), prefix = "") {
+    this.images = images;
+    this.send = send;
+    this.scripts = scripts;
     const viewNode = theme.children.find((n) => n.tag === "view");
     if (!viewNode) throw new Error("the skin has no view");
-    // Expressions find elements by id, so ids are known before geometry is.
+    const skin = () => this;
+    const host: Host = {
+      get state() { return skin().state; },
+      get openState() { return skin().openState; },
+      status: () => this.status(),
+      elapsed: () => this.elapsed(),
+      controlEnabled: (name) => this.controlEnabled(name),
+      send: (msg) => this.send(msg),
+      set: (patch) => {
+        this.state = { ...this.state, ...patch };
+        this.changed();
+      },
+      log: (msg) => this.log(msg),
+      viewId: () => this.view.attr("id") ?? "",
+      prefix,
+    };
+    this.extras = objects(host);
+    const log = (msg: string) => this.log(msg);
+    this.globals = Object.assign(Object.create(null), {
+      ...CONSTANTS,
+      player: wmpObject("player", this.extras.player, log),
+      theme: wmpObject("theme", this.extras.theme, log),
+      mediacenter: wmpObject("mediacenter", this.extras.mediacenter, log),
+    });
+    // Scripts, handlers and expressions all run inside `with (scope)`: element
+    // ids first, then the WMP objects. Anything else falls through to the
+    // global object, where the skin's own functions and variables live.
     this.scope = new Proxy(Object.create(null), {
-      has: (_, k) => typeof k === "string" && (this.byId.has(k) || this.constants.has(k)),
+      has: (_, k) => typeof k === "string" && (this.byId.has(k) || k in this.globals),
       get: (_, k) => {
         if (typeof k !== "string") return undefined;
         const e = this.byId.get(k);
-        return e ? this.api(e) : this.constants.get(k);
+        return e ? this.api(e) : this.globals[k];
+      },
+      set: (_, k) => {
+        // `view = …` and the like: WMP's objects are read-only names.
+        this.log(`cannot assign to ${String(k)}`);
+        return true;
       },
     });
     this.view = new El(viewNode, null, this);
@@ -557,17 +699,170 @@ export class Skin {
     this.listen();
   }
 
-  /** What an expression sees of an element. */
-  private api(e: El) {
-    return {
-      get left() { return e.x; },
-      get top() { return e.y; },
-      get width() { return e.w; },
-      get height() { return e.h; },
-      get visible() { return e.visible; },
-      get enabled() { return e.enabled; },
-      id: e.attr("id"),
+  /** Runs the view's scripts and its onLoad, starts its timer, and paints. */
+  start() {
+    const files = (this.view.attr("scriptfile") ?? "").split(";").map((f) => f.trim()).filter(Boolean);
+    for (const file of files) {
+      const code = resScript(file) ?? this.scripts.get(file.replace(/^.*[\\/]/, "").toLowerCase());
+      if (code === undefined) {
+        this.log(`missing script ${file}`);
+        continue;
+      }
+      try {
+        // Global code, so the skin's functions and variables are shared by
+        // its files, its handlers and its attributes, as in WMP.
+        (globalThis as Record<string, unknown>).__wmpScope = this.scope;
+        // oxlint-disable-next-line no-eval -- skin code runs in this webview by design (ATA-107)
+        (0, eval)(`with (__wmpScope) {\n${code}\n}`);
+      } catch (e) {
+        // Keep what layout needs: the file's literal constants.
+        this.log(`script ${file} failed: ${String(e)}`);
+        for (const [name, v] of constants([code])) (globalThis as Record<string, unknown>)[name] ??= v;
+      }
+    }
+    // Geometry as it is at load, for alignment.
+    for (const e of this.view.all()) for (const name of ["left", "top", "width", "height"] as const) if (e.kind !== "none") e.geo(name);
+    this.started = true;
+    this.openState = this.state.title ? OS_MEDIA_OPEN : 0;
+    this.fire(this.view, "onload");
+    this.restartTimer();
+    this.paint();
+  }
+
+  /** The element's object for scripts and expressions: its properties and
+   * methods, case-insensitive, with WMP's own members on the elements that
+   * stand for player objects (`<player>`, `<equalizerSettings>`, …). */
+  private api(e: El): object {
+    if (e.api) return e.api;
+    const extra = this.extra(e);
+    const methods = IDLE_METHODS[e.node.tag] ?? [];
+    const member = (k: string) => {
+      const lk = k.toLowerCase();
+      if (extra && lk in extra) return "extra";
+      if (methods.includes(lk) || COMMON.has(lk) || e.props.has(lk)) return lk;
+      // Handlers are not properties: `onLoad="OnLoad();"` must find the
+      // skin's function, not the attribute.
+      if (e.attr(lk) !== undefined && !HANDLER.test(lk)) return lk;
+      if (e === this.view && ["close", "minimize", "returntomediacenter", "size", "title", "timerinterval"].includes(lk)) return lk;
+      return null;
     };
+    const api = new Proxy(Object.create(null), {
+      has: (_, k) => typeof k === "string" && member(k) !== null,
+      get: (_, k) => {
+        if (typeof k !== "string") return undefined;
+        const m = member(k);
+        if (m === "extra") return extra![k.toLowerCase()];
+        if (m === null) {
+          this.log(`${e.attr("id") ?? e.node.tag}.${k} is not supported`);
+          return undefined;
+        }
+        return this.getMember(e, m, methods);
+      },
+      set: (_, k, v) => {
+        const lk = String(k).toLowerCase();
+        if (extra && lk in extra) extra[lk] = v;
+        else this.setProp(e, lk, v);
+        return true;
+      },
+    });
+    e.api = api;
+    return api;
+  }
+
+  private extra(e: El): Record<string, any> | null {
+    const tag = e.node.tag;
+    const name = tag === "equalizersettings" ? "eq" : tag === "videosettings" ? "vs" : tag;
+    const members = (this.extras as Record<string, Record<string, any>>)[name];
+    return members && SILENT.has(tag) ? wmpObject(tag, members, (msg) => this.log(msg)) : null;
+  }
+
+  private getMember(e: El, name: string, methods: string[]): unknown {
+    switch (name) {
+      case "left": return e.x;
+      case "top": return e.y;
+      case "width": return e.w;
+      case "height": return e.h;
+      case "visible": return e.visible;
+      case "enabled": return e.enabled;
+      case "down": return e.shownDown();
+      case "id": return e.attr("id");
+      case "textwidth": return e.kind === "text" ? e.textWidth() : 0;
+      case "value": return e.kind === "text" ? e.text() : ["slider", "custom", "progress"].includes(e.kind) ? e.range()[2] : this.typed(this.str(e, "value"));
+      case "moveto": return (x: unknown, y: unknown, ms: unknown) => this.moveTo(e, Number(x), Number(y), Number(ms));
+      case "alphablendto": return (alpha: unknown) => this.setProp(e, "alphablend", Number(alpha));
+      case "setfocus": return () => {};
+      case "close": return () => this.close();
+      case "minimize": return () => this.send({ type: "minimize" });
+      case "returntomediacenter": return () => this.log("view.returnToMediaCenter: there is no full mode");
+      case "size": return () => this.log("view.size: resizing by hand is not supported");
+    }
+    if (methods.includes(name)) return () => this.log(`${e.node.tag}.${name} does nothing yet`);
+    return this.typed(this.value(e, name).v);
+  }
+
+  /** Numbers in the markup read as numbers, as WMP's typed properties do. */
+  private typed(v: unknown): unknown {
+    return typeof v === "string" && /^\s*-?\d+(\.\d+)?\s*$/.test(v) ? Number(v) : v;
+  }
+
+  /** A script sets an element's property: it wins over the markup, the skin
+   * repaints, and the element's `<name>_onchange` runs. */
+  private setProp(e: El, name: string, v: unknown) {
+    const old = e.props.has(name) ? e.props.get(name) : undefined;
+    e.props.set(name, v);
+    if (e === this.view && name === "timerinterval") this.restartTimer();
+    this.changed();
+    if (old !== v) this.fire(e, `${name}_onchange`);
+  }
+
+  /** Slides an element to (x, y) over `ms`, then runs its onEndMove. */
+  private moveTo(e: El, x: number, y: number, ms: number) {
+    if (e.move) clearTimeout(e.move);
+    const [x0, y0, t0] = [e.x, e.y, performance.now()];
+    const step = () => {
+      const t = ms > 0 ? Math.min(1, (performance.now() - t0) / ms) : 1;
+      e.props.set("left", Math.round(x0 + (x - x0) * t));
+      e.props.set("top", Math.round(y0 + (y - y0) * t));
+      this.changed();
+      if (t < 1) e.move = setTimeout(step, 16);
+      else {
+        e.move = null;
+        this.fire(e, "onendmove");
+      }
+    };
+    step();
+  }
+
+  private restartTimer() {
+    if (this.timer) clearInterval(this.timer);
+    this.timer = null;
+    const ms = this.num(this.view, "timerinterval") ?? 0;
+    if (ms > 0 && this.view.has("ontimer")) this.timer = setInterval(() => this.fire(this.view, "ontimer"), ms);
+  }
+
+  private close() {
+    this.fire(this.view, "onclose");
+    this.send({ type: "close" });
+  }
+
+  /** Runs an element's handler attribute, if it has one. */
+  fire(e: El, attr: string, args: Record<string, unknown> = {}) {
+    const code = e.attr(attr);
+    if (code) this.run(e, code, args);
+  }
+
+  /** Runs skin code with the element's own members in scope (`value`,
+   * `down`), then element ids and the WMP objects, then the skin's globals. */
+  private run(e: El, code: string, args: Record<string, unknown> = {}): unknown {
+    const names = Object.keys(args);
+    const key = `${names.join(",")}\n${code}`;
+    try {
+      let f = this.compiled.get(key);
+      if (!f) this.compiled.set(key, (f = new Function("scope", "self", ...names, `with (scope) with (self) {\n${code}\n}`) as (...a: unknown[]) => unknown));
+      return f(this.scope, this.api(e), ...names.map((n) => args[n]));
+    } catch (err) {
+      this.log(`${e.attr("id") ?? `<${e.node.tag}>`}: ${code.trim().slice(0, 60)} failed: ${String(err)}`);
+    }
   }
 
   log(msg: string) {
@@ -578,28 +873,27 @@ export class Skin {
 
   image(name: string | undefined): Img | undefined {
     if (!name) return undefined;
+    if (/^res:/i.test(name)) return this.resImage(name);
     const img = this.images.get(name.trim().toLowerCase());
     if (!img) this.log(`missing image ${name}`);
     return img;
   }
 
-  /** The player properties a static skin can show. */
-  private prop(path: string): unknown {
-    const p = path.toLowerCase();
-    const band = /^eq\.gainlevel(\d+)$/.exec(p);
-    if (band) return this.state.eq[+band[1] - 1] ?? 0;
-    const props: Record<string, unknown> = {
-      "player.controls.currentposition": this.state.time,
-      "player.controls.currentpositionstring": this.elapsed(),
-      "player.currentmedia.duration": 0,
-      "player.currentmedia.durationstring": "",
-      "player.currentmedia.name": this.state.title,
-      "player.status": this.status(),
-      "player.settings.volume": this.state.volume * 100,
-      "player.settings.balance": this.state.balance * 100,
-      "player.settings.mute": this.state.mute,
-    };
-    return props[p];
+  /** Our own stand-in for a wmploc.dll image, or nothing. */
+  private resImage(ref: string): Img | undefined {
+    if (!this.resImages.has(ref)) {
+      const px = resImage(ref);
+      let img: Img | undefined;
+      if (px) {
+        const c = document.createElement("canvas");
+        c.width = px.width;
+        c.height = px.height;
+        c.getContext("2d")!.putImageData(new ImageData(px.data, px.width, px.height), 0, 0);
+        img = { ...px, bitmap: c };
+      } else this.log(`no stand-in for ${ref}`);
+      this.resImages.set(ref, img);
+    }
+    return this.resImages.get(ref);
   }
 
   /** Whether a stream is on, or being brought back. */
@@ -630,34 +924,36 @@ export class Skin {
     return null;
   }
 
-  /** An attribute's value: plain, a player property, or an expression. */
+  /** An attribute's value: set by script, plain, a binding, or an expression. */
   private value(e: El, name: string): { ok: boolean; v?: unknown } {
+    if (e.props.has(name)) return { ok: true, v: e.props.get(name) };
     const raw = e.attr(name);
     if (raw === undefined) return { ok: false };
-    const m = /^\s*(jscript|wmpprop|wmpenabled):\s*([\s\S]*?)[\s;]*$/i.exec(raw);
-    if (!m) return { ok: true, v: raw };
+    const m = BINDING.exec(raw);
+    if (!m) return { ok: true, v: resString(raw, (msg) => this.log(msg)) ?? raw };
     const [, kind, expr] = m;
-    if (kind.toLowerCase() === "wmpenabled") {
+    const k = kind.toLowerCase();
+    if (k === "wmpenabled" || k === "wmpdisabled") {
       const control = /^player\.controls\.(\w+)$/i.exec(expr);
       const v = control ? this.controlEnabled(control[1].toLowerCase()) : null;
-      return v === null ? this.fail(name, raw) : { ok: true, v };
+      return v === null ? this.fail(name, raw) : { ok: true, v: k === "wmpenabled" ? v : !v };
     }
-    if (kind.toLowerCase() === "wmpprop") {
-      const v = this.prop(expr);
-      if (v !== undefined) return { ok: true, v };
-    }
+    // wmpprop: reads the object model (`player.currentMedia.name`) or another
+    // element (`bgTransports.left`), and jscript: may call the skin's
+    // functions. Both are worked out again on every paint, so they follow
+    // the player's state and whatever the scripts change.
     try {
-      // Only expressions made of element properties work before the skin's
-      // scripts run; calls into those scripts fail here and are skipped.
       // An element's own properties come first: `width="jscript:parent.width-left;"`.
-      return { ok: true, v: new Function("scope", "self", `with (scope) with (self) { return (${expr}); }`)(this.scope, this.api(e)) };
+      let f = this.compiled.get(expr);
+      if (!f) this.compiled.set(expr, (f = new Function("scope", "self", `with (scope) with (self) { return (${expr}); }`) as (...a: unknown[]) => unknown));
+      return { ok: true, v: f(this.scope, this.api(e)) };
     } catch {
       return this.fail(name, raw);
     }
   }
 
   private fail(name: string, raw: string) {
-    this.log(`${name}="${raw}" needs the skin's scripts, ignored`);
+    this.log(`${name}="${raw}" could not be worked out, ignored`);
     return { ok: false };
   }
 
@@ -703,14 +999,35 @@ export class Skin {
     return c;
   }
 
-  /** Paints the view onto the canvas, inside the window shape. */
+  /** Something scripts or the player changed: work geometry out again,
+   * and repaint (and reshape the window) once the current handler is done. */
+  changed() {
+    this.gen++;
+    this.shapeMask = null;
+    if (this.painting) return;
+    this.painting = true;
+    queueMicrotask(() => {
+      this.painting = false;
+      this.paint();
+    });
+  }
+
+  /** Paints the view onto the canvas, inside the window shape, and sends
+   * the window its new shape when that changed. */
   paint() {
     const { w, h } = this.view;
+    if (w <= 0 || h <= 0) return;
     if (!this.shapeMask) {
       this.shaping = true;
       this.shapeMask = document.createElement("canvas");
       this.draw(this.shapeMask, w, h);
       this.shaping = false;
+      const shape = this.shape();
+      const key = JSON.stringify(shape);
+      if (this.started && key !== this.lastShape) {
+        this.lastShape = key;
+        this.send({ type: "shape", ...shape });
+      }
     }
     const g = this.draw(this.canvas, w, h);
     g.globalCompositeOperation = "destination-in";
@@ -743,10 +1060,42 @@ export class Skin {
 
   setState(s: State) {
     const old = this.state;
+    const before = { ps: playState(old.playState), status: this.status(), title: old.title, channel: old.channel };
     this.state = s;
     // Repaint for what skins show, not for the level or a sub-second clock.
     const shown = (t: State) => JSON.stringify([t.playState, t.title, Math.floor(t.time), t.volume, t.mute, t.balance, t.eq]);
-    if (shown(old) !== shown(s)) this.paint();
+    if (shown(old) !== shown(s)) this.changed();
+    if (this.started) this.events(before);
+  }
+
+  /** The `<player>` events that follow from a new state, in WMP's order:
+   * the open state, then the play state. A channel switch passes through
+   * osMediaChanging, as a new item does in WMP. */
+  private events(before: { ps: number; status: string; title: string; channel: number }) {
+    const players = [...this.view.all()].filter((e) => e.node.tag === "player");
+    const fire = (name: string, value?: unknown) => {
+      for (const p of players) {
+        this.fire(p, `${name}_onchange`);
+        if (name === "openstate" || name === "playstate") this.fire(p, `${name}change`, { NewState: value });
+      }
+    };
+    const s = this.state;
+    const open = s.title ? OS_MEDIA_OPEN : 0;
+    if (s.title !== before.title || s.channel !== before.channel) {
+      if (before.title && open) {
+        this.openState = OS_MEDIA_CHANGING;
+        fire("openstate", OS_MEDIA_CHANGING);
+      }
+      this.openState = open;
+      fire("openstate", open);
+      for (const p of players) this.fire(p, "mediachange", { Item: this.extras.player.currentmedia });
+      fire("url");
+    }
+    if (playState(s.playState) !== before.ps) fire("playstate", playState(s.playState));
+    if (this.status() !== before.status) {
+      fire("status");
+      for (const p of players) this.fire(p, "statuschange");
+    }
   }
 
   /** Something on screen moves: repaint on the next frame. */
@@ -778,53 +1127,60 @@ export class Skin {
         return;
       }
       const found = this.at(ev);
-      const target = found?.interactive() && found.enabled ? found : null;
-      if (target !== this.hovered) {
-        if (this.hovered) this.hovered.hover = false;
-        if (target) target.hover = true;
-        this.hovered = target;
-        c.title = target?.tooltip() ?? "";
-        c.style.cursor = target && (target.attr("cursor") ?? "").toLowerCase() === "hand" ? "pointer" : "default";
-        this.paint();
-      }
+      this.hover(found?.interactive() && found.enabled ? found : null);
     });
-    c.addEventListener("mouseleave", () => {
-      if (this.hovered) this.hovered.hover = false;
-      this.hovered = null;
-      this.paint();
-    });
+    c.addEventListener("mouseleave", () => this.hover(null));
     c.addEventListener("mousedown", (ev) => {
       if (ev.button !== 0) return;
       const found = this.at(ev);
       if (found?.interactive() && !found.enabled) return;
       if (found?.interactive()) {
         this.pressed = found;
-        this.wasDown = found.down;
+        this.wasDown = found.shownDown();
         if (found.kind === "slider" || found.kind === "custom") this.slide(found, ev, false);
         found.down = true;
+        this.fire(found, "onmousedown");
         this.paint();
       } else if (found || this.opaque(ev)) {
         // The body of the skin: move the window.
         this.send({ type: "drag" });
       }
     });
+    c.addEventListener("dblclick", (ev) => {
+      const found = this.at(ev);
+      if (found?.interactive() && found.enabled) this.fire(found, "ondblclick");
+    });
     window.addEventListener("mouseup", (ev) => {
       const e = this.pressed;
       if (!e) return;
       this.pressed = null;
-      if (e.kind === "slider" || e.kind === "custom") {
-        this.slide(e, ev, true);
-        e.down = false;
-      } else {
-        const sticky = this.bool(e, "sticky", false);
+      e.down = false;
+      if (e.kind === "slider" || e.kind === "custom") this.slide(e, ev, true);
+      else {
         const inside = this.at(ev) === e;
-        // A sticky button toggles on a click and keeps its state otherwise;
-        // one with a `down` binding shows the binding instead.
-        e.down = e.attr("down") === undefined && e.role !== "mute" && sticky && (inside ? !this.wasDown : this.wasDown);
+        // A sticky button toggles its down property on a click, before its
+        // onClick reads it. One whose down is bound (`wmpprop:`) goes back
+        // to the binding after the handler, which has set what it shows.
+        const bound = BINDING.test(e.attr("down") ?? "");
+        if (inside && this.bool(e, "sticky", false)) e.props.set("down", !this.wasDown);
         if (inside) this.click(e);
+        if (bound) e.props.delete("down");
       }
-      this.paint();
+      this.changed();
     });
+  }
+
+  private hover(target: El | null) {
+    if (target === this.hovered) return;
+    const was = this.hovered;
+    if (was) was.hover = false;
+    if (target) target.hover = true;
+    this.hovered = target;
+    this.canvas.title = target?.tooltip() ?? "";
+    this.canvas.style.cursor = target && this.str(target, "cursor").toLowerCase() === "hand" ? "pointer" : "default";
+    if (was) this.fire(was, "onmouseout");
+    if (target) this.fire(target, "onmouseover");
+    this.paint();
   }
 
   /** Whether the pixel under the pointer is part of the skin. */
@@ -837,7 +1193,7 @@ export class Skin {
     const [x, y] = this.point(ev);
     const [ox, oy] = e.origin();
     const v = e.valueAt(x - ox, y - oy);
-    if (v !== null) {
+    if (v !== null && v !== e.dragValue) {
       e.dragValue = v;
       // Whatever the slider's own range, the protocol wants 0..1 and -1..1.
       const t = e.fraction();
@@ -849,9 +1205,13 @@ export class Skin {
         this.state.balance = t * 2 - 1;
         this.send({ type: "balance", value: t * 2 - 1 });
       }
+      this.fire(e, "value_onchange");
     }
-    // Back to the player's value. Seeking is disabled: live.
-    if (done) e.dragValue = null;
+    if (done) {
+      this.fire(e, "ondragend");
+      // Back to the player's value. Seeking is disabled: live.
+      e.dragValue = null;
+    }
     this.paint();
   }
 
@@ -859,7 +1219,10 @@ export class Skin {
     const role = e.role;
     if (["play", "pause", "stop", "next"].includes(role)) this.send({ type: role });
     else if (role === "prev" || role === "previous") this.send({ type: "previous" });
-    else if (role === "mute") this.send({ type: "mute", value: !this.state.mute });
-    else if (e.attr("onclick")) this.log(`onClick of <${e.node.tag}> needs the skin's scripts, ignored`);
+    else if (role === "close") this.close();
+    else if (role === "minimize") this.send({ type: "minimize" });
+    // A mute button with an onClick mutes through it (`player.settings.mute=down`).
+    else if (role === "mute" && !e.has("onclick")) this.send({ type: "mute", value: !this.state.mute });
+    this.fire(e, "onclick");
   }
 }
