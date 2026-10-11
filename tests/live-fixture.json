@@ -1,0 +1,62 @@
+{
+  "results": [
+    {
+      "channel_name": "1",
+      "now": {
+        "broadcast_title": "THE NTS BREAKFAST SHOW w/ CHEB MIMO &amp; NIHAL",
+        "start_timestamp": "2026-10-09T09:00:00+01:00",
+        "end_timestamp": "2026-10-09T11:00:00+01:00",
+        "embeds": {
+          "details": {
+            "location_long": "London",
+            "media": {
+              "picture_small": "https://media3.ntslive.co.uk/resize/200x200/2d3b5b71-b025-4afa-b734-ec54306d0fbc_1767744000.jpeg"
+            }
+          }
+        }
+      },
+      "next": {
+        "broadcast_title": "SOUP TO NUTS w/ ARCHITECT",
+        "start_timestamp": "2026-10-09T11:00:00+01:00",
+        "end_timestamp": "2026-10-09T13:00:00+01:00",
+        "embeds": {
+          "details": {
+            "location_long": "London",
+            "media": {
+              "picture_small": "https://media3.ntslive.co.uk/resize/200x200/3778294f-c056-472f-8cd8-3e521b8680dc_1791331200.jpeg"
+            }
+          }
+        }
+      }
+    },
+    {
+      "channel_name": "2",
+      "now": {
+        "broadcast_title": "The weirdness of dancing w/ JULES FRANCIS",
+        "start_timestamp": "2026-10-09T10:00:00+01:00",
+        "end_timestamp": "2026-10-09T11:00:00+01:00",
+        "embeds": {
+          "details": {
+            "location_long": "Paris",
+            "media": {
+              "picture_small": "https://media3.ntslive.co.uk/resize/200x200/680e5a54-12a6-4885-b610-b6bedb5f1fd8_1788393600.png"
+            }
+          }
+        }
+      },
+      "next": {
+        "broadcast_title": "In Focus: Flying Lotus",
+        "start_timestamp": "2026-10-09T11:00:00+01:00",
+        "end_timestamp": "2026-10-09T13:00:00+01:00",
+        "embeds": {
+          "details": {
+            "location_long": null,
+            "media": {
+              "picture_small": "https://media3.ntslive.co.uk/resize/200x200/61ee02ff-bf8f-41c5-9057-e5673149c5f3_1657584000.jpeg"
+            }
+          }
+        }
+      }
+    }
+  ]
+}

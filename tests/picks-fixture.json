@@ -1,0 +1,67 @@
+{
+  "results": [
+    {
+      "name": "Buried Light - 100% AshTreJinkins",
+      "location_long": "Los Angeles",
+      "genres": [
+        {
+          "id": "genres-avantgarde-experimental",
+          "value": "Experimental"
+        },
+        {
+          "id": "genres-housetechno-minimal",
+          "value": "Minimal"
+        },
+        {
+          "id": "genres-electronicadowntempo-beats",
+          "value": "Beats"
+        }
+      ],
+      "moods": [
+        {
+          "id": "moods-minimal-talkin",
+          "value": "Minimal Talkin"
+        }
+      ],
+      "media": {
+        "picture_small": "https://media3.ntslive.co.uk/resize/200x200/70a734c2-b5a5-475a-84e9-35451a1726d6_1791244800.png"
+      },
+      "mixcloud": "https://www.mixcloud.com/NTSRadio/buried-light-100-ashtrejinkins-7th-october-2026-1/",
+      "audio_sources": [
+        {
+          "url": "https://soundcloud.com/user-202286394-991268468/buried-light-100-ashtrejinkins?utm_medium=api&utm_campaign=social_sharing&utm_source=id_314736",
+          "source": "soundcloud"
+        }
+      ]
+    },
+    {
+      "name": "POST-SUMMER DANCE RITUALS W/ JEAN-BAPTISTE DOMINICI",
+      "location_long": "Paris",
+      "genres": [
+        {
+          "id": "genres-electronicadowntempo-electronica",
+          "value": "Electronica"
+        },
+        {
+          "id": "genres-newclub-reggaeton",
+          "value": "Reggaeton"
+        },
+        {
+          "id": "genres-africanmiddleeast-arabic-pop",
+          "value": "Arabic Pop"
+        }
+      ],
+      "moods": [],
+      "media": {
+        "picture_small": "https://media3.ntslive.co.uk/resize/200x200/c7f08611-12ad-4327-b80e-71c5e143ae7f_1788393600.jpeg"
+      },
+      "mixcloud": "https://www.mixcloud.com/NTSRadio/post-summer-dance-rituals-w-jean-baptiste-dominici-6th-october-2026/",
+      "audio_sources": [
+        {
+          "url": "https://soundcloud.com/user-202286394-991268468/post-summer-dance-rituals-w?utm_medium=api&utm_campaign=social_sharing&utm_source=id_314736",
+          "source": "soundcloud"
+        }
+      ]
+    }
+  ]
+}
