@@ -41,7 +41,7 @@ const { Skin } = await import("../src/skin/engine.ts");
 const { parse } = await import("../src/skin/wms.ts");
 const { resImage, resString, CONSTANTS } = await import("../src/skin/runtime.ts");
 
-const STATE = { playState: "stopped", channel: 0, title: "NTS 1", author: "", location: "", link: "", items: ["NTS 1", "NTS 2"], time: 0, duration: 0, volume: 0.5, mute: false, balance: 0, eq: Array(10).fill(0), level: 0 };
+const STATE = { playState: "stopped", channel: 0, title: "NTS 1", url: "", author: "", location: "", link: "", items: ["NTS 1", "NTS 2"], time: 0, duration: 0, volume: 0.5, mute: false, balance: 0, eq: Array(10).fill(0), level: 0 };
 
 /** A started skin from markup and scripts, the messages it sends, and a way
  * to evaluate skin code against it. */
@@ -225,27 +225,38 @@ test("wmploc stand-ins: our own strings and glyphs, nothing for the rest", () =>
   assert.equal(resImage("res://wmploc/RT_IMAGE/#9999"), null);
 });
 
-test("now playing: the media's name and item info, the playlist, and a pick's title linking back", () => {
-  const items = ["NTS 1 - A show - London", "NTS 2", "Poolside", "A pick - someone on SoundCloud"];
+test("now playing: the media's name and item info, the playlist, and a pick's link on a double click", () => {
+  const items = ["NTS 1 - A show - London", "NTS 2", "Poolside", "someone on SoundCloud - A pick"];
   const { skin, js, sent, set } = load(`<theme><view width="100" height="60">
        <text id="name" left="0" top="0" width="100" height="10" value="wmpprop:player.currentMedia.name"/>
+       <text id="len" left="0" top="10" width="100" height="10" value="wmpprop:player.currentMedia.durationString"/>
        <playlist id="pl" left="0" top="20" width="100" height="24" fontSize="6"/>
      </view></theme>`);
-  set({ title: items[0], author: "A show", location: "London", items });
-  assert.deepEqual(js(`[name.value, player.currentMedia.getItemInfo("Author"), player.currentMedia.getItemInfo("location"), player.currentMedia.getItemInfo("Title")]`), [items[0], "A show", "London", items[0]]);
+  set({ title: items[0], url: "https://streams.radiomast.io/nts1", author: "A show", location: "London", items });
+  assert.deepEqual(js(`[name.value, player.currentMedia.getItemInfo("Author"), player.currentMedia.getItemInfo("location"), player.currentMedia.getItemInfo("Title"), player.URL]`), [items[0], "A show", "London", items[0], "https://streams.radiomast.io/nts1"]);
   assert.deepEqual(js("[player.currentPlaylist.count, player.currentPlaylist.item(2).name]"), [4, "Poolside"]);
-  // A click on the title opens nothing for a channel, and the pick's page for a pick.
   const title = { button: 0, clientX: 5, clientY: 5 };
+  const len = { button: 0, clientX: 5, clientY: 15 };
+  // A channel has no link; a press on the title drags the window.
   listeners.mousedown(title);
   listeners.mouseup(title);
-  set({ channel: 3, title: items[3], author: "someone on SoundCloud", location: "", link: "https://soundcloud.com/a/b" });
+  listeners.dblclick(title);
+  assert.deepEqual(sent.filter((m) => m.type === "drag").length, 1);
+  set({ channel: 3, title: items[3], url: "https://soundcloud.com/a/b", author: "someone on SoundCloud", location: "", link: "https://soundcloud.com/a/b" });
+  // During a pick a press still drags; only a double click on the title opens the page, not on another currentMedia text.
   listeners.mousedown(title);
-  listeners.mouseup(title);
+  listeners.dblclick(len);
+  assert.deepEqual(sent.filter((m) => m.type === "launchUrl"), []);
+  listeners.dblclick(title);
   assert.deepEqual(sent.filter((m) => m.type === "launchUrl"), [{ type: "launchUrl", url: "https://soundcloud.com/a/b" }]);
+  assert.equal(js("player.currentMedia.sourceURL"), "https://soundcloud.com/a/b");
   // Painting scrolls the current item (3) into sight: the first row is no longer NTS 1.
   skin.paint();
   const row = { button: 0, clientX: 5, clientY: 25 };
   listeners.mousedown(row);
   listeners.mouseup(row);
   assert.deepEqual(sent.filter((m) => m.type === "select"), [{ type: "select", index: 3 }]);
+  // A double click on the pick's own row opens it too.
+  listeners.dblclick(row);
+  assert.equal(sent.filter((m) => m.type === "launchUrl").length, 2);
 });

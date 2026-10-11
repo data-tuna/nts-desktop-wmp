@@ -325,10 +325,11 @@ the app runs on a hidden desktop in tests, and Windows listed no session
 for it there, muted or not. Someone needs to look at the overlay on a real
 desktop.
 
-**A pick's credit link is a click on the title.** A text element bound to
-`player.currentMedia` opens the pick's SoundCloud page when clicked; nothing
-on screen says so, and a skin without such a text shows the credit only
-in the playlist row.
+**A pick's credit link is a double click.** On a text showing the title, or
+on the pick's playlist row, it opens the pick's SoundCloud page. The credit
+leads the title (`<uploader> on SoundCloud - …`), but nothing on screen
+says it is a link, and a skin with neither such a text nor a playlist pane
+has no way to open it.
 
 **Fast forward, rewind and seek sliders are drawn disabled:** a live stream
 has no length.

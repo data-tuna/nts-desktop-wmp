@@ -10,12 +10,16 @@ import { constants, type Node } from "./wms.ts";
 import { css, keyed, mappedElement, parseColor, rgbAt, runs, type Pixels } from "./pixels.ts";
 import { CONSTANTS, OS_MEDIA_CHANGING, OS_MEDIA_OPEN, objects, playState, resImage, resScript, resString, wmpObject, type Host } from "./runtime.ts";
 
+/** A text showing the current item's name, title or author. */
+const TITLE = /currentmedia\.(name\b|getiteminfo\(\s*["'](title|author)["'])/i;
 export type Img = Pixels & { bitmap: CanvasImageSource };
 /** The host's state message (docs/decisions.md, ATA-109). */
 export type State = {
   playState: "playing" | "buffering" | "reconnecting" | "paused" | "stopped";
   channel: number;
   title: string;
+  /** The current item's stream or page (player.URL). */
+  url: string;
   /** player.currentMedia's item info: the show (or a pick's credit) and where it comes from. */
   author: string;
   location: string;
@@ -681,7 +685,7 @@ export class Skin {
   readonly canvas = document.createElement("canvas");
   readonly measure = document.createElement("canvas").getContext("2d")!;
   readonly view: El;
-  state: State = { playState: "stopped", channel: 0, title: "", author: "", location: "", link: "", items: CHANNELS.map((c) => c.title), time: 0, duration: 0, volume: 1, mute: false, balance: 0, eq: [], level: 0 };
+  state: State = { playState: "stopped", channel: 0, title: "", url: "", author: "", location: "", link: "", items: CHANNELS.map((c) => c.title), time: 0, duration: 0, volume: 1, mute: false, balance: 0, eq: [], level: 0 };
   /** Bumped by every change scripts or the player make; geometry is cached per generation. */
   gen = 0;
   private byId = new Map<string, El>();
@@ -1232,9 +1236,6 @@ export class Skin {
         this.paint();
       } else if (found?.kind === "playlist") {
         this.pick(found, ev);
-      } else if (found?.kind === "text" && this.state.link && /currentmedia/i.test(found.attr("value") ?? "")) {
-        // A pick's title links back to it on SoundCloud, as SoundCloud's terms ask.
-        this.send({ type: "launchUrl", url: this.state.link });
       } else if (found || this.opaque(ev)) {
         // The body of the skin: move the window.
         this.send({ type: "drag" });
@@ -1249,6 +1250,10 @@ export class Skin {
     c.addEventListener("dblclick", (ev) => {
       const found = this.at(ev);
       if (found?.interactive() && found.enabled) this.byUser(() => this.fire(found, "ondblclick"));
+      // A pick links back to SoundCloud, as its terms ask: a double click on
+      // the title, or on the pick's playlist row. A press still drags the window.
+      else if (this.state.link && (found?.kind === "playlist" ? found.rowAt(this.point(ev)[1] - found.origin()[1]) === this.state.channel : found?.kind === "text" && TITLE.test(found.attr("value") ?? "")))
+        this.send({ type: "launchUrl", url: this.state.link });
     });
     window.addEventListener("mouseup", (ev) => {
       const e = this.pressed;
@@ -1331,7 +1336,9 @@ export class Skin {
     const i = list.rowAt(this.point(ev)[1] - list.origin()[1]);
     if (i < 0) return;
     this.send({ type: "select", index: i });
-    // Set locally too, so a second click before the host's next state does not step again.
+    // Set locally too, so the row shows as current before the host's next state;
+    // the old item's link goes with it, so a double click opens nothing stale.
+    if (i !== this.state.channel) this.state.link = "";
     this.state.channel = i;
     this.paint();
   }

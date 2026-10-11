@@ -27,16 +27,22 @@ the evidence.
   exactly like the channels.
 - **Picks** play through SoundCloud's widget in the trusted page
   (`widget.ts`, adapted from the Winamp app). SoundCloud's terms want the
-  uploader and SoundCloud credited, with a link back: a pick's title ends
-  `- <uploader> on SoundCloud`, that credit is also its Author, and a click
-  on a text element showing `player.currentMedia` opens the track page
-  through `launchUrl`. A pick that does not start within 15 s, or that the
+  uploader and SoundCloud credited, with a link back: a pick's title starts
+  `<uploader> on SoundCloud - `, so skins that cut long titles still show
+  it, and that credit is also its Author. A double click on a text showing
+  `currentMedia.name` (or its title or author item info), or on the pick's
+  own playlist row, opens the track page through `launchUrl`. A double
+  click, not a press, so pressing the title still drags the window. A pick that does not start within 15 s, or that the
   widget reports an error for, stops the player; a stuck pick is not
   reloaded, since that would start a two-hour mix over; a finished pick
   moves on to the next item. Pause keeps a pick's place. Picks report no
   duration, so skins treat them as live (no seeking) for now.
-- **The state message** gains `author`, `location`, `link` (a pick's page,
-  else `""`) and `items` (the playlist's titles).
+- **The state message** gains `url` (the current item's stream or page:
+  `player.URL`, `currentMedia.sourceURL`), `author`, `location`, `link` (a
+  pick's page, else `""`) and `items` (the playlist's titles).
+- **Selecting the item already playing** (a double click's two presses on
+  its row) leaves it playing, and the widget is never sent `play` while it
+  plays, since it toggles on it.
 - **Windows' media overlay** gets the title, the show and the artwork
   through `navigator.mediaSession`, with play, pause, stop, next and
   previous wired back to the player. Not yet seen in the overlay itself;
@@ -160,7 +166,7 @@ Host to skin: the trusted page calls the `skin_send` command, and Rust
 dispatches a `message` event in the skin webview. Today that is, four times
 a second (ATA-109):
 
-    { "type": "state", "playState", "channel", "title", "author", "location",
+    { "type": "state", "playState", "channel", "title", "url", "author", "location",
       "link", "items", "time", "duration",
       "volume", "mute", "balance", "eq", "level" }
 

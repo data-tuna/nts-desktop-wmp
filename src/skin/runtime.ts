@@ -42,7 +42,6 @@ export type Host = {
   prefix: string;
 };
 
-const URLS = ["https://streams.radiomast.io/nts1", "https://streams.radiomast.io/nts2"];
 const clamp = (v: unknown, lo: number, hi: number) => Math.min(hi, Math.max(lo, Number(v) || 0));
 
 /** COM objects are case-insensitive (`player.PlayState`, `player.playstate`),
@@ -80,7 +79,7 @@ export function objects(host: Host) {
     durationstring: "",
     imagesourcewidth: 0,
     imagesourceheight: 0,
-    get sourceurl() { return URLS[s().channel] ?? ""; },
+    get sourceurl() { return s().url; },
     isidentical: (other: unknown) => other === media,
   }, log);
   // The playlist: the channels, then the mixtapes and picks.
@@ -154,7 +153,7 @@ export function objects(host: Host) {
     get playstate() { return playState(s().playState); },
     get openstate() { return host.openState; },
     get status() { return host.status(); },
-    get url() { return URLS[s().channel] ?? ""; },
+    get url() { return s().url; },
     set url(_: unknown) { log("player.URL cannot be set: the app plays NTS 1 and NTS 2"); },
     // Only http(s), only from a click, and only through Rust, which checks
     // again (lib.rs): a skin's timer or onLoad opens nothing.

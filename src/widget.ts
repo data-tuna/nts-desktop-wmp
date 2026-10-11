@@ -113,7 +113,8 @@ export function createWidget(on: Events): Widget & { setVolume(volume: number): 
       wanted = true;
       expectStart();
       if (next === url && ready) {
-        send("play");
+        // The widget toggles on "play": never send it to a playing pick.
+        if (!playing) send("play");
         return;
       }
       url = next;

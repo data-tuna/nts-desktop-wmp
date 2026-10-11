@@ -164,3 +164,13 @@ test("a stalled pick is not reloaded", () => {
   assert.deepEqual(widget.calls, ["play https://soundcloud.com/a/b"]);
   assert.equal(player.state().playState, "buffering");
 });
+
+test("selecting the item already playing leaves it alone", () => {
+  const audio = fakeAudio();
+  const player = createPlayer(audio);
+  player.play();
+  player.select(0);
+  assert.deepEqual(audio.loads, [NTS1]);
+  player.select(1);
+  assert.deepEqual(audio.loads, [NTS1, NTS2]);
+});

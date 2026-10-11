@@ -110,7 +110,10 @@ export function createPlayer(audio: Media, items: Item[] = [...CHANNELS], widget
 
   /** Item `i`, wrapping around; it plays if the player was playing. */
   const select = (i: number) => {
-    channel = (((Math.trunc(i) || 0) % items.length) + items.length) % items.length;
+    const next = (((Math.trunc(i) || 0) % items.length) + items.length) % items.length;
+    // The current item again (a double click on its row): leave it playing.
+    if (next === channel && mode === "playing" && timer === undefined) return;
+    channel = next;
     if (mode === "playing") start();
   };
 

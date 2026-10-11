@@ -112,20 +112,22 @@ function level() {
 }
 
 /** What a skin shows for item `i`: `title` is `player.currentMedia.name`,
- * `author` and `location` its item info, `link` the page a click on the
+ * `author` and `location` its item info, `link` the page a double click on the
  * title opens. SoundCloud's terms want the uploader and SoundCloud credited,
  * with a link back, wherever a pick plays, so a pick's title carries both. */
 function info(i: number) {
   const item = items[i];
+  const url = item.url;
   const show = i < CHANNELS.length ? onAir[i] : undefined;
   // The channel always leads, as in the Winamp app (Ata, 2026-10-09): "NTS 1 - <show> - <location>".
-  if (show) return { title: `${item.title} - ${show.title}`, author: show.show, location: show.location ?? "", link: "", artwork: show.artwork };
+  if (show) return { title: `${item.title} - ${show.title}`, url, author: show.show, location: show.location ?? "", link: "", artwork: show.artwork };
   const pick = picks.get(item.url);
   if (pick) {
     const credit = pick.uploader ? `${pick.uploader} on SoundCloud` : "SoundCloud";
-    return { title: `${pick.title} - ${credit}`, author: credit, location: "", link: pick.url, artwork: pick.artwork };
+    // Credit first, so a skin that cuts long titles still shows it.
+    return { title: `${credit} - ${pick.title}`, url, author: credit, location: "", link: pick.url, artwork: pick.artwork };
   }
-  return { title: item.title, author: "", location: "", link: "", artwork: undefined };
+  return { title: item.title, url, author: "", location: "", link: "", artwork: undefined };
 }
 
 // Windows' media overlay, through WebView2's Media Session.
