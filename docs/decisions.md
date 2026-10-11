@@ -119,6 +119,7 @@ unknown fields included, and refuses requests from any webview but `skin`
 | `{ "type": "shape", "width", "height", "rects": [[x, y, w, h], …] }` | Rust: sizes the window and sets its region. Ignored unless the view is 1–4096 px a side and every run is non-empty and inside it, with at most ceil(width / 2) runs per row |
 | `{ "type": "close" }`, `{ "type": "minimize" }` | Rust: closes or minimizes the window (ATA-110) |
 | `{ "type": "launchUrl", "url": "…" }` | Rust: opens the URL in the default browser, only if it parses as http(s), is at most 2048 characters, and comes 3 s or more after the last one (ATA-110) |
+| `{ "type": "picker" }` | Rust: opens the skin picker, or brings it to the front (ATA-112) |
 
 Host to skin: the trusted page calls the `skin_send` command, and Rust
 dispatches a `message` event in the skin webview. Today that is, four times
@@ -132,7 +133,8 @@ a second (ATA-109):
 seek bar disabled. `volume`, `mute`, `balance` and `eq` (ten gains in dB)
 are the saved settings, so a skin's controls start where the listener left
 them. The skin also gets `GET /` (the engine page), `GET /engine.js` (the
-engine) and `GET /skin.wmz` (the skin itself, whole) from the protocol, and
+engine), `GET /skin.wmz` (the skin itself, whole) and `GET /house.wmz` (the
+house skin, for when a skin will not load; ATA-112) from the protocol, and
 nothing of the app's. Until ATA-108 the stub skin read its files one by one
 from `GET /files/<name>`.
 
@@ -264,6 +266,11 @@ timing from process start to the skin's first canvas:
   the cache and the network blocked, the house skin showed and `skin.json`
   still named it. "A random skin on every launch" set `{"skin":null}` and
   the next launches were random again.
+- **Isolation:** `tools/escape.mjs` gives the ATA-107 result on this build.
+  From the skin webview, `list_skins`, `choose_skin` and `open_link` are
+  each refused by the ACL ("not allowed by ACL"), and so is `list_skins`
+  from the trusted page: only the picker's own webview has them. A skin can
+  open the picker (`{ "type": "picker" }`), which is all a right click does.
 - Not tried: a real right click with a real mouse (the input came through
   DevTools), and the picker's links, which open the default browser.
 
