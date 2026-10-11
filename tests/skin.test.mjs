@@ -147,3 +147,27 @@ test("keyed clears or keeps colours, and runs traces the opaque rows", () => {
   assert.deepEqual(runs(kept), [[0, 0, 1, 1], [3, 0, 1, 1]]);
   assert.equal(img.data[3], 255, "the source is left alone");
 });
+
+test("effects: bars are log-spaced spectrum peaks, the wave is evenly sampled, and unknown effects fall back", async () => {
+  const { bands, samples, effectIndex } = await import("../src/skin/effects.ts");
+  // 1024 bins at 48 kHz: 23.4 Hz each. A tone at bin 100 (2.3 kHz) lands in one bar only.
+  const spectrum = new Uint8Array(1024);
+  spectrum[100] = 200;
+  const bars = bands(spectrum, 48000, 32);
+  assert.equal(bars.length, 32);
+  assert.deepEqual(bars.filter((v) => v), [200]);
+  assert.ok(bars.indexOf(200) > 16 && bars.indexOf(200) < 24, "2.3 kHz sits two-thirds of the way up a 40 Hz-16 kHz log scale");
+  assert.equal(bands(new Uint8Array(1024).fill(9), 48000, 32).every((v) => v === 9), true, "no bar is empty");
+  // The app's 8192-point analyser: no two bars read the same bin, at either rate.
+  for (const rate of [44100, 48000])
+    for (let k = 0; k < 4096; k++) {
+      const one = new Uint8Array(4096);
+      one[k] = 1;
+      assert.ok(bands(one, rate, 32).filter((v) => v).length <= 1, `bin ${k} at ${rate} Hz lights more than one bar`);
+    }
+  assert.deepEqual(samples(Uint8Array.from({ length: 8 }, (_, i) => i), 4), [0, 2, 4, 6]);
+  assert.equal(effectIndex("Bars and Waves", 1), 1);
+  assert.equal(effectIndex("ambience", 7), 2, "unknown preset: the type's first");
+  assert.equal(effectIndex("", 0), 0);
+  assert.equal(effectIndex("{some-clsid}", 3), 0);
+});

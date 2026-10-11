@@ -166,6 +166,7 @@ unknown fields included, and refuses requests from any webview but `skin`
 | `{ "type": "shape", "width", "height", "rects": [[x, y, w, h], …] }` | Rust: sizes the window and sets its region. Ignored unless the view is 1–4096 px a side and every run is non-empty and inside it, with at most ceil(width / 2) runs per row |
 | `{ "type": "close" }`, `{ "type": "minimize" }` | Rust: closes or minimizes the window (ATA-110) |
 | `{ "type": "launchUrl", "url": "…" }` | Rust: opens the URL in the default browser, only if it parses as http(s), is at most 2048 characters, and comes 3 s or more after the last one (ATA-110) |
+| `{ "type": "effects", "on": true \| false }` | the trusted page: whether a visualisation is on screen, so wants analyser frames (ATA-114) |
 
 Host to skin: the trusted page calls the `skin_send` command, and Rust
 dispatches a `message` event in the skin webview. Today that is, four times
@@ -179,7 +180,14 @@ a second (ATA-109):
 `stopped`. `duration` is 0 for a live stream, as in WMP: a skin shows its
 seek bar disabled. `volume`, `mute`, `balance` and `eq` (ten gains in dB)
 are the saved settings, so a skin's controls start where the listener left
-them. The skin also gets `GET /` (the engine page), `GET /engine.js` (the
+them.
+
+From ATA-114, also about 30 times a second while the skin shows a
+visualisation and the stream plays:
+
+    { "type": "vis", "bars": [32 × 0..255], "wave": [96 × 0..255] }
+
+The skin also gets `GET /` (the engine page), `GET /engine.js` (the
 engine) and `GET /skin.wmz` (the skin itself, whole) from the protocol, and
 nothing of the app's. Until ATA-108 the stub skin read its files one by one
 from `GET /files/<name>`.
@@ -236,6 +244,64 @@ A separate app in its own repository, drawing WMP skins with its own engine
 rather than through Webamp. WMP skins matter as much as the Winamp app does.
 
 ## Skins
+
+### Visualisations: our own bars, scope and ambience (ATA-114, 2026-10-11)
+
+An `<effects>` element draws one of three visualisations of our own, after
+the look of WMP's: **Bars** (32 log-spaced spectrum bars, 40 Hz to 16 kHz,
+with falling peak caps), **Scope** (the waveform) and **Ambience** (soft
+coloured lights that drift and swell with the music). Nothing is copied from
+WMP or from the GPL WMP 8 clone. `src/skin/effects.ts` has them.
+
+- **Data.** The trusted page reads a second analyser, tapped from the
+  stream before the volume, so the visualisation moves at any volume and
+  when muted, as WMP's does. It has 8192 points (6 Hz bins), so the lowest
+  bars, 8 Hz apart, each read their own bin. About 30 times a second it sends
+  `{ "type": "vis", "bars": [32 × 0..255], "wave": [96 × 0..255] }` through
+  `skin_send`, but only while the skin has said a visualisation is on screen
+  (`effects` message) and the stream is playing. Each frame repaints the
+  skin on the next display frame.
+- **Effect state.** `currentEffectType` and `currentPreset` name the effect
+  as `mediacenter.effectType` and `effectPreset` do: "Bars and Waves"
+  presets 0 (Bars) and 1 (Scope), and "Ambience" preset 0. An unknown type
+  shows Bars. `next()` and `previous()` step round the list and run the
+  properties' `_onchange` handlers, which is how anemone, bluegrid and
+  cerulean save the choice to `mediacenter`. `mediacenter` is not saved
+  across launches.
+- **Colours.** `backgroundColor` (black if none) behind, and
+  `foregroundColor` for bars and scope if the skin gives one (the house
+  skin's amber); otherwise WMP-like green to red.
+- **Stopped or paused,** the screen is its background colour.
+- **Picks show a flat visualisation.** NTS Picks play through SoundCloud's
+  hidden widget, another origin's frame whose audio never enters our Web
+  Audio graph (ATA-113). The pick plays, but every bar is 0 and the wave
+  sits at 128, so Bars is empty and Scope is a flat line (checked on the
+  merged build, anemone, 2026-10-11). The trusted page sends one such flat
+  frame, so the screen does not keep the last stream frame, and then none
+  while the pick plays: 30 empty frames a second cost about 8% of a core.
+- **Clicks.** A subview's drawn background pixels now stop a click, so a
+  visualisation behind it (anemone's, `zIndex="-1"` under its yellow pods)
+  takes clicks only through the hole. Before, a click on the pod ran the
+  visualisation's `onClick="next();"` instead of moving the window.
+- **Minimised.** WebView2 is not told when a Tauri window is minimised:
+  both pages stayed `visible` and `requestAnimationFrame` kept running.
+  Rust now hides both webviews while the window is minimised and shows them
+  on restore; the audio plays on.
+- **Milkdrop (Butterchurn): not added.** The `butterchurn` package is
+  0.7 MB unpacked and `butterchurn-presets` 11.9 MB, against a 3.3 MB
+  release binary; it would also need WebGL in the skin webview and the full
+  spectrum at frame rate. Three effects of our own cover what the test
+  skins ask for.
+
+Measured on the release build, anemone, a 20-thread machine, muted
+(`--mute-audio`), whole process tree:
+
+| State | CPU, % of one core |
+|---|---|
+| Open, playing, visualisation showing (Bars, Scope, Ambience) | 29–35 |
+| Open, playing, visualisation hidden (anemone's small mode) | 16 |
+| Minimised, playing, before the webviews were hidden | 30 |
+| Minimised, playing | 5 |
 
 ### The script runtime and the WMP object model (ATA-110, 2026-10-11)
 
