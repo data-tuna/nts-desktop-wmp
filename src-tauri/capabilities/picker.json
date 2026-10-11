@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "picker",
+  "description": "The skin picker: our own page, listing skins by name. No skin code runs there.",
+  "webviews": ["picker"],
+  "permissions": ["allow-list-skins", "allow-choose-skin", "allow-open-link"]
+}

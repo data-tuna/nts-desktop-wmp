@@ -3,18 +3,13 @@
 // build:skin` first), one .wmz, and a /msg sink that prints what the skin
 // sends. A stand-in host in the page answers the skin with state, as the
 // trusted page does, but plays nothing. For looking at the engine without
-// the app.
+// the app. tools/compat.mjs drives it too.
 //
 //   node tools/skin-preview.mjs C:\path\to\skin.wmz [port]
 //   then open http://localhost:1432/ (or /?play, to start playing as the app does)
 import { createServer } from "node:http";
 import { readFileSync } from "node:fs";
 
-const [wmz, port = "1432"] = process.argv.slice(2);
-if (!wmz) {
-  console.error("usage: node tools/skin-preview.mjs <skin.wmz> [port]");
-  process.exit(1);
-}
 const root = new URL("..", import.meta.url);
 
 // The trusted page's side of the protocol, in miniature: NTS 1 and NTS 2, a
@@ -42,30 +37,45 @@ const fakeHost = `<script>
 })();
 </script>`;
 
-createServer((req, res) => {
-  if (req.method === "POST" && req.url === "/msg") {
-    let body = "";
-    req.on("data", (c) => (body += c));
-    req.on("end", () => {
-      try {
-        const msg = JSON.parse(body);
-        if (msg.type === "shape") msg.rects = `${msg.rects.length} runs`;
-        console.log(JSON.stringify(msg));
-        res.writeHead(204).end();
-      } catch {
-        res.writeHead(400).end();
-      }
-    });
-    return;
+/** Serves the page and the skin `wmz()` names; each message the skin sends goes to `onMsg`. */
+export function preview(port, wmz, onMsg) {
+  return createServer((req, res) => {
+    if (req.method === "POST" && req.url === "/msg") {
+      let body = "";
+      req.on("data", (c) => (body += c));
+      req.on("end", () => {
+        try {
+          onMsg(JSON.parse(body));
+          res.writeHead(204).end();
+        } catch {
+          res.writeHead(400).end();
+        }
+      });
+      return;
+    }
+    try {
+      const path = new URL(req.url, "http://x").pathname;
+      if (path === "/skin.wmz") return res.writeHead(200).end(readFileSync(wmz()));
+      if (path === "/house.wmz") return res.writeHead(200).end(readFileSync(new URL("skins/house/house.wmz", root)));
+      if (path === "/engine.js") return res.writeHead(200, { "Content-Type": "text/javascript" }).end(readFileSync(new URL("dist-skin/engine.js", root)));
+      if (path !== "/") return res.writeHead(404).end();
+      const page = readFileSync(new URL("src/skin/index.html", root), "utf8").replace('<script src="/engine.js">', `${fakeHost}<script src="/engine.js">`);
+      res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" }).end(page);
+    } catch (e) {
+      res.writeHead(500).end(String(e));
+    }
+  }).listen(+port);
+}
+
+if (import.meta.url.endsWith(process.argv[1].replaceAll("\\", "/").split("/").pop())) {
+  const [wmz, port = "1432"] = process.argv.slice(2);
+  if (!wmz) {
+    console.error("usage: node tools/skin-preview.mjs <skin.wmz> [port]");
+    process.exit(1);
   }
-  try {
-    const path = new URL(req.url, "http://x").pathname;
-    if (path === "/skin.wmz") return res.writeHead(200).end(readFileSync(wmz));
-    if (path === "/engine.js") return res.writeHead(200, { "Content-Type": "text/javascript" }).end(readFileSync(new URL("dist-skin/engine.js", root)));
-    if (path !== "/") return res.writeHead(404).end();
-    const page = readFileSync(new URL("src/skin/index.html", root), "utf8").replace('<script src="/engine.js">', `${fakeHost}<script src="/engine.js">`);
-    res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" }).end(page);
-  } catch (e) {
-    res.writeHead(500).end(String(e));
-  }
-}).listen(+port, () => console.log(`http://localhost:${port}/`));
+  preview(port, () => wmz, (msg) => {
+    if (msg.type === "shape") msg.rects = `${msg.rects.length} runs`;
+    console.log(JSON.stringify(msg));
+  });
+  console.log(`http://localhost:${port}/`);
+}
