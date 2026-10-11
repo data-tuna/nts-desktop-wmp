@@ -108,6 +108,22 @@ test("pause and stop cancel a pending retry", () => {
   }
 });
 
+test("pause and stop keep the src, so the media session survives; play loads afresh", () => {
+  for (const action of ["pause", "stop"]) {
+    const audio = fakeAudio();
+    const player = createPlayer(audio);
+    player.play();
+    player[action]();
+    assert.equal(audio.src, NTS1, action);
+    assert.equal(audio.paused, true, action);
+    // Paused, a stalled clock is not a drop.
+    mock.timers.tick(30_000);
+    assert.equal(audio.loads.length, 1, action);
+    player.play();
+    assert.deepEqual(audio.loads, [NTS1, NTS1], action);
+  }
+});
+
 test("play while playing keeps the stream; a refused autoplay stops instead of looping", async () => {
   const audio = fakeAudio();
   const player = createPlayer(audio);

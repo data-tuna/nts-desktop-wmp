@@ -52,12 +52,16 @@ export function createPlayer(audio: Media, items: Item[] = [...CHANNELS], widget
     clearTimeout(timer);
     timer = undefined;
   };
-  // A live stream has nothing to resume, so pause drops the connection too.
+  // Drops the stream: before a retry, and while a pick plays.
   const disconnect = () => {
     audio.pause();
     audio.removeAttribute("src");
     audio.load();
   };
+  // Pause and stop keep the src: without it WebView2 ends the media session,
+  // and the Play key and Windows' overlay can no longer reach the app. A
+  // paused stream buffers a little, then stalls; Play loads it afresh.
+  const hold = () => audio.pause();
   const load = () => {
     lastTime = 0;
     movedAt = Date.now();
@@ -122,17 +126,17 @@ export function createPlayer(audio: Media, items: Item[] = [...CHANNELS], widget
     play() {
       if (mode !== "playing" || timer !== undefined) start();
     },
-    /** A pick keeps its place; a stream is dropped (there is nothing to resume). */
+    /** A pick keeps its place; a stream is reloaded on Play (there is nothing to resume). */
     pause() {
       cancel();
       mode = "paused";
-      disconnect();
+      hold();
       widget?.pause();
     },
     stop() {
       cancel();
       mode = "stopped";
-      disconnect();
+      hold();
       widget?.stop();
     },
     /** Next (1) or previous (-1) item, wrapping around. */
