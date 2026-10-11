@@ -34,5 +34,8 @@ test("showLayers hides the layers not asked for and refuses unknown ones", () =>
   assert.equal(showLayers(svg, []), svg);
   const styled = '<svg><g inkscape:groupmode="layer" id="key"/><g style="display:inline" inkscape:groupmode="layer" id="up"/></svg>';
   assert.equal(showLayers(styled, ["key"]), '<svg><g inkscape:groupmode="layer" id="key"/><g style="display:none" inkscape:groupmode="layer" id="up"/></svg>');
+  // As Inkscape saves it while showing another layer: the one asked for is shown anyway.
+  const saved = '<svg><g style="display:none" inkscape:groupmode="layer" id="key"/><g style="display:none" inkscape:groupmode="layer" id="up"/></svg>';
+  assert.equal(showLayers(saved, ["up"]), '<svg><g inkscape:groupmode="layer" id="key"/><g inkscape:groupmode="layer" id="up"/></svg>');
   assert.throws(() => showLayers(svg, ["hover"]), /no layer "hover"/);
 });

@@ -215,12 +215,13 @@ reaches too.
 - No NTS logo and no wordmark: the only "NTS" on the skin is the channel
   name the player reports.
 
-It uses every element kind the engine draws: subviews with a
+It uses most of the element kinds the engine draws: subviews with a
 `clippingColor` and a `transparencyColor`, `alphaBlend`, a button group
 with hover, down and disabled images, buttons bound with `wmpenabled:`,
 text bound with `wmpprop:` (with scrolling), a slider with a fill and thumb
-states, an `effects` area and a `playlist`. It has no close or minimize
-button, since the skin protocol has no message for them yet.
+states, an `effects` area and a `playlist`; not a progress bar or a custom
+slider. It has no close or minimize button, since the skin protocol has
+no message for them yet.
 
 **The sources.** Layered SVGs in `skins/house/art/`, one Inkscape layer per
 state, rendered by `build.mjs` with resvg (`@resvg/resvg-js`, a dev

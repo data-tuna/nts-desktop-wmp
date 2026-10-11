@@ -44,8 +44,11 @@ export function showLayers(svg, layers) {
   const out = svg.replace(/<g\b[^>]*\binkscape:groupmode="layer"[^>]*>/g, (tag) => {
     const id = /\bid="([^"]+)"/.exec(tag)?.[1];
     found.add(id);
-    // Inkscape may have written its own style (display:inline): replace it.
-    return !layers.length || shown.has(id) ? tag : tag.replace(/\sstyle="[^"]*"/, "").replace("<g", '<g style="display:none"');
+    if (!layers.length) return tag;
+    // Inkscape saves each layer's visibility as a style (display:none or
+    // display:inline), so whatever it saved is dropped and ours applies.
+    const bare = tag.replace(/\sstyle="[^"]*"/, "");
+    return shown.has(id) ? bare : bare.replace("<g", '<g style="display:none"');
   });
   for (const id of shown) if (!found.has(id)) throw new Error(`no layer "${id}"`);
   return out;
@@ -84,6 +87,7 @@ export function files() {
   for (const [name, [svg, ...layers]] of Object.entries(BITMAPS)) {
     try {
       const img = new Resvg(showLayers(read(`art/${svg}`), layers)).render();
+      if (!img.pixels.some((v, i) => i % 4 !== 3 && v !== [255, 0, 255][i % 4])) throw new Error("nothing but the key colour");
       out.push([name, bmp(img.width, img.height, img.pixels)]);
     } catch (e) {
       throw new Error(`${name} from ${svg}: ${e.message}`);
