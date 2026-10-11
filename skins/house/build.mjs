@@ -44,11 +44,15 @@ export function showLayers(svg, layers) {
   const out = svg.replace(/<g\b[^>]*\binkscape:groupmode="layer"[^>]*>/g, (tag) => {
     const id = /\bid="([^"]+)"/.exec(tag)?.[1];
     found.add(id);
-    if (!layers.length) return tag;
-    // Inkscape saves each layer's visibility as a style (display:none or
-    // display:inline), so whatever it saved is dropped and ours applies.
-    const bare = tag.replace(/\sstyle="[^"]*"/, "");
-    return shown.has(id) ? bare : bare.replace("<g", '<g style="display:none"');
+    // Inkscape saves each layer's visibility in its style (display:none or
+    // display:inline), beside opacity and blend mode. A shown layer loses only
+    // the display; a hidden one draws nothing, so its style is replaced.
+    if (!layers.length || shown.has(id))
+      return tag.replace(/\sstyle="([^"]*)"/, (_, css) => {
+        const rest = css.split(";").filter((d) => d.trim() && !/^\s*display\s*:/.test(d)).join(";");
+        return rest ? ` style="${rest}"` : "";
+      });
+    return tag.replace(/\sstyle="[^"]*"/, "").replace("<g", '<g style="display:none"');
   });
   for (const id of shown) if (!found.has(id)) throw new Error(`no layer "${id}"`);
   return out;
