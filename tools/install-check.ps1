@@ -114,7 +114,7 @@ Start-Process (Join-Path $dir "uninstall.exe") -ArgumentList "/S" -Wait
 # The uninstaller runs a copy of itself from %TEMP% and returns at once.
 $deadline = (Get-Date).AddSeconds(60)
 while ((Test-Path $dir) -or (Entry)) {
-  if ((Get-Date) -gt $deadline) { throw "uninstall left $(if (Test-Path $dir) { "$dir: $((Get-ChildItem $dir -Recurse -Name) -join ', ')" } else { 'the Settings > Apps entry' })" }
+  if ((Get-Date) -gt $deadline) { throw "uninstall left $(if (Test-Path $dir) { "${dir}: $((Get-ChildItem $dir -Recurse -Name) -join ', ')" } else { 'the Settings > Apps entry' })" }
   Start-Sleep 2
 }
 $shortcuts = Get-ChildItem "$env:APPDATA\Microsoft\Windows\Start Menu", "$env:USERPROFILE\Desktop" -Recurse -Filter "$product*.lnk" -ErrorAction SilentlyContinue
