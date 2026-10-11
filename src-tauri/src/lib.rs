@@ -9,11 +9,14 @@ use serde::Deserialize;
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 use tauri::http::{HeaderValue, Method, Request, Response, StatusCode};
+use tauri::menu::{Menu, MenuEvent, MenuItem, PredefinedMenuItem};
+use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::webview::NewWindowResponse;
 use tauri::{
-    AppHandle, Emitter, EventTarget, LogicalPosition, LogicalSize, Manager, Url, WebviewBuilder,
-    WebviewUrl, WebviewWindowBuilder,
+    AppHandle, Emitter, EventTarget, LogicalPosition, LogicalSize, Manager, PhysicalPosition,
+    PhysicalRect, Url, WebviewBuilder, WebviewUrl, WebviewWindowBuilder, Window, Wry,
 };
+use tauri_plugin_window_state::{StateFlags, WindowExt as _};
 
 const SKIN_PAGE: &str = include_str!("../../src/skin/index.html");
 
@@ -321,9 +324,19 @@ fn handle(app: &AppHandle, msg: FromSkin) {
             rects,
         } => {
             if valid_shape(width, height, &rects) {
+                let resized = window
+                    .inner_size()
+                    .and_then(|s| Ok(s.to_logical::<u32>(window.scale_factor()?)))
+                    .is_ok_and(|s| (s.width, s.height) != (width, height));
                 let _ = window.set_size(LogicalSize::new(width, height));
                 #[cfg(windows)]
                 win32::apply(&window, rects);
+                // A bigger skin can push a remembered position off screen. Only
+                // on a new size: a mask change must not move a window the
+                // listener parked partly off screen.
+                if resized {
+                    let _ = pull_on_screen(&window);
+                }
             }
         }
         FromSkin::Close {} => {
@@ -350,6 +363,290 @@ fn handle(app: &AppHandle, msg: FromSkin) {
         }
         other => {
             let _ = app.emit_to(EventTarget::webview("main"), "skin", other);
+        }
+    }
+}
+
+/// Brings the player back: a second launch, or a click on the tray icon.
+fn show_player(app: &AppHandle) {
+    if let Some(main) = app.get_window("main") {
+        let _ = main.unminimize();
+        let _ = main.show();
+        let _ = main.set_focus();
+    }
+}
+
+/// The window-state plugin restores a saved position only when it is on a
+/// monitor. If part of the window is still off every monitor's work area (a
+/// monitor was unplugged, or the skin is bigger than the last one), pull it
+/// into its monitor's work area. A window that is fully visible, even across
+/// two monitors, stays where the user put it. From the Winamp app.
+fn pull_on_screen(window: &Window) -> tauri::Result<()> {
+    let position = window.outer_position()?;
+    let size = window.outer_size()?;
+    let areas: Vec<_> = window
+        .available_monitors()?
+        .iter()
+        .map(|monitor| *monitor.work_area())
+        .collect();
+    if fully_visible(position, (size.width, size.height), &areas) {
+        return Ok(());
+    }
+    let Some(monitor) = window.current_monitor()?.or(window.primary_monitor()?) else {
+        return Ok(());
+    };
+    window.set_position(fit_into(
+        position,
+        (size.width, size.height),
+        monitor.work_area(),
+    ))
+}
+
+/// Whether every corner of the window lies in one of `areas`.
+fn fully_visible(
+    position: PhysicalPosition<i32>,
+    (width, height): (u32, u32),
+    areas: &[PhysicalRect<i32, u32>],
+) -> bool {
+    // The last pixel, not the edge one past it.
+    let (right, bottom) = (
+        position.x + width as i32 - 1,
+        position.y + height as i32 - 1,
+    );
+    [
+        (position.x, position.y),
+        (right, position.y),
+        (position.x, bottom),
+        (right, bottom),
+    ]
+    .into_iter()
+    .all(|(x, y)| {
+        areas.iter().any(|area| {
+            x >= area.position.x
+                && x < area.position.x + area.size.width as i32
+                && y >= area.position.y
+                && y < area.position.y + area.size.height as i32
+        })
+    })
+}
+
+/// The nearest position to `position` that puts a window of `size` inside
+/// `area`; its top-left corner if the window is bigger than the area.
+fn fit_into(
+    position: PhysicalPosition<i32>,
+    (width, height): (u32, u32),
+    area: &PhysicalRect<i32, u32>,
+) -> PhysicalPosition<i32> {
+    let (left, top) = (area.position.x, area.position.y);
+    let right = left + area.size.width as i32;
+    let bottom = top + area.size.height as i32;
+    PhysicalPosition::new(
+        position.x.min(right - width as i32).max(left),
+        position.y.min(bottom - height as i32).max(top),
+    )
+}
+
+/// The SoundCloud credit for the pick playing: its uploader and track page.
+#[derive(Deserialize, Clone, PartialEq)]
+struct Credit {
+    name: String,
+    url: String,
+}
+
+/// The tray menu, and its credit entry, which is in the menu only while a
+/// pick plays.
+struct Tray {
+    menu: Menu<Wry>,
+    credit: MenuItem<Wry>,
+}
+
+static CREDIT: Mutex<Option<Credit>> = Mutex::new(None);
+
+/// The credit's height, in CSS pixels.
+const CREDIT_HEIGHT: u32 = 16;
+
+/// What a pick's credit shows: "<uploader> on SoundCloud".
+fn credit_text(credit: &Credit) -> String {
+    if credit.name.is_empty() {
+        "SoundCloud".into()
+    } else {
+        format!("{} on SoundCloud", credit.name)
+    }
+}
+
+/// A pick's page is a soundcloud.com track page, and nothing else.
+fn soundcloud_page(url: &str) -> bool {
+    Url::parse(url).is_ok_and(|u| {
+        u.scheme() == "https" && u.host_str() == Some("soundcloud.com") && u.path().len() > 1
+    })
+}
+
+/// Windows keeps 127 UTF-16 units of a tray tooltip, and tray-icon copies a
+/// longer one without its terminator. Cut on a character boundary. From the
+/// Winamp app.
+fn fit_tooltip(text: &str) -> String {
+    let mut units = 0;
+    text.chars()
+        .take_while(|c| {
+            units += c.len_utf16();
+            units <= 127
+        })
+        .collect()
+}
+
+/// The trusted page, whenever what plays changes: its title for the tray's
+/// tooltip, and a pick's credit, or none. While a pick plays the app draws
+/// the credit itself, above the skin, in a webview of its own: a skin's code
+/// cannot hide it, and a skin with no title text still shows it.
+#[tauri::command]
+async fn now_playing(app: AppHandle, title: String, credit: Option<Credit>) -> Result<(), String> {
+    if let Some(tray) = app.tray_by_id("main") {
+        let _ = tray.set_tooltip(Some(fit_tooltip(&title)));
+    }
+    if credit.as_ref().is_some_and(|c| !soundcloud_page(&c.url)) {
+        return Err("not a SoundCloud page".into());
+    }
+    // Swapped before any UI work, which waits on the UI thread, where
+    // credit() may be waiting on this lock.
+    let had = {
+        let mut current = CREDIT.lock().unwrap();
+        if *current == credit {
+            return Ok(());
+        }
+        std::mem::replace(&mut *current, credit.clone()).is_some()
+    };
+    let tray = app.state::<Tray>();
+    let window = app.get_window("main").ok_or("no main window")?;
+    match &credit {
+        Some(c) => {
+            tray.credit
+                // A lone & in a menu item marks a mnemonic: "Rhythm & Sound" needs &&.
+                .set_text(credit_text(c).replace('&', "&&"))
+                .map_err(|e| e.to_string())?;
+            if !had {
+                let _ = tray.menu.insert(&tray.credit, 5);
+            }
+            // As wide as the window while it lays out; credit_size narrows it.
+            let width = window
+                .inner_size()
+                .map_err(|e| e.to_string())?
+                .to_logical::<f64>(window.scale_factor().map_err(|e| e.to_string())?)
+                .width;
+            let size = LogicalSize::new(width, CREDIT_HEIGHT as f64);
+            match app.get_webview("credit") {
+                Some(webview) => {
+                    let _ = webview.set_size(size);
+                    let _ = webview.eval("render()");
+                }
+                None => {
+                    let builder =
+                        WebviewBuilder::new("credit", WebviewUrl::App("credit.html".into()))
+                            .additional_browser_args(BROWSER_ARGS)
+                            .on_navigation(|url| url.path() == "/credit.html")
+                            .on_new_window(|_, _| NewWindowResponse::Deny);
+                    window
+                        .add_child(builder, LogicalPosition::new(0.0, 0.0), size)
+                        .map_err(|e| e.to_string())?;
+                }
+            }
+        }
+        None => {
+            let _ = tray.menu.remove(&tray.credit);
+            if let Some(webview) = app.get_webview("credit") {
+                let _ = webview.close();
+            }
+            #[cfg(windows)]
+            win32::set_credit(&window, None);
+        }
+    }
+    Ok(())
+}
+
+/// The credit page asks what to show.
+#[tauri::command]
+fn credit() -> Option<String> {
+    CREDIT.lock().unwrap().as_ref().map(credit_text)
+}
+
+/// The credit page's width once laid out, in CSS pixels: the credit webview
+/// takes that size, and the window's shape gains its rectangle.
+#[tauri::command]
+fn credit_size(app: AppHandle, width: u32) -> Result<(), String> {
+    let window = app.get_window("main").ok_or("no main window")?;
+    let webview = app.get_webview("credit").ok_or("no credit")?;
+    let width = width.clamp(1, 4096);
+    webview
+        .set_size(LogicalSize::new(width, CREDIT_HEIGHT))
+        .map_err(|e| e.to_string())?;
+    #[cfg(windows)]
+    win32::set_credit(&window, Some([0, 0, width, CREDIT_HEIGHT]));
+    #[cfg(not(windows))]
+    let _ = window;
+    Ok(())
+}
+
+/// A click on the credit, or on its tray entry: the pick's SoundCloud page.
+#[tauri::command]
+fn open_credit() {
+    if let Some(credit) = CREDIT.lock().unwrap().as_ref() {
+        if let Ok(url) = Url::parse(&credit.url) {
+            open_url(&url);
+        }
+    }
+}
+
+/// The tray icon: play, stop, the two channels, the pick's credit while one
+/// plays, and quit. A left click brings the player forward.
+fn build_tray(app: &AppHandle) -> tauri::Result<()> {
+    let item = |id: &str, text: &str| MenuItem::with_id(app, id, text, true, None::<&str>);
+    let sep = || PredefinedMenuItem::separator(app);
+    let menu = Menu::with_items(
+        app,
+        &[
+            &item("play", "Play")?,
+            &item("stop", "Stop")?,
+            &sep()?,
+            &item("nts1", "NTS 1")?,
+            &item("nts2", "NTS 2")?,
+            // The credit goes here, at 5, while a pick plays.
+            &sep()?,
+            &item("quit", "Quit")?,
+        ],
+    )?;
+    let credit = item("credit", "SoundCloud")?;
+    app.manage(Tray {
+        menu: menu.clone(),
+        credit,
+    });
+    let mut tray = TrayIconBuilder::with_id("main")
+        .tooltip("NTS Radio Bootleg Media Player")
+        .menu(&menu)
+        .show_menu_on_left_click(false)
+        .on_menu_event(on_tray_menu)
+        .on_tray_icon_event(|tray, event| {
+            if let TrayIconEvent::Click {
+                button: MouseButton::Left,
+                button_state: MouseButtonState::Up,
+                ..
+            } = event
+            {
+                show_player(tray.app_handle());
+            }
+        });
+    if let Some(icon) = app.default_window_icon() {
+        tray = tray.icon(icon.clone());
+    }
+    tray.build(app)?;
+    Ok(())
+}
+
+fn on_tray_menu(app: &AppHandle, event: MenuEvent) {
+    match event.id().as_ref() {
+        "quit" => app.exit(0),
+        "credit" => open_credit(),
+        // main.ts plays, stops and switches.
+        id => {
+            let _ = app.emit_to(EventTarget::webview("main"), "tray", id);
         }
     }
 }
@@ -469,9 +766,18 @@ mod win32 {
         });
     }
 
+    /// The credit's rectangle while a pick plays, kept in the shape.
+    static CREDIT: Mutex<Option<[u32; 4]>> = Mutex::new(None);
+
     /// Clips the window to the skin's opaque runs, given in CSS pixels.
     pub fn apply(window: &tauri::Window, rects: Vec<[u32; 4]>) {
         *SHAPE.lock().unwrap() = rects;
+        reapply(window);
+    }
+
+    /// Adds the credit's rectangle to the shape, or with none takes it out.
+    pub fn set_credit(window: &tauri::Window, rect: Option<[u32; 4]>) {
+        *CREDIT.lock().unwrap() = rect;
         reapply(window);
     }
 
@@ -487,7 +793,7 @@ mod win32 {
         let px = |v: u32| (v as f64 * scale).round() as i32;
         unsafe {
             let rgn = CreateRectRgn(0, 0, 0, 0);
-            for &[x, y, w, h] in rects.iter() {
+            for &[x, y, w, h] in rects.iter().chain(CREDIT.lock().unwrap().iter()) {
                 let r = CreateRectRgn(px(x), px(y), px(x + w), px(y + h));
                 CombineRgn(rgn, rgn, r, RGN_OR);
                 DeleteObject(r);
@@ -501,11 +807,30 @@ mod win32 {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        // First, so a second launch hands over and exits before anything else
+        // runs. The lock is named after the identifier, so the Winamp app
+        // (com.datatuna.ntswinamp) has its own.
+        .plugin(tauri_plugin_single_instance::init(|app, _, _| {
+            show_player(app)
+        }))
+        // The position only: the skin sets the size. Restored in setup, so it
+        // can be pulled back on screen first.
+        .plugin(
+            tauri_plugin_window_state::Builder::new()
+                .with_state_flags(StateFlags::POSITION)
+                .with_denylist(&["picker"])
+                .skip_initial_state("main")
+                .build(),
+        )
         .invoke_handler(tauri::generate_handler![
             skin_send,
             list_skins,
             choose_skin,
-            open_link
+            open_link,
+            now_playing,
+            credit,
+            credit_size,
+            open_credit
         ])
         .register_asynchronous_uri_scheme_protocol("skin", |ctx, req, responder| {
             let (app, from) = (ctx.app_handle().clone(), ctx.webview_label().to_owned());
@@ -541,7 +866,10 @@ pub fn run() {
         })
         .setup(|app| {
             skins::start(app.handle());
+            build_tray(app.handle())?;
             let window = app.get_window("main").expect("main window");
+            window.restore_state(StateFlags::POSITION)?;
+            pull_on_screen(&window)?;
             let size = window
                 .inner_size()?
                 .to_logical::<f64>(window.scale_factor()?);
@@ -603,6 +931,61 @@ mod tests {
             &last
         )
         .is_some());
+    }
+
+    #[test]
+    fn fit_into_pulls_an_off_screen_window_onto_the_work_area() {
+        let area = PhysicalRect {
+            position: PhysicalPosition::new(0, 0),
+            size: tauri::PhysicalSize::new(1920, 1032),
+        };
+        let fit = |x, y| fit_into(PhysicalPosition::new(x, y), (321, 268), &area);
+        assert_eq!(fit(100, 100), PhysicalPosition::new(100, 100));
+        assert_eq!(fit(-50, -200), PhysicalPosition::new(0, 0));
+        assert_eq!(fit(1800, 900), PhysicalPosition::new(1599, 764));
+    }
+
+    #[test]
+    fn fully_visible_allows_spanning_two_monitors_but_not_off_screen() {
+        let left = PhysicalRect {
+            position: PhysicalPosition::new(-1920, 0),
+            size: tauri::PhysicalSize::new(1920, 1032),
+        };
+        let right = PhysicalRect {
+            position: PhysicalPosition::new(0, 0),
+            size: tauri::PhysicalSize::new(1920, 1032),
+        };
+        let visible =
+            |x, y, areas: &[_]| fully_visible(PhysicalPosition::new(x, y), (321, 268), areas);
+        assert!(visible(100, 100, &[right]));
+        assert!(visible(-100, 100, &[left, right]));
+        assert!(!visible(-100, 100, &[right]));
+        assert!(!visible(5000, 5000, &[left, right]));
+    }
+
+    #[test]
+    fn fit_tooltip_keeps_127_utf16_units_on_a_char_boundary() {
+        assert_eq!(fit_tooltip("NTS 1 - Show"), "NTS 1 - Show");
+        assert_eq!(fit_tooltip(&"a".repeat(200)).len(), 127);
+        assert_eq!(fit_tooltip(&"\u{1F4FB}".repeat(64)).chars().count(), 63);
+    }
+
+    #[test]
+    fn credit_opens_only_soundcloud_pages() {
+        assert!(soundcloud_page("https://soundcloud.com/user-1/a-mix"));
+        assert!(!soundcloud_page("https://soundcloud.com/"));
+        assert!(!soundcloud_page("http://soundcloud.com/user-1/a-mix"));
+        assert!(!soundcloud_page("https://soundcloud.com.evil.example/a"));
+        assert!(!soundcloud_page("file:///C:/Windows/System32/calc.exe"));
+        let credit = |name: &str| Credit {
+            name: name.into(),
+            url: String::new(),
+        };
+        assert_eq!(
+            credit_text(&credit("NTS Latest")),
+            "NTS Latest on SoundCloud"
+        );
+        assert_eq!(credit_text(&credit("")), "SoundCloud");
     }
 
     #[test]

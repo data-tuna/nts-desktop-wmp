@@ -3,5 +3,5 @@
   "identifier": "default",
   "description": "The trusted page only. Matched by webview, not window: the skin webview is a child of the main window and must get nothing.",
   "webviews": ["main"],
-  "permissions": ["core:default", "allow-skin-send"]
+  "permissions": ["core:default", "allow-skin-send", "allow-now-playing"]
 }

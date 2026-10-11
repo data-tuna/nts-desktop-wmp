@@ -38,7 +38,9 @@ Written in English.
                           nts-desktop-winamp; see Gotchas. widget.ts plays
                           a pick through SoundCloud's hidden widget.
                           picker.ts is the skin picker (picker.html), a
-                          trusted page of its own.
+                          trusted page of its own. credit.ts (credit.html)
+                          is the SoundCloud credit drawn over the skin
+                          while a pick plays.
     src/skin/             The skin engine, which runs in the skin webview:
                           wmz.ts unzips, wms.ts decodes and parses the .wms,
                           engine.ts lays out and paints the view, runs the
@@ -114,6 +116,13 @@ clock stuck for 10 s alike.
 EQ are remembered (`localStorage` in the trusted page); the channel is not.
 The skin picked in the picker is remembered too (`skin.json` beside the skin
 cache); with none picked, every launch wears a random working skin.
+
+**A pick's credit is the app's, not the skin's.** While a pick plays, the
+app draws "<uploader> on SoundCloud" over the skin's top-left corner in a
+webview of its own (`credit`), adds it to the window's shape, and lists it in
+the tray; one click opens the track's page. A skin's code cannot hide it, and
+a skin with no title text still shows it. SoundCloud's terms want that
+credit and link wherever a pick plays.
 
 **Skins are fetched at runtime and never committed.** `.wmz` skins are
 third-party works, and many of the classic ones are Microsoft's own. They
@@ -198,7 +207,8 @@ from the app in a release build. Inline the code or use another protocol.
 
 **This app and the Winamp app run side by side.** They differ in identifier
 (`com.datatuna.ntswmp` here, `com.datatuna.ntswinamp` there), so each has its
-own `%LOCALAPPDATA%\<identifier>` folder and WebView2 profile; in executable
+own `%LOCALAPPDATA%\<identifier>` folder, WebView2 profile and
+single-instance lock (`<identifier>-sim`); in executable
 (`nts-desktop-wmp.exe`); in product name, which names the install folder and
 the Settings > Apps entry; and in dev port (1430 here, 1420 there). Keep all
 four distinct.
@@ -299,6 +309,20 @@ sees: `__wmpScope.player.status`, `__wmpScope.<element id>.visible`.
 reports it. `escape.mjs` reloads the trusted page when it finishes, since its
 forced-fallback test leaves that page on `postMessage` IPC.
 
+**Other copies of the app share its profile.** Every copy with the
+identifier `com.datatuna.ntswmp`, whoever built it, uses the same WebView2
+folder under `%LOCALAPPDATA%`. A second copy started with other browser
+arguments (another DevTools port) panics in setup with `0x800700AA`, "The
+requested resource is in use", and exits with `0xC0000409`. One started with
+the same arguments shares the first one's browser process, which dies with
+whichever copy is closed first. The single-instance lock hands a second
+launch over to the first copy before any webview exists, but only when both
+run on the same desktop: the lock finds the first copy's window with
+`FindWindow`, which looks at its own desktop only. So when testing, give the
+run its own desktop name (`hidden-run.ps1 <exe> <name>`), DevTools port and
+`WEBVIEW2_USER_DATA_FOLDER`, and check which process a port belongs to
+before you poke it: another agent's copy may be listening on 9355.
+
 **Testing reconnect.** Add `--proxy-server=http://127.0.0.1:8899` to the
 browser arguments, run `node tools/proxy.mjs 8899`, and cut it with
 `curl "http://127.0.0.1:8899/cut?seconds=30"`. Its log shows each tunnel
@@ -312,14 +336,28 @@ DevTools port if another copy of the app may be running.
 The machine is in use. Use `hidden-run.ps1`, and keep the volume at 0 if you
 press Play. Clicks go through DevTools input events (`click.mjs`); anything
 that needs a real pointer, such as dragging the window, is a manual check
-for a person. The window shots need the visible desktop, so ask first.
+for a person. `PrintWindow` does draw a window on a hidden desktop if the
+process calling it runs there too: start `powershell.exe` with
+`region-shot.ps1` on that desktop. Windows lists no media session for an app
+on a hidden desktop, so the media keys and the overlay can only be checked
+on the real one.
 
 ## Known gaps
 
 **Dragging the window is unverified.** Rust follows the cursor while the
 primary button is down (`win32::drag` in `lib.rs`), because `start_dragging`
 did nothing under the skin webview. Nobody has dragged it with a real mouse
-yet.
+yet, nor clicked the tray menu or the credit, nor moved the window to a
+monitor with another scale (the shape is redone on `ScaleFactorChanged`).
+ATA-115 has the list of checks for a person.
+
+**Stop from Windows ends the media session.** The overlay's Stop button, or
+a Stop media key, stops the player, and WebView2 then drops the session, so
+the Play key cannot start it again: use the window or the tray. Pause, and
+Stop from the skin or the tray, keep the session.
+
+**A launch while the app is closing does nothing.** The closing copy still
+holds the single-instance lock, so the new one hands over to it and exits.
 
 **The trusted page has no content security policy.** `tauri.conf.json` has
 `"csp": null`, the scaffold default. The skin protocol sends its own CSP
@@ -342,7 +380,7 @@ until this one gets its own.
 **PR CI does not build the Rust side.** It runs typecheck, lint, the frontend
 build, the tests and `cargo fmt --check`.
 
-**No release workflow, updater or single-instance lock yet.**
+**No release workflow or updater yet.**
 
 **Only a skin's first view is drawn.** `theme.openView` and
 `theme.currentViewID` are logged and ignored, so circle's video, playlist
@@ -357,17 +395,10 @@ wheel; it has no columns or scroll bar. Their methods
 our own. The chosen effect is not saved across launches (`mediacenter`
 starts empty each time).
 
-**The media overlay is unverified.** The trusted page sets
-`navigator.mediaSession` (title, show, artwork; checked over DevTools), but
-the app runs on a hidden desktop in tests, and Windows listed no session
-for it there, muted or not. Someone needs to look at the overlay on a real
-desktop.
-
-**A pick's credit link is a double click.** On a text showing the title, or
-on the pick's playlist row, it opens the pick's SoundCloud page. The credit
-leads the title (`<uploader> on SoundCloud - …`), but nothing on screen
-says it is a link, and a skin with neither such a text nor a playlist pane
-has no way to open it.
+**Nobody has looked at the media overlay itself.** Windows lists the app's
+session with its title and show (`NTS 1 - <show> - <location>`), and plays,
+pauses and stops it, through the same API the overlay uses (ATA-115). The
+flyout has not been seen on screen.
 
 **Fast forward, rewind and seek sliders are drawn disabled:** a live stream
 has no length.
