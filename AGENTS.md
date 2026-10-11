@@ -394,7 +394,7 @@ until this one gets its own.
 **PR CI does not build the Rust side.** It runs typecheck, lint, the frontend
 build, the tests and `cargo fmt --check`.
 
-**A visualisation costs about 20 points of a core** (ATA-116). With one
+**A visualisation costs about 20–30 points of a core** (ATA-116). With one
 showing, the app uses about 25–35 % of a core (5–7 % without). Each frame
 redraws only the visualisation, so most of that is the frames' trip: an IPC
 call from the trusted page, a script evaluated in the skin webview, a
