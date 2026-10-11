@@ -40,12 +40,18 @@ const SKIN_CSP: &str = "default-src 'self'; script-src 'self' 'unsafe-inline' 'u
 #[serde(tag = "type", rename_all = "camelCase", deny_unknown_fields)]
 enum FromSkin {
     Play {},
+    Pause {},
     Stop {},
+    Next {},
+    Previous {},
     Volume {
         value: f64,
     },
     Balance {
         value: f64,
+    },
+    Mute {
+        value: bool,
     },
     Seek {
         seconds: f64,
@@ -343,6 +349,12 @@ mod tests {
         assert_eq!(parse(r#"{"type":"drag","evil":1}"#), None);
         assert_eq!(parse(r#"{"type":"volume","value":0.5,"evil":1}"#), None);
         assert_eq!(parse(r#"{"type":"bogus"}"#), None);
+        assert_eq!(parse(r#"{"type":"next"}"#), Some(FromSkin::Next {}));
+        assert_eq!(
+            parse(r#"{"type":"mute","value":true}"#),
+            Some(FromSkin::Mute { value: true })
+        );
+        assert_eq!(parse(r#"{"type":"mute","value":1}"#), None);
         // The trusted page still gets the bare form.
         let play = serde_json::to_string(&FromSkin::Play {}).unwrap();
         assert_eq!(play, r#"{"type":"play"}"#);

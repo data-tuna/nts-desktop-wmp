@@ -1,6 +1,5 @@
 // The skin engine, static half: draws a skin's first view as it looks before
-// any of its scripts run, and drives play, stop and volume through the named
-// controls. Scripts, `wmpprop:` bindings beyond the player's own state, and
+// any of its scripts run, and drives the player through the named controls. Scripts, `wmpprop:` bindings beyond the player's own state, and
 // the WMP object model come with the script runtime (ATA-110).
 //
 // Everything is painted back to front on one canvas the size of the view, so
@@ -11,7 +10,19 @@ import { constants, type Node } from "./wms.ts";
 import { css, keyed, mappedElement, parseColor, rgbAt, runs, type Pixels } from "./pixels.ts";
 
 export type Img = Pixels & { bitmap: CanvasImageSource };
-export type State = { playing: boolean; time: number; title: string };
+/** The host's state message (docs/decisions.md, ATA-109). */
+export type State = {
+  playState: "playing" | "buffering" | "reconnecting" | "paused" | "stopped";
+  channel: number;
+  title: string;
+  time: number;
+  duration: number;
+  volume: number;
+  mute: boolean;
+  balance: number;
+  eq: number[];
+  level: number;
+};
 export type Send = (msg: { type: string; [k: string]: unknown }) => void;
 
 type Kind = "container" | "button" | "group" | "element" | "slider" | "custom" | "progress" | "text" | "effects" | "none";
@@ -161,9 +172,8 @@ class El {
   }
 
   text(): string {
-    const s = this.skin.state;
     if (this.role === "currentposition") return this.skin.elapsed();
-    if (this.role === "status") return s.playing ? "Playing" : "Ready";
+    if (this.role === "status") return this.skin.status();
     if (this.role === "duration") return "";
     return this.skin.str(this, "value");
   }
@@ -174,7 +184,8 @@ class El {
     const min = this.skin.num(this, "min") ?? (role === "balance" ? -100 : 0);
     const max = this.skin.num(this, "max") ?? 100;
     let value = this.dragValue ?? this.skin.num(this, "value");
-    if (value === null) value = role === "volume" ? min + (this.skin.volume / 100) * (max - min) : role === "balance" ? (min + max) / 2 : min;
+    const { volume, balance } = this.skin.state;
+    if (value === null) value = role === "volume" ? min + volume * (max - min) : role === "balance" ? min + ((balance + 1) / 2) * (max - min) : min;
     return [min, max, Math.min(max, Math.max(min, value))];
   }
 
@@ -491,8 +502,7 @@ export class Skin {
   readonly canvas = document.createElement("canvas");
   readonly measure = document.createElement("canvas").getContext("2d")!;
   readonly view: El;
-  state: State = { playing: false, time: 0, title: "" };
-  volume = 100;
+  state: State = { playState: "stopped", channel: 0, title: "", time: 0, duration: 0, volume: 1, mute: false, balance: 0, eq: [], level: 0 };
   private byId = new Map<string, El>();
   private constants: Map<string, unknown>;
   private scope: object;
@@ -566,33 +576,46 @@ export class Skin {
   /** The player properties a static skin can show. */
   private prop(path: string): unknown {
     const p = path.toLowerCase();
-    if (/^eq\.gainlevel\d+$/.test(p)) return 0;
+    const band = /^eq\.gainlevel(\d+)$/.exec(p);
+    if (band) return this.state.eq[+band[1] - 1] ?? 0;
     const props: Record<string, unknown> = {
       "player.controls.currentposition": this.state.time,
       "player.controls.currentpositionstring": this.elapsed(),
       "player.currentmedia.duration": 0,
       "player.currentmedia.durationstring": "",
       "player.currentmedia.name": this.state.title,
-      "player.status": this.state.playing ? "Playing" : "Ready",
-      "player.settings.volume": this.volume,
-      "player.settings.balance": 0,
+      "player.status": this.status(),
+      "player.settings.volume": this.state.volume * 100,
+      "player.settings.balance": this.state.balance * 100,
+      "player.settings.mute": this.state.mute,
     };
     return props[p];
   }
 
-  /** The elapsed time as WMP shows it: blank while stopped. */
+  /** Whether a stream is on, or being brought back. */
+  get playing(): boolean {
+    return ["playing", "buffering", "reconnecting"].includes(this.state.playState);
+  }
+
+  status(): string {
+    const p = this.state.playState;
+    return p === "stopped" ? "Ready" : p[0].toUpperCase() + p.slice(1);
+  }
+
+  /** The elapsed time as WMP shows it: blank while stopped or paused. */
   elapsed(): string {
-    return this.state.playing ? fmt(this.state.time) : "";
+    return this.playing ? fmt(this.state.time) : "";
   }
 
   /** Whether a named transport control is enabled, or null for other names.
-   * A live stream can play or stop; it has no previous, next or seeking. */
+   * Previous and next switch channels; a live stream has no seeking. */
   controlEnabled(role: string): boolean | null {
-    if (role === "play") return !this.state.playing;
-    if (role === "pause" || role === "stop") return this.state.playing;
+    if (role === "play") return !this.playing;
+    if (role === "pause" || role === "stop") return this.playing;
     // Tag names (prevbutton, ffwdelement, seekslider) and the
     // player.controls names that wmpenabled: uses.
-    if (["prev", "previous", "next", "ffwd", "fastforward", "rew", "fastreverse", "seek"].includes(role)) return false;
+    if (["prev", "previous", "next"].includes(role)) return true;
+    if (["ffwd", "fastforward", "rew", "fastreverse", "seek"].includes(role)) return false;
     return null;
   }
 
@@ -710,7 +733,9 @@ export class Skin {
   setState(s: State) {
     const old = this.state;
     this.state = s;
-    if (old.playing !== s.playing || Math.floor(old.time) !== Math.floor(s.time) || old.title !== s.title) this.paint();
+    // Repaint for what skins show, not for the level or a sub-second clock.
+    const shown = (t: State) => JSON.stringify([t.playState, t.title, Math.floor(t.time), t.volume, t.mute, t.balance, t.eq]);
+    if (shown(old) !== shown(s)) this.paint();
   }
 
   /** Something on screen moves: repaint on the next frame. */
@@ -804,22 +829,25 @@ export class Skin {
       e.dragValue = v;
       // Whatever the slider's own range, the protocol wants 0..1 and -1..1.
       const t = e.fraction();
+      // Set locally too, so the slider holds still until the host's next state.
       if (e.role === "volume") {
-        this.volume = t * 100;
+        this.state.volume = t;
         this.send({ type: "volume", value: t });
-      } else if (e.role === "balance") this.send({ type: "balance", value: t * 2 - 1 });
+      } else if (e.role === "balance") {
+        this.state.balance = t * 2 - 1;
+        this.send({ type: "balance", value: t * 2 - 1 });
+      }
     }
-    // Volume and balance keep the dragged value; anything else bound to the
-    // player goes back to the player's value. Seeking is disabled: live.
-    if (done && e.role !== "volume" && e.role !== "balance") e.dragValue = null;
+    // Back to the player's value. Seeking is disabled: live.
+    if (done) e.dragValue = null;
     this.paint();
   }
 
   private click(e: El) {
     const role = e.role;
-    if (role === "play") this.send({ type: "play" });
-    // A live stream cannot pause: pausing stops it.
-    else if (role === "stop" || role === "pause") this.send({ type: "stop" });
+    if (["play", "pause", "stop", "next"].includes(role)) this.send({ type: role });
+    else if (role === "prev" || role === "previous") this.send({ type: "previous" });
+    else if (role === "mute") this.send({ type: "mute", value: !this.state.mute });
     else if (e.attr("onclick")) this.log(`onClick of <${e.node.tag}> needs the skin's scripts, ignored`);
   }
 }

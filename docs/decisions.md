@@ -6,6 +6,28 @@ the evidence.
 
 ## Stack
 
+### The core player (ATA-109, 2026-10-11)
+
+- **The playlist is NTS 1 and NTS 2.** On launch NTS 1 plays, whatever was
+  playing at exit. Next and previous switch channels and wrap around; while
+  stopped or paused they select the channel without playing it.
+- **Pause drops the connection, as stop does.** Resuming a paused live
+  stream would play from minutes ago, so Play after a pause reloads it.
+  Play while playing does nothing. If WebView2 refuses autoplay, the player
+  goes to `stopped` and waits for Play rather than retrying.
+- **Reconnect** (`player.ts`): an `error`, an `ended`, or a clock that has
+  not moved for 10 s while playing reloads the same channel after 1, 2, 4,
+  then every 8 s, until it plays again; a moving clock resets the backoff.
+  Pause and stop cancel a pending retry. Checked on a release build through
+  `tools/proxy.mjs`: a 30 s cut on NTS 1 showed `reconnecting` within 3 s
+  (the buffer played out first), six retries all to `/nts1`, and playback
+  5 s after the cut ended. A pause during a cut stayed paused: no tunnel
+  opened after the cut ended.
+- **Remembered:** volume, mute, balance and the EQ, in the trusted page's
+  `localStorage`, clamped on load. **Not yet:** the last skin. Nothing
+  chooses a skin until ATA-112, so it is left to that issue (noted on
+  ATA-112, with its conflict with a random skin on launch, for Ata).
+
 ### Skin code runs in its own webview, with no capabilities (ATA-107, 2026-10-11)
 
 **The host.** The main window holds two webviews. `main` is the trusted
@@ -86,7 +108,9 @@ unknown fields included, and refuses requests from any webview but `skin`
 
 | Message | Handled by |
 |---|---|
-| `{ "type": "play" }`, `{ "type": "stop" }` | the trusted page |
+| `{ "type": "play" }`, `{ "type": "pause" }`, `{ "type": "stop" }` | the trusted page |
+| `{ "type": "next" }`, `{ "type": "previous" }` | the trusted page: the other channel, wrapping around |
+| `{ "type": "mute", "value": true \| false }` | the trusted page |
 | `{ "type": "volume", "value": 0..1 }`, `{ "type": "balance", "value": -1..1 }` | the trusted page, clamped |
 | `{ "type": "eq", "band": 0..9, "gain": -15..15 }` | the trusted page, clamped |
 | `{ "type": "seek", "seconds": n }` | accepted, ignored: live streams cannot seek |
@@ -94,9 +118,17 @@ unknown fields included, and refuses requests from any webview but `skin`
 | `{ "type": "shape", "width", "height", "rects": [[x, y, w, h], …] }` | Rust: sizes the window and sets its region. Ignored unless the view is 1–4096 px a side and every run is non-empty and inside it, with at most ceil(width / 2) runs per row |
 
 Host to skin: the trusted page calls the `skin_send` command, and Rust
-dispatches a `message` event in the skin webview. Today that is
-`{ "type": "state", "playing", "time", "title", "level" }`, four times a
-second. The skin also gets `GET /` (the engine page), `GET /engine.js` (the
+dispatches a `message` event in the skin webview. Today that is, four times
+a second (ATA-109):
+
+    { "type": "state", "playState", "channel", "title", "time", "duration",
+      "volume", "mute", "balance", "eq", "level" }
+
+`playState` is `playing`, `buffering`, `reconnecting`, `paused` or
+`stopped`. `duration` is 0 for a live stream, as in WMP: a skin shows its
+seek bar disabled. `volume`, `mute`, `balance` and `eq` (ten gains in dB)
+are the saved settings, so a skin's controls start where the listener left
+them. The skin also gets `GET /` (the engine page), `GET /engine.js` (the
 engine) and `GET /skin.wmz` (the skin itself, whole) from the protocol, and
 nothing of the app's. Until ATA-108 the stub skin read its files one by one
 from `GET /files/<name>`.
@@ -186,11 +218,15 @@ against the 7 ATA-103 skins; no code from Webamp Modern.
   the top level (`var leftOffset = 260;`), which Asimov_Radio lays out with;
   reading a literal runs none of the script. Anything else is logged and
   skipped until the script runtime (ATA-110).
-- **Player state.** The named controls follow the host's state: Play is
-  enabled while stopped, Stop and Pause while playing; Previous, Next, fast
-  forward and rewind, and seek sliders never (a live stream has none of
-  them). Pause sends `stop`. Sliders bound to the volume or balance, named
-  or not, send `volume` and `balance`, scaled from the slider's own range.
+- **Player state.** The named controls follow the host's state message
+  (ATA-109): Play is enabled unless a stream is on (playing, buffering or
+  reconnecting), Pause and Stop only while one is; Previous and Next always
+  (they switch channels); fast forward, rewind and seek sliders never, since
+  a live stream has no length. Each sends its own message, and Mute sends
+  the opposite of the host's mute. Sliders bound to the volume or balance,
+  named or not, start at the host's saved values and send `volume` and
+  `balance`, scaled from the slider's own range; EQ sliders show the saved
+  gains. The elapsed time is blank while stopped or paused, as in WMP.
 
 ### Source: archive.org, one per launch, a compatibility list (proposed by Lama, confirmed by Ata, 2026-10-10)
 
