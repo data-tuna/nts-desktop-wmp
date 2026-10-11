@@ -211,8 +211,9 @@ primary button is down (`win32::drag` in `lib.rs`), because `start_dragging`
 did nothing under the skin webview. Nobody has dragged it with a real mouse
 yet.
 
-**No content security policy.** `tauri.conf.json` has `"csp": null`, the
-scaffold default.
+**The trusted page has no content security policy.** `tauri.conf.json` has
+`"csp": null`, the scaffold default. The skin protocol sends its own CSP
+(`SKIN_CSP` in `lib.rs`).
 
 **The icon is the Winamp app's.** Both apps look the same in the taskbar
 until this one gets its own.

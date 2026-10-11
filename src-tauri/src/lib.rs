@@ -117,7 +117,7 @@ fn skin_file(name: &str) -> Response<Vec<u8>> {
 }
 
 /// A view of at most 4096 px a side, with runs that are non-empty, inside it,
-/// and no more than one per two pixels (a bitmap's row runs never need more).
+/// and no more than a bitmap's row runs can need: ceil(width / 2) per row.
 fn valid_shape(width: u32, height: u32, rects: &[[u32; 4]]) -> bool {
     let side = 1..=4096;
     let inside = |&[x, y, w, h]: &[u32; 4]| {
@@ -128,7 +128,7 @@ fn valid_shape(width: u32, height: u32, rects: &[[u32; 4]]) -> bool {
     };
     side.contains(&width)
         && side.contains(&height)
-        && rects.len() <= (width * height / 2) as usize
+        && rects.len() <= (height * width.div_ceil(2)) as usize
         && rects.iter().all(inside)
 }
 
@@ -315,6 +315,9 @@ mod tests {
         assert!(!valid_shape(200, 200, &[[0, 0, 0, 1]]));
         assert!(!valid_shape(0, 200, &[]));
         assert!(!valid_shape(4, 4, &[[0, 0, 1, 1]; 9]));
+        // One 3 px row, opaque-clear-opaque: two runs.
+        assert!(valid_shape(3, 1, &[[0, 0, 1, 1], [2, 0, 1, 1]]));
+        assert!(!valid_shape(3, 1, &[[0, 0, 1, 1]; 3]));
     }
 
     #[test]

@@ -91,7 +91,7 @@ unknown fields included, and refuses requests from any webview but `skin`
 | `{ "type": "eq", "band": 0..9, "gain": -15..15 }` | the trusted page, clamped |
 | `{ "type": "seek", "seconds": n }` | accepted, ignored: live streams cannot seek |
 | `{ "type": "drag" }` | Rust: moves the window with the pointer, only while our window is in front and under the pointer with the button down |
-| `{ "type": "shape", "width", "height", "rects": [[x, y, w, h], …] }` | Rust: sizes the window and sets its region. Ignored unless the view is 1–4096 px a side and every run is non-empty and inside it, with at most one run per two pixels |
+| `{ "type": "shape", "width", "height", "rects": [[x, y, w, h], …] }` | Rust: sizes the window and sets its region. Ignored unless the view is 1–4096 px a side and every run is non-empty and inside it, with at most ceil(width / 2) runs per row |
 
 Host to skin: the trusted page calls the `skin_send` command, and Rust
 dispatches a `message` event in the skin webview. Today that is
