@@ -100,7 +100,10 @@ function onSkin(m: FromSkin) {
   else if (m.type === "stop") player.stop();
   else if (m.type === "next") player.step(1);
   else if (m.type === "previous") player.step(-1);
-  else if (m.type === "effects") effectsOn = m.on;
+  else if (m.type === "effects") {
+    effectsOn = m.on;
+    startVis();
+  }
   else if (m.type === "select") player.select(m.index);
   else if (m.type === "seek") {
     // ponytail: seek is accepted but a live stream has nowhere to seek to.
@@ -167,20 +170,28 @@ setInterval(() => {
   // ponytail: picks have a length, and SoundCloud's widget can seek; they are shown as live too until someone asks to seek a pick.
   const state = { type: "state", ...now, ...shown, items: items.map((_, i) => info(i).title), duration: 0, ...settings, level: level() };
   void invoke("skin_send", { msg: state }).catch(() => {});
+  startVis();
 }, 250);
 
 // Analyser frames for the skin's visualisation, about 30 a second, only
-// while one is on screen and the stream plays. Rust hides the webviews
-// while the window is minimised, so requestAnimationFrame, and the frames,
-// stop then.
+// while one is on screen and the stream plays. The loop asks for display
+// frames only then: idle, it cost about 4 % of a core (ATA-116). The state
+// tick above starts it again. Rust hides the webviews while the window is
+// minimised, so requestAnimationFrame, and the frames, stop then.
 const spectrum = new Uint8Array(visAnalyser.frequencyBinCount);
 const wave = new Uint8Array(visAnalyser.fftSize);
 let lastFrame = 0;
 let flatSent = false;
-function visFrame(now: number) {
+let visLooping = false;
+function startVis() {
+  if (visLooping) return;
+  visLooping = true;
   requestAnimationFrame(visFrame);
+}
+function visFrame(now: number) {
+  visLooping = false;
   const { playState, channel } = player.state();
-  if (!effectsOn || playState !== "playing" || now - lastFrame < 30) return;
+  if (!effectsOn || playState !== "playing") return;
   // A pick plays outside our Web Audio graph: one flat frame clears the last
   // stream frame, then nothing until a stream plays. Silence, not the
   // analyser's data, which still holds the stream's last moments.
@@ -189,6 +200,8 @@ function visFrame(now: number) {
     flatSent = true;
     return;
   }
+  startVis();
+  if (now - lastFrame < 30) return;
   flatSent = false;
   lastFrame = now;
   visAnalyser.getByteFrequencyData(spectrum);
@@ -198,7 +211,6 @@ function visFrame(now: number) {
   const msg = { type: "vis", bars: bands(spectrum, ctx.sampleRate, 32), wave: samples(wave.subarray(-2048), 96) };
   void invoke("skin_send", { msg }).catch(() => {});
 }
-requestAnimationFrame(visFrame);
 
 // The show on air. Nothing here touches playback: when the API fails the
 // titles fall back to "NTS 1" and "NTS 2" and the stream plays on.
