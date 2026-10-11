@@ -14,6 +14,7 @@ use tauri::{
     AppHandle, Emitter, EventTarget, LogicalPosition, LogicalSize, Manager, Url, WebviewBuilder,
     WebviewUrl, WebviewWindowBuilder,
 };
+use tauri_plugin_updater::UpdaterExt;
 
 const SKIN_PAGE: &str = include_str!("../../src/skin/index.html");
 
@@ -501,6 +502,7 @@ mod win32 {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .invoke_handler(tauri::generate_handler![
             skin_send,
             list_skins,
@@ -557,10 +559,31 @@ pub fn run() {
             .on_navigation(is_skin_url)
             .on_new_window(|_, _| NewWindowResponse::Deny);
             window.add_child(skin, LogicalPosition::new(0.0, 0.0), size)?;
+            // A dev build would otherwise replace itself with the release.
+            if !cfg!(debug_assertions) {
+                let app = app.handle().clone();
+                tauri::async_runtime::spawn(async move {
+                    // Offline or no release yet: play on, try next launch.
+                    if let Err(error) = update(app).await {
+                        eprintln!("update check failed: {error}");
+                    }
+                });
+            }
             Ok(())
         })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+/// Installs a newer GitHub release, if there is one, and restarts into it.
+/// On Windows the installer closes the app itself, so the stream drops for
+/// the few seconds the install takes.
+async fn update(app: AppHandle) -> tauri_plugin_updater::Result<()> {
+    if let Some(update) = app.updater()?.check().await? {
+        update.download_and_install(|_, _| {}, || {}).await?;
+        app.restart();
+    }
+    Ok(())
 }
 
 const BROWSER_ARGS: &str = "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection --autoplay-policy=no-user-gesture-required --enable-features=HardwareMediaKeyHandling";

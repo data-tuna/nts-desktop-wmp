@@ -43,5 +43,16 @@
     "copyright": "Copyright (c) 2026 Ata Tuna. Not made or endorsed by NTS.",
     "shortDescription": "Unofficial Windows Media Player-style player for NTS Radio",
     "longDescription": "An unofficial Windows Media Player-style desktop player for NTS Radio. Not made, endorsed or supported by NTS."
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDkwOUZERUE5NjlGOTAyNjgKUldSb0F2bHBxZDZma0xsOS9VWTgrUTZnRXpOR3dIOHk3TFJ4d2pWNFRhVVR3WCs5QjBnLzF1Z0sK",
+      "endpoints": [
+        "https://github.com/data-tuna/nts-desktop-wmp/releases/latest/download/latest.json"
+      ],
+      "windows": {
+        "installMode": "passive"
+      }
+    }
   }
 }
