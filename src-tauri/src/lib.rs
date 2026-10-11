@@ -249,13 +249,8 @@ fn open_link(url: String) -> Result<(), String> {
     Ok(())
 }
 
-/// Opens the skin picker, or brings it to the front.
+/// Opens the skin picker.
 fn open_picker(app: &AppHandle) {
-    if let Some(picker) = app.get_webview_window("picker") {
-        let _ = picker.unminimize();
-        let _ = picker.set_focus();
-        return;
-    }
     let built = WebviewWindowBuilder::new(app, "picker", WebviewUrl::App("picker.html".into()))
         .title("Skins - NTS Radio Bootleg Media Player")
         .inner_size(380.0, 520.0)
@@ -290,15 +285,21 @@ fn launchable(url: &str, now: Instant, last: &Mutex<Option<Instant>>) -> Option<
     if !matches!(url.scheme(), "http" | "https") || url.as_str().len() > 2048 {
         return None;
     }
+    throttle(now, last).then_some(url)
+}
+
+/// Whether 3 s have passed since the last time this said yes.
+fn throttle(now: Instant, last: &Mutex<Option<Instant>>) -> bool {
     let mut last = last.lock().unwrap();
     if last.is_some_and(|t| now.duration_since(t) < Duration::from_secs(3)) {
-        return None;
+        return false;
     }
     *last = Some(now);
-    Some(url)
+    true
 }
 
 static LAST_LAUNCH: Mutex<Option<Instant>> = Mutex::new(None);
+static LAST_PICKER: Mutex<Option<Instant>> = Mutex::new(None);
 
 fn handle(app: &AppHandle, msg: FromSkin) {
     let Some(window) = app.get_window("main") else {
@@ -332,6 +333,12 @@ fn handle(app: &AppHandle, msg: FromSkin) {
             }
         }
         FromSkin::Picker {} => {
+            // A skin can send this itself: never while the picker is open, so
+            // it cannot keep taking the focus, and at most one every 3 s.
+            if app.get_webview_window("picker").is_some() || !throttle(Instant::now(), &LAST_PICKER)
+            {
+                return;
+            }
             // Building a window on the UI thread, where this handler runs, deadlocks.
             let app = app.clone();
             std::thread::spawn(move || open_picker(&app));
@@ -505,6 +512,12 @@ pub fn run() {
             }
         })
         .on_window_event(|_window, _event| {
+            // Closing the player quits, picker and all.
+            if let tauri::WindowEvent::Destroyed = _event {
+                if _window.label() == "main" {
+                    _window.app_handle().exit(0);
+                }
+            }
             // A new monitor scale resizes the window but leaves its region in
             // the old device pixels.
             #[cfg(windows)]

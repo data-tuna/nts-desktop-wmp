@@ -133,6 +133,9 @@ fn download_once(skin: &Skin) -> Result<Vec<u8>, String> {
         .build();
     let agent = ureq::Agent::config_builder()
         .tls_config(tls)
+        // A stalled connection gives up soon; a slow body gets two minutes.
+        .timeout_connect(Some(Duration::from_secs(15)))
+        .timeout_recv_response(Some(Duration::from_secs(15)))
         .timeout_global(Some(Duration::from_secs(120)))
         .user_agent(concat!("nts-desktop-wmp/", env!("CARGO_PKG_VERSION")))
         .build()

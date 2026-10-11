@@ -167,7 +167,7 @@ unknown fields included, and refuses requests from any webview but `skin`
 | `{ "type": "shape", "width", "height", "rects": [[x, y, w, h], …] }` | Rust: sizes the window and sets its region. Ignored unless the view is 1–4096 px a side and every run is non-empty and inside it, with at most ceil(width / 2) runs per row |
 | `{ "type": "close" }`, `{ "type": "minimize" }` | Rust: closes or minimizes the window (ATA-110) |
 | `{ "type": "launchUrl", "url": "…" }` | Rust: opens the URL in the default browser, only if it parses as http(s), is at most 2048 characters, and comes 3 s or more after the last one (ATA-110) |
-| `{ "type": "picker" }` | Rust: opens the skin picker, or brings it to the front (ATA-112) |
+| `{ "type": "picker" }` | Rust: opens the skin picker, unless it is open already or one opened in the last 3 s (ATA-112) |
 
 Host to skin: the trusted page calls the `skin_send` command, and Rust
 dispatches a `message` event in the skin webview. Today that is, four times
@@ -271,7 +271,8 @@ rather than through Webamp. WMP skins matter as much as the Winamp app does.
   its md5, or is downloaded through Rust (archive.org sends no CORS
   headers), checked, and cached. At most one download per launch; one more
   try after a second, since archive.org now and then answers 500 for a file
-  it serves a second later. The first paint waits up to 8 s for it, then
+  it serves a second later. Connecting and the first response byte get
+  15 s each, the whole download 120 s. The first paint waits up to 8 s for it, then
   settles for the house skin while the download finishes into the cache.
   A skin that fails to download, fails its md5, or that the engine cannot
   load gives the house skin. Only the latest fetch is worn: a launch
@@ -285,7 +286,9 @@ rather than through Webamp. WMP skins matter as much as the Winamp app does.
   `native-tls`, which also carries a bundle of root certificates the app
   does not use. The installer is 1.34 MiB, the exe 3.6 MiB.
 - **The picker** opens on a right click on the skin, as WMP's menu offered
-  its skin chooser. It is a window of our own (`picker.html`), with a
+  its skin chooser. A skin can send that message too, so it is ignored
+  while the picker is open (no taking the focus back) and more often than
+  once every 3 s. Closing the player quits the app, picker and all. It is a window of our own (`picker.html`), with a
   capability for three commands: `list_skins`, `choose_skin`, and
   `open_link`, which opens only archive.org `/details/` pages and
   `https://www.nts.live/supporters`. It lists the working skins with their
@@ -293,7 +296,8 @@ rather than through Webamp. WMP skins matter as much as the Winamp app does.
   download size of those not cached, and credits the archive and links to
   NTS's supporters page. It asks the app every 2 s what is on the window,
   so it follows a launch download landing or a skin falling back to the
-  house skin. archive.org has no preview per skin, so the picker shows
+  house skin; when a kept skin failed, it says the kept one is tried again
+  next launch. archive.org has no preview per skin, so the picker shows
   none; picking one puts it on the window. "A random skin on every launch"
   also puts a new random skin on at once, so the choice shows.
 - **Remembering the choice** (Mika for Ata, 2026-10-11, carried over from

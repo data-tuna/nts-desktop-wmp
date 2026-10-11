@@ -47,7 +47,7 @@ async function refresh() {
   const { choice, worn, fetching } = state;
   random.checked = choice === null;
   random.disabled = busy;
-  if (!busy) status.textContent = failed || (fetching ? "Loading a skin…" : `Wearing ${worn ? name(worn) : "the house skin"}.${choice ? " It stays on every launch." : ""}`);
+  if (!busy) status.textContent = failed || (fetching ? "Loading a skin…" : `Wearing ${worn ? name(worn) : "the house skin"}.${!choice ? "" : choice === worn ? " It stays on every launch." : ` ${name(choice)} is tried again next launch.`}`);
   for (const skin of state.skins) {
     const row = rows.get(skin.path);
     if (!row) continue;
