@@ -13,7 +13,7 @@
       html, body { margin: 0; overflow: hidden; background: #000; user-select: none; }
       canvas { display: block; }
       #controls { position: absolute; left: 50px; top: 150px; display: flex; gap: 4px; align-items: center; }
-      #state { position: absolute; left: 62px; top: 20px; color: #9cf; font: 11px/1.4 Tahoma, sans-serif; white-space: pre; }
+      #state { position: absolute; left: 50px; top: 178px; color: #9cf; font: 11px/1.4 Tahoma, sans-serif; white-space: pre; }
       button { font: 11px Tahoma, sans-serif; }
       input { width: 60px; }
     </style>
@@ -44,7 +44,7 @@
         const s = e.data;
         if (s?.type !== "state") return;
         document.getElementById("state").textContent =
-          `${s.title}\n${s.playing ? "Playing" : "Stopped"}  ${fmt(s.time)}\nlevel ${s.level.toFixed(2)}`;
+          `${s.title}  ${s.playing ? "Playing" : "Stopped"} ${fmt(s.time)}  level ${s.level.toFixed(2)}`;
       });
       const fmt = (t) => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, "0")}`;
 
@@ -74,7 +74,7 @@
         }
         send({ type: "shape", width: c.width, height: c.height, rects });
       };
-      img.onerror = () => (document.getElementById("state").textContent = "no background.bmp:\nset NTS_WMP_SKIN_DIR");
+      img.onerror = () => (document.getElementById("state").textContent = "no background.bmp: set NTS_WMP_SKIN_DIR");
       img.src = "/files/background.bmp";
     </script>
   </body>

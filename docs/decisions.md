@@ -6,6 +6,86 @@ the evidence.
 
 ## Stack
 
+### Skin code runs in its own webview, with no capabilities (ATA-107, 2026-10-11)
+
+**The host.** The main window holds two webviews. `main` is the trusted
+page: it owns the `<audio>` element, the Web Audio graph (gain, stereo
+panner, a 10-band EQ, the analyser) and, later, reconnect. `skin` is a child
+webview drawn over it, loaded from our own `skin` protocol
+(`http://skin.localhost` on Windows). The skin engine and every skin script
+run there and nowhere else.
+
+**Why this host and not a sandboxed frame.** Both were attacked with the
+ATA-103 attempts (`tools/escape.mjs`, dev build, Tauri 2.12.3). Tauri
+injects `__TAURI_INTERNALS__`, `window.ipc` and the invoke key into both.
+
+| Attempt, from skin code | Skin webview | Sandboxed srcdoc frame | Trusted page (control) |
+|---|---|---|---|
+| Read the parent | no parent to read | `SecurityError` | n/a |
+| Replay a captured IPC request, no key | `missing Tauri-Invoke-Key header` | same | n/a |
+| Replay it with the key | `window.set_size not allowed on window "main", webview "skin", URL: local` | `Origin header is not a valid URL` | 200, window resized |
+| `__TAURI_INTERNALS__.invoke` (`set_size`, `app version`, our `skin_send`) | not allowed, same message | `Origin header is not a valid URL` | resolves, window resized |
+| Force the `postMessage` fallback | not allowed, same message | no reply | resolves, window resized |
+| Raw `window.ipc.postMessage` with the key | no effect | no effect | window resized |
+| Navigate to the app's page / `window.open` it | stays on `skin.localhost` / `null` | `null` | n/a |
+
+The frame is cut off only because Tauri rejects `Origin: null` and WebView2
+does not pass a sub-frame's `postMessage` on. The skin webview is refused by
+the ACL, by webview label, even though Tauri counts its origin as **local**
+("URL: local" above). So the boundary would hold if Tauri's origin rules
+changed. What it rests on:
+
+- `capabilities/default.json` names `webviews: ["main"]`, never a window. A
+  capability matched by window would also cover the skin webview, which is a
+  child of the main window.
+- `build.rs` declares an app manifest. Without one, Tauri skips the ACL for
+  app commands called from a local page (`webview/mod.rs` in Tauri 2.12.3),
+  and the skin webview counts as local. Every new command goes into that
+  manifest and a capability.
+- The skin webview refuses to navigate off `skin.localhost` and to open
+  windows (`on_navigation`, `on_new_window` in `lib.rs`).
+- In dev, the skin webview can read the Vite dev server (`fetch` of the
+  app's page returned its 347 bytes), and `server.cors: false` did not stop
+  it. That is our public source, not a secret, and the dev server is not in
+  a release build. Whether a release build's `tauri.localhost` is readable
+  from the skin was not tested.
+
+A skin webview also has a real origin, so `localStorage` works and its
+scripts load from the protocol without the CORS problem of an opaque frame.
+
+**The protocol.** Skin to host is a `POST /msg` on the skin protocol with a
+JSON body. Rust parses it into a fixed enum and refuses anything else (400),
+and refuses requests from any webview but `skin` (403):
+
+| Message | Handled by |
+|---|---|
+| `{ "type": "play" }`, `{ "type": "stop" }` | the trusted page |
+| `{ "type": "volume", "value": 0..1 }`, `{ "type": "balance", "value": -1..1 }` | the trusted page, clamped |
+| `{ "type": "eq", "band": 0..9, "gain": -15..15 }` | the trusted page, clamped |
+| `{ "type": "seek", "seconds": n }` | accepted, ignored: live streams cannot seek |
+| `{ "type": "drag" }` | Rust: moves the window with the pointer |
+| `{ "type": "shape", "width", "height", "rects": [[x, y, w, h], …] }` | Rust: sizes the window and sets its region |
+
+Host to skin: the trusted page calls the `skin_send` command, and Rust
+dispatches a `message` event in the skin webview. Today that is
+`{ "type": "state", "playing", "time", "title", "level" }`, four times a
+second. The skin also gets `GET /` (the engine page) and `GET /files/<name>`
+(the skin's own files) from the protocol, and nothing of the app's.
+
+**Window shape.** The skin computes its opaque runs from the view's
+`transparencyColor` and sends them; Rust combines them with
+`SetWindowRgn`. On bluegrid, the region Windows reports cuts exactly the
+19,200 `#FF00FF` pixels of `background.bmp`.
+
+**Dragging.** `start_dragging` returned Ok but did not move the window: the
+skin webview holds the mouse capture. Rust instead follows the cursor while
+the primary button is down. Not yet seen working with a real mouse.
+
+**Audio.** NTS 1 played and stopped from the stub skin's buttons, with the
+clock running. NTS 1 was on dead air during the test (a decoded sample
+peaked at 0.00002), so the graph was checked on NTS 2: level 0.27 at full
+volume, 0.03 at 10%.
+
 ### Bootstrap: identity, toolchain, shared code (ATA-106, 2026-10-10)
 
 - **Identity:** product name "NTS Radio Bootleg Media Player", identifier

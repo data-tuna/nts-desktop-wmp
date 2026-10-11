@@ -107,7 +107,7 @@ fn handle(app: &AppHandle, msg: FromSkin) {
     match msg {
         FromSkin::Drag => {
             #[cfg(windows)]
-            shape::drag(&window);
+            win32::drag(&window);
         }
         FromSkin::Shape {
             width,
@@ -117,7 +117,7 @@ fn handle(app: &AppHandle, msg: FromSkin) {
             if (1..=4096).contains(&width) && (1..=4096).contains(&height) {
                 let _ = window.set_size(LogicalSize::new(width, height));
                 #[cfg(windows)]
-                shape::apply(&window, &rects);
+                win32::apply(&window, &rects);
             }
         }
         other => {
@@ -127,7 +127,7 @@ fn handle(app: &AppHandle, msg: FromSkin) {
 }
 
 #[cfg(windows)]
-mod shape {
+mod win32 {
     use std::ffi::c_void;
     use std::sync::atomic::{AtomicBool, Ordering};
     use std::time::Duration;

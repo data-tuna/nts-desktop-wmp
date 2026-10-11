@@ -27,8 +27,10 @@ Written in English.
 
 ## Layout
 
-    src/                  The frontend: Vite + TypeScript. Nothing on screen yet.
-                          live.ts reads the NTS live API; picks.ts and
+    src/                  The frontend: Vite + TypeScript. main.ts is the
+                          trusted page: it owns the audio and answers the
+                          skin. skin/stub.html stands in for the skin engine
+                          until ATA-108. live.ts reads the NTS live API; picks.ts and
                           mixtapes.ts parse the NTS Picks and Infinite
                           Mixtapes APIs. All three are copied from
                           nts-desktop-winamp; see Gotchas.
@@ -37,6 +39,7 @@ Written in English.
     src-tauri/icons/      App icons. For now the Winamp app's pixel-art radio.
     docs/decisions.md     Decisions, research findings, and why.
     tests/                `node --test` tests and their fixtures.
+    tools/                DevTools and window probes; see Observing the app.
     .github/workflows/    ci.yml checks every PR on windows-latest.
 
 ## Commands
@@ -90,8 +93,12 @@ own house skin. Be polite to archive.org: one skin per launch, no bulk
 downloads.
 
 **Skin scripts never run where they can reach Tauri.** A skin's JScript is
-untrusted code. See `docs/decisions.md` (ATA-103) for why a sandboxed iframe
-alone is not enough.
+untrusted code. It runs only in the `skin` webview, which no capability
+names, and talks to the trusted page only through the `skin` protocol's
+fixed message list. Capabilities match by `webviews`, never `windows` (the
+skin webview is a child of the main window), and every app command goes in
+the app manifest in `build.rs`. Run `node tools/escape.mjs` after touching
+any of it. `docs/decisions.md` (ATA-107) has the protocol and the evidence.
 
 **Microsoft's resources are not shipped.** Skins reference
 `res://wmploc.dll/...`; we write stand-ins for what skins call, and copy
@@ -165,7 +172,36 @@ before and after screenshots in the PR.
 Keep this file, `CLAUDE.md` and `docs/decisions.md` true in the same branch
 as the change that makes them stale.
 
+## Observing the app
+
+Start it with WebView2's DevTools port open. The variable replaces the
+browser arguments in `tauri.conf.json`, so repeat them:
+
+    $env:WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS = "--remote-debugging-port=9355 --disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection --autoplay-policy=no-user-gesture-required"
+    $env:NTS_WMP_SKIN_DIR = "C:\path\to\an\unpacked\skin"    the stub skin draws its background.bmp
+    npm run tauri dev
+
+    node tools/cdp.mjs 9355 main|skin "<expr>"   Evaluate in either webview
+    node tools/click.mjs 9355 "#play"            Click an element in the skin
+    node tools/escape.mjs 9355 webview|frame     The ATA-107 escape attempts
+    powershell -File tools/window-shot.ps1 "NTS Radio Bootleg Media Player" shot.png
+    powershell -File tools/region-shot.ps1 "NTS Radio Bootleg Media Player" shot.png
+    powershell -File tools/ram.ps1 nts-desktop-wmp
+
+`region-shot.ps1` greys out what the window region cuts away, as Windows
+reports it. `escape.mjs` reloads the trusted page when it finishes, since its
+forced-fallback test leaves that page on `postMessage` IPC.
+
+**Never drive the real mouse or keyboard.** The machine is in use. Clicks go
+through DevTools input events (`click.mjs`); anything that needs a real
+pointer, such as dragging the window, is a manual check for a person.
+
 ## Known gaps
+
+**Dragging the window is unverified.** Rust follows the cursor while the
+primary button is down (`win32::drag` in `lib.rs`), because `start_dragging`
+did nothing under the skin webview. Nobody has dragged it with a real mouse
+yet.
 
 **No content security policy.** `tauri.conf.json` has `"csp": null`, the
 scaffold default.
