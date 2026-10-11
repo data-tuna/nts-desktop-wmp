@@ -4,6 +4,8 @@
 // (see build.rs). The two pages talk only through the `skin` protocol below;
 // docs/decisions.md (ATA-107) has the message list.
 use serde::Deserialize;
+use std::sync::Mutex;
+use std::time::{Duration, Instant};
 use tauri::http::{HeaderValue, Method, Request, Response, StatusCode};
 use tauri::webview::NewWindowResponse;
 use tauri::{
@@ -67,6 +69,14 @@ enum FromSkin {
         width: u32,
         height: u32,
         rects: Vec<[u32; 4]>,
+    },
+    /// `view.close()` and the skin's close button: quit.
+    Close {},
+    /// `view.minimize()` and the skin's minimize button.
+    Minimize {},
+    /// `player.launchURL(url)`: open a web page in the default browser.
+    LaunchUrl {
+        url: String,
     },
 }
 
@@ -159,6 +169,23 @@ fn valid_shape(width: u32, height: u32, rects: &[[u32; 4]]) -> bool {
         && rects.iter().all(inside)
 }
 
+/// Only http(s) URLs of a sane length, re-serialised by the URL parser, and
+/// at most one every 3 s, so a skin cannot flood the desktop with tabs.
+fn launchable(url: &str, now: Instant, last: &Mutex<Option<Instant>>) -> Option<Url> {
+    let url = Url::parse(url).ok()?;
+    if !matches!(url.scheme(), "http" | "https") || url.as_str().len() > 2048 {
+        return None;
+    }
+    let mut last = last.lock().unwrap();
+    if last.is_some_and(|t| now.duration_since(t) < Duration::from_secs(3)) {
+        return None;
+    }
+    *last = Some(now);
+    Some(url)
+}
+
+static LAST_LAUNCH: Mutex<Option<Instant>> = Mutex::new(None);
+
 fn handle(app: &AppHandle, msg: FromSkin) {
     let Some(window) = app.get_window("main") else {
         return;
@@ -179,10 +206,32 @@ fn handle(app: &AppHandle, msg: FromSkin) {
                 win32::apply(&window, rects);
             }
         }
+        FromSkin::Close {} => {
+            let _ = window.close();
+        }
+        FromSkin::Minimize {} => {
+            let _ = window.minimize();
+        }
+        FromSkin::LaunchUrl { url } => {
+            if let Some(url) = launchable(&url, Instant::now(), &LAST_LAUNCH) {
+                open_url(&url);
+            }
+        }
         other => {
             let _ = app.emit_to(EventTarget::webview("main"), "skin", other);
         }
     }
+}
+
+#[cfg(windows)]
+fn open_url(url: &Url) {
+    win32::open(url.as_str());
+}
+
+#[cfg(not(windows))]
+fn open_url(url: &Url) {
+    // macOS; Linux has no build yet.
+    let _ = std::process::Command::new("open").arg(url.as_str()).spawn();
 }
 
 #[cfg(windows)]
@@ -206,6 +255,34 @@ mod win32 {
         fn GetAsyncKeyState(key: i32) -> i16;
         fn GetSystemMetrics(index: i32) -> i32;
         fn GetForegroundWindow() -> *mut c_void;
+    }
+    #[link(name = "shell32")]
+    extern "system" {
+        fn ShellExecuteW(
+            hwnd: *mut c_void,
+            op: *const u16,
+            file: *const u16,
+            params: *const u16,
+            dir: *const u16,
+            show: i32,
+        ) -> *mut c_void;
+    }
+    const SW_SHOWNORMAL: i32 = 1;
+
+    /// Opens an http(s) URL in the default browser.
+    pub fn open(url: &str) {
+        let wide = |s: &str| s.encode_utf16().chain([0]).collect::<Vec<u16>>();
+        let (op, file) = (wide("open"), wide(url));
+        unsafe {
+            ShellExecuteW(
+                std::ptr::null_mut(),
+                op.as_ptr(),
+                file.as_ptr(),
+                std::ptr::null(),
+                std::ptr::null(),
+                SW_SHOWNORMAL,
+            )
+        };
     }
     const SM_SWAPBUTTON: i32 = 23;
     const RGN_OR: i32 = 2;
@@ -348,6 +425,29 @@ mod tests {
     }
 
     #[test]
+    fn launch_only_http_and_not_too_often() {
+        let last = Mutex::new(None);
+        let t = Instant::now();
+        assert!(launchable("file:///C:/Windows/System32/calc.exe", t, &last).is_none());
+        assert!(launchable("javascript:alert(1)", t, &last).is_none());
+        assert!(launchable("ms-settings:", t, &last).is_none());
+        assert!(launchable(&format!("https://a.example/{}", "x".repeat(3000)), t, &last).is_none());
+        assert!(launchable("https://www.nts.live/supporters", t, &last).is_some());
+        assert!(launchable(
+            "http://www.mediabay.com/",
+            t + Duration::from_secs(1),
+            &last
+        )
+        .is_none());
+        assert!(launchable(
+            "http://www.mediabay.com/",
+            t + Duration::from_secs(4),
+            &last
+        )
+        .is_some());
+    }
+
+    #[test]
     fn messages_refuse_unknown_fields() {
         let parse = |s: &str| serde_json::from_str::<FromSkin>(s).ok();
         assert_eq!(parse(r#"{"type":"play"}"#), Some(FromSkin::Play {}));
@@ -363,6 +463,14 @@ mod tests {
             Some(FromSkin::Mute { value: true })
         );
         assert_eq!(parse(r#"{"type":"mute","value":1}"#), None);
+        assert_eq!(parse(r#"{"type":"close"}"#), Some(FromSkin::Close {}));
+        assert_eq!(parse(r#"{"type":"minimize","evil":1}"#), None);
+        assert_eq!(
+            parse(r#"{"type":"launchUrl","url":"https://www.nts.live/"}"#),
+            Some(FromSkin::LaunchUrl {
+                url: "https://www.nts.live/".into()
+            })
+        );
         // The trusted page still gets the bare form.
         let play = serde_json::to_string(&FromSkin::Play {}).unwrap();
         assert_eq!(play, r#"{"type":"play"}"#);

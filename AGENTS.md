@@ -37,9 +37,11 @@ Written in English.
                           nts-desktop-winamp; see Gotchas.
     src/skin/             The skin engine, which runs in the skin webview:
                           wmz.ts unzips, wms.ts decodes and parses the .wms,
-                          engine.ts lays out and paints the view and handles
-                          the pointer, pixels.ts holds the pixel helpers its
-                          tests share. main.ts is the entry; index.html the page.
+                          engine.ts lays out and paints the view, runs the
+                          skin's scripts and handles the pointer, runtime.ts
+                          is the WMP object model the scripts see, pixels.ts
+                          holds the pixel helpers its tests share. main.ts is
+                          the entry; index.html the page.
     skins/house/          The house skin, the one skin that ships: house.wms,
                           the layered SVGs in art/ it is drawn from, build.mjs
                           that renders them to bitmaps and zips house.wmz,
@@ -161,9 +163,21 @@ own `%LOCALAPPDATA%\<identifier>` folder and WebView2 profile; in executable
 the Settings > Apps entry; and in dev port (1430 here, 1420 there). Keep all
 four distinct.
 
-**A `.wms` is not XML a parser will take.** Attributes repeat, script
+**A `.wms` is not XML a parser will take.** Attributes repeat (the last one
+wins, as in WMP: cerulean's screens and circle's duration need it), script
 attributes hold raw `&&` and `<`, and close tags differ in case from their
 open tags. `wms.ts` tokenizes forgivingly; don't swap in `DOMParser`.
+
+**Skin scripts are global code.** `engine.ts` runs each script file with
+indirect `eval` inside `with (__wmpScope)`, so the skin's functions and
+variables land on the skin webview's global object, where handlers and
+`jscript:` attributes find them, and `eval("eq" + i + ".down = …")` inside a
+skin function still sees element ids. Each file first copies its top-level
+functions to the global object: inside the `with` block they would
+otherwise appear only when execution reaches them. Element members are
+case-insensitive, as COM's are, but handler attributes are not members:
+`onLoad="OnLoad();"` must reach the function, not the attribute. Two skins never share a webview,
+so their globals never meet.
 
 **Node's `TextDecoder("windows-1252")` is Latin-1.** It gets 0x80-0x9F
 wrong (`€`, curly quotes), so `wms.ts` maps that range itself. WebView2 gets
@@ -236,6 +250,11 @@ no app at all:
     npm run build:skin
     node tools/skin-preview.mjs C:\path\to\a\skin.wmz     then open http://localhost:1432/
 
+A stand-in host in that page answers the skin with state as the trusted page
+does, but plays nothing; `/?play` starts it playing, as the app does on
+launch. In either place, `__wmpScope` in the skin webview is what skin code
+sees: `__wmpScope.player.status`, `__wmpScope.<element id>.visible`.
+
 `region-shot.ps1` greys out what the window region cuts away, as Windows
 reports it. `escape.mjs` reloads the trusted page when it finishes, since its
 forced-fallback test leaves that page on `postMessage` IPC.
@@ -274,14 +293,22 @@ build, the tests and `cargo fmt --check`.
 
 **No release workflow, updater or single-instance lock yet.**
 
-**Skins draw as their markup says, before any script runs.** Panels that a
-skin's `onLoad` hides or shows (bluegrid's equalizer, Asimov_Radio's head),
-text that scripts fill in ("Ready" in a metadata line), and attributes that
-call script functions are left as the markup has them until the script
-runtime (ATA-110). The engine logs each attribute it skips.
+**Only a skin's first view is drawn.** `theme.openView` and
+`theme.currentViewID` are logged and ignored, so circle's video, playlist
+and settings views and 9SeriesDefault's compact view never open.
 
-**Some controls do nothing yet.** Minimize and close have no message in the
-skin protocol (the house skin has neither button yet), and other `onClick`
-handlers need scripts; they are logged.
-Fast forward, rewind and seek sliders are drawn disabled: a live stream has
-no length. EQ sliders show the saved gains but do not send changes yet.
+**Video, item and drop-down playlists, and popups are not drawn,** and the
+visualiser is a black placeholder (ATA-114). `<playlist>` lists the two
+channels only. Their methods (`setColumnResizeMode`, the effects'
+`next`/`previous`, `appendItem`) are logged and do nothing. 9SeriesDefault's
+screen is black where WMP showed navy: that colour is WMP's visualiser's.
+
+**Fast forward, rewind and seek sliders are drawn disabled:** a live stream
+has no length.
+
+**A skin's `onClose` runs only when it closes the window itself** (its close
+button or `view.close()`), not when Windows closes the app, so preferences a
+skin saves there may not be saved.
+
+**The house skin has no close or minimize button yet,** though the skin
+protocol now has messages for both (ATA-110).

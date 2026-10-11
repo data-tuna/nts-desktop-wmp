@@ -91,7 +91,7 @@ test("parse forgives what hand-written skins do", () => {
     <text constructor="yes"></text>
   </theme>`);
   const [sub, text] = theme.children;
-  assert.equal(sub.attrs.left, "42", "the first of a repeated attribute wins");
+  assert.equal(sub.attrs.left, "11", "the last of a repeated attribute wins");
   assert.equal(sub.attrs.onclick, "if(a&&b<c)go();");
   assert.equal(sub.attrs.title, "it's");
   assert.equal(sub.children[0].attrs.image, "x.bmp");

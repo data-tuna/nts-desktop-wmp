@@ -1,5 +1,5 @@
-// The skin page's entry: load the skin the protocol serves, draw it, shape
-// the window to it, and keep it in step with the trusted page's state.
+// The skin page's entry: load the skin the protocol serves, run it, and keep
+// it in step with the trusted page's state. The skin shapes the window itself.
 import { unzip } from "./wmz.ts";
 import { decode, parse } from "./wms.ts";
 import { Skin, type Img, type Send, type State } from "./engine.ts";
@@ -31,16 +31,16 @@ async function load(): Promise<Skin> {
       }
     }),
   );
-  const scripts = [...files].filter(([name]) => name.endsWith(".js")).map(([, bytes]) => decode(bytes));
-  return new Skin(parse(decode(files.get(wms)!)), images, send, scripts);
+  const scripts = new Map([...files].filter(([name]) => name.endsWith(".js")).map(([name, bytes]) => [name, decode(bytes)]));
+  // Preferences are kept per skin, by its .wms name.
+  return new Skin(parse(decode(files.get(wms)!)), images, send, scripts, `pref:${wms}:`);
 }
 
 // A classic script has no top-level await.
 load().then(
   (skin) => {
     document.body.append(skin.canvas);
-    skin.paint();
-    send({ type: "shape", ...skin.shape() });
+    skin.start();
     window.addEventListener("message", (e) => {
       if (e.data?.type === "state") skin.setState(e.data as State);
     });
