@@ -5,7 +5,7 @@
   "version": "../package.json",
   "identifier": "com.datatuna.ntswmp",
   "build": {
-    "beforeDevCommand": "npm run dev",
+    "beforeDevCommand": "npm run build:skin && npm run dev",
     "devUrl": "http://localhost:1430",
     "beforeBuildCommand": "npm run build",
     "frontendDist": "../dist"

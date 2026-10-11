@@ -11,7 +11,21 @@ use tauri::{
     WebviewUrl,
 };
 
-const SKIN_PAGE: &str = include_str!("../../src/skin/stub.html");
+const SKIN_PAGE: &str = include_str!("../../src/skin/index.html");
+
+/// The skin engine, built from src/skin/ by `npm run build:skin`. A debug
+/// build reads it from disk on each load, so the engine can be rebuilt
+/// without rebuilding the app; a release build carries it.
+fn engine_js() -> Vec<u8> {
+    #[cfg(debug_assertions)]
+    return std::fs::read(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../dist-skin/engine.js"
+    ))
+    .unwrap_or_else(|_| b"document.body.textContent = 'run npm run build:skin'".to_vec());
+    #[cfg(not(debug_assertions))]
+    include_bytes!("../../dist-skin/engine.js").to_vec()
+}
 
 /// Sent with everything the skin protocol serves. Skins need no network and
 /// no frames: only their own files, inline scripts and `jscript:` eval.
@@ -96,7 +110,11 @@ fn respond(app: &AppHandle, from: &str, req: Request<Vec<u8>>) -> Response<Vec<u
             .header("Content-Type", "text/html; charset=utf-8")
             .body(SKIN_PAGE.as_bytes().to_vec())
             .unwrap(),
-        (&Method::GET, _) if path.starts_with("/files/") => skin_file(&path[7..]),
+        (&Method::GET, "/engine.js") => Response::builder()
+            .header("Content-Type", "text/javascript; charset=utf-8")
+            .body(engine_js())
+            .unwrap(),
+        (&Method::GET, "/skin.wmz") => skin_file(),
         (&Method::POST, "/msg") => match serde_json::from_slice::<FromSkin>(req.body()) {
             Ok(msg) => {
                 handle(app, msg);
@@ -108,16 +126,11 @@ fn respond(app: &AppHandle, from: &str, req: Request<Vec<u8>>) -> Response<Vec<u
     }
 }
 
-// ponytail: the spike serves one unpacked skin from NTS_WMP_SKIN_DIR. The
-// engine (ATA-108) serves the cached .wmz instead.
-fn skin_file(name: &str) -> Response<Vec<u8>> {
-    let safe = !name.is_empty() && !name.contains(['/', '\\', ':']) && !name.contains("..");
-    let dir = std::env::var_os("NTS_WMP_SKIN_DIR");
-    match (safe, dir) {
-        (true, Some(dir)) => match std::fs::read(std::path::Path::new(&dir).join(name)) {
-            Ok(bytes) => Response::builder().body(bytes).unwrap(),
-            Err(_) => status(StatusCode::NOT_FOUND),
-        },
+// ponytail: serves the .wmz named by NTS_WMP_SKIN. The skin cache (ATA-112)
+// serves the cached skin instead, and the house skin (ATA-111) when there is none.
+fn skin_file() -> Response<Vec<u8>> {
+    match std::env::var_os("NTS_WMP_SKIN").map(std::fs::read) {
+        Some(Ok(bytes)) => Response::builder().body(bytes).unwrap(),
         _ => status(StatusCode::NOT_FOUND),
     }
 }

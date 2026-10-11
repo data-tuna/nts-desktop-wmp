@@ -30,12 +30,16 @@ Written in English.
     src/                  The frontend: Vite + TypeScript. main.ts is the
                           trusted page: it owns the audio, saves the
                           settings and answers the skin. player.ts keeps a
-                          channel playing and reconnects. skin/stub.html
-                          stands in for the skin engine until ATA-108.
+                          channel playing and reconnects.
                           live.ts reads the NTS live API; picks.ts and
                           mixtapes.ts parse the NTS Picks and Infinite
                           Mixtapes APIs. All three are copied from
                           nts-desktop-winamp; see Gotchas.
+    src/skin/             The skin engine, which runs in the skin webview:
+                          wmz.ts unzips, wms.ts decodes and parses the .wms,
+                          engine.ts lays out and paints the view and handles
+                          the pointer, pixels.ts holds the pixel helpers its
+                          tests share. main.ts is the entry; index.html the page.
     src-tauri/            The Rust shell (Tauri 2). Window config in tauri.conf.json,
                           permissions in capabilities/.
     src-tauri/icons/      App icons. For now the Winamp app's pixel-art radio.
@@ -50,7 +54,8 @@ Written in English.
     npm run tauri dev     The app, with the Vite dev server on :1430
     npm run typecheck     tsc, no emit
     npm run lint          oxlint, warnings fail
-    npm run build         Frontend only, into dist/
+    npm run build         Frontend only: dist/, and the skin engine in dist-skin/
+    npm run build:skin    The skin engine alone (dist-skin/engine.js)
     npm test              node --test on tests/ (Node 22.18+ runs the .ts imports)
     npm run check         lint + typecheck + build + test; CI runs this plus cargo fmt
     npm run tauri build   Release binary and the NSIS installer (slow, minutes)
@@ -150,6 +155,14 @@ own `%LOCALAPPDATA%\<identifier>` folder and WebView2 profile; in executable
 the Settings > Apps entry; and in dev port (1430 here, 1420 there). Keep all
 four distinct.
 
+**A `.wms` is not XML a parser will take.** Attributes repeat, script
+attributes hold raw `&&` and `<`, and close tags differ in case from their
+open tags. `wms.ts` tokenizes forgivingly; don't swap in `DOMParser`.
+
+**Node's `TextDecoder("windows-1252")` is Latin-1.** It gets 0x80-0x9F
+wrong (`€`, curly quotes), so `wms.ts` maps that range itself. WebView2 gets
+it right, which is why only the tests would notice.
+
 **`tauri dev` needs port 1430 free.** Vite runs with `strictPort`, so a
 leftover dev server makes the next launch fail rather than pick another port.
 
@@ -185,7 +198,7 @@ Start it with WebView2's DevTools port open. The variable replaces the
 browser arguments in `tauri.conf.json`, so repeat them:
 
     $env:WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS = "--remote-debugging-port=9355 --disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection --autoplay-policy=no-user-gesture-required"
-    $env:NTS_WMP_SKIN_DIR = "C:\path\to\an\unpacked\skin"    the stub skin draws its background.bmp
+    $env:NTS_WMP_SKIN = "C:\path\to\a\skin.wmz"      the skin to draw
     npm run tauri dev
 
 or, to keep the window off the screen entirely, start the built exe on a
@@ -200,6 +213,14 @@ hidden desktop (a debug build needs `npx vite` running for its pages):
     powershell -File tools/region-shot.ps1 "NTS Radio Bootleg Media Player" shot.png
     powershell -File tools/ram.ps1 nts-desktop-wmp
     node tools/proxy.mjs 8899                    A CONNECT proxy you can cut; see below
+
+A debug build reads `dist-skin/engine.js` each time the skin page loads, so
+after `npm run build:skin` a reload of the skin webview picks up engine
+changes without rebuilding the app. To look at the engine in a browser, with
+no app at all:
+
+    npm run build:skin
+    node tools/skin-preview.mjs C:\path\to\a\skin.wmz     then open http://localhost:1432/
 
 `region-shot.ps1` greys out what the window region cuts away, as Windows
 reports it. `escape.mjs` reloads the trusted page when it finishes, since its
@@ -238,3 +259,14 @@ until this one gets its own.
 build, the tests and `cargo fmt --check`.
 
 **No release workflow, updater or single-instance lock yet.**
+
+**Skins draw as their markup says, before any script runs.** Panels that a
+skin's `onLoad` hides or shows (bluegrid's equalizer, Asimov_Radio's head),
+text that scripts fill in ("Ready" in a metadata line), and attributes that
+call script functions are left as the markup has them until the script
+runtime (ATA-110). The engine logs each attribute it skips.
+
+**Some controls do nothing yet.** Minimize and close have no message in the
+skin protocol, and other `onClick` handlers need scripts; they are logged.
+Fast forward, rewind and seek sliders are drawn disabled: a live stream has
+no length. EQ sliders show the saved gains but do not send changes yet.
