@@ -97,8 +97,9 @@ untrusted code. It runs only in the `skin` webview, which no capability
 names, and talks to the trusted page only through the `skin` protocol's
 fixed message list. Capabilities match by `webviews`, never `windows` (the
 skin webview is a child of the main window), and every app command goes in
-the app manifest in `build.rs`. Run `node tools/escape.mjs` after touching
-any of it. `docs/decisions.md` (ATA-107) has the protocol and the evidence.
+the app manifest in `build.rs`. Everything the skin protocol serves carries
+a CSP with no network and no frames. Run `node tools/escape.mjs` after
+touching any of it, and after every Tauri upgrade. `docs/decisions.md` (ATA-107) has the protocol and the evidence.
 
 **Microsoft's resources are not shipped.** Skins reference
 `res://wmploc.dll/...`; we write stand-ins for what skins call, and copy
@@ -181,6 +182,11 @@ browser arguments in `tauri.conf.json`, so repeat them:
     $env:NTS_WMP_SKIN_DIR = "C:\path\to\an\unpacked\skin"    the stub skin draws its background.bmp
     npm run tauri dev
 
+or, to keep the window off the screen entirely, start the built exe on a
+hidden desktop (a debug build needs `npx vite` running for its pages):
+
+    powershell -File tools/hidden-run.ps1 src-tauri/target/release/nts-desktop-wmp.exe
+
     node tools/cdp.mjs 9355 main|skin "<expr>"   Evaluate in either webview
     node tools/click.mjs 9355 "#play"            Click an element in the skin
     node tools/escape.mjs 9355 webview|frame     The ATA-107 escape attempts
@@ -192,9 +198,11 @@ browser arguments in `tauri.conf.json`, so repeat them:
 reports it. `escape.mjs` reloads the trusted page when it finishes, since its
 forced-fallback test leaves that page on `postMessage` IPC.
 
-**Never drive the real mouse or keyboard.** The machine is in use. Clicks go
-through DevTools input events (`click.mjs`); anything that needs a real
-pointer, such as dragging the window, is a manual check for a person.
+**Never drive the real mouse or keyboard, and keep the app off the screen.**
+The machine is in use. Use `hidden-run.ps1`, and keep the volume at 0 if you
+press Play. Clicks go through DevTools input events (`click.mjs`); anything
+that needs a real pointer, such as dragging the window, is a manual check
+for a person. The window shots need the visible desktop, so ask first.
 
 ## Known gaps
 

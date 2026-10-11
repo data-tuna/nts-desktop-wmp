@@ -16,8 +16,9 @@ webview drawn over it, loaded from our own `skin` protocol
 run there and nowhere else.
 
 **Why this host and not a sandboxed frame.** Both were attacked with the
-ATA-103 attempts (`tools/escape.mjs`, dev build, Tauri 2.12.3). Tauri
-injects `__TAURI_INTERNALS__`, `window.ipc` and the invoke key into both.
+ATA-103 attempts (`tools/escape.mjs`, Tauri 2.12.3). Tauri injects
+`__TAURI_INTERNALS__`, `window.ipc` and the invoke key into both. First,
+before the skin protocol sent a CSP (dev build):
 
 | Attempt, from skin code | Skin webview | Sandboxed srcdoc frame | Trusted page (control) |
 |---|---|---|---|
@@ -33,7 +34,30 @@ The frame is cut off only because Tauri rejects `Origin: null` and WebView2
 does not pass a sub-frame's `postMessage` on. The skin webview is refused by
 the ACL, by webview label, even though Tauri counts its origin as **local**
 ("URL: local" above). So the boundary would hold if Tauri's origin rules
-changed. What it rests on:
+changed.
+
+Then with the CSP below, on a dev and a release build, each run on a hidden
+desktop with `tools/hidden-run.ps1`. The IPC rows now call `skin_send` with
+a title unique to the row, and "reached" means that title arrived in the
+skin webview. The trusted page no longer has `set_size`.
+
+| Attempt, from the skin webview | Release build | Trusted page (control) |
+|---|---|---|
+| Replay a captured IPC request, with or without the key | `Failed to fetch`: the CSP's `connect-src` stops it before Tauri sees it | 200, reached |
+| `__TAURI_INTERNALS__.invoke` `skin_send`, `set_size`, `app version` (it falls back to `postMessage`) | `Command … not allowed by ACL`, not reached | resolves, reached |
+| Force the `postMessage` fallback | `Command skin_send not allowed by ACL`, not reached | resolves, reached |
+| Raw `window.ipc.postMessage` with the key | not reached | reached |
+| Read the app's page (`fetch` of `http://tauri.localhost/`) | `TypeError` (CSP) | n/a |
+| `fetch` a remote URL, `no-cors` | CSP `connect-src` violation | n/a |
+| Frame a remote page / the app's page | CSP `frame-src` violation | n/a |
+| Navigate to the app's page / `window.open` it | stays on `skin.localhost` / `null` | n/a |
+
+The dev build gave the same rows, with Tauri's longer "not allowed on window
+"main", webview "skin"" wording. Before the CSP, a release build's skin
+could read the app page (315 bytes) and frame it, and a dev build's skin
+could read the Vite dev server; both are now CSP violations.
+
+What the boundary rests on:
 
 - `capabilities/default.json` names `webviews: ["main"]`, never a window. A
   capability matched by window would also cover the skin webview, which is a
@@ -42,20 +66,23 @@ changed. What it rests on:
   app commands called from a local page (`webview/mod.rs` in Tauri 2.12.3),
   and the skin webview counts as local. Every new command goes into that
   manifest and a capability.
+- Everything the skin protocol serves carries a CSP: `default-src 'self'`;
+  scripts from `'self'`, inline and eval (skins need `jscript:`); images from
+  `'self'`, `data:` and `blob:`; no frames, objects or forms. Skins need no
+  network: the trusted page fetches what they show.
 - The skin webview refuses to navigate off `skin.localhost` and to open
   windows (`on_navigation`, `on_new_window` in `lib.rs`).
-- In dev, the skin webview can read the Vite dev server (`fetch` of the
-  app's page returned its 347 bytes), and `server.cors: false` did not stop
-  it. That is our public source, not a secret, and the dev server is not in
-  a release build. Whether a release build's `tauri.localhost` is readable
-  from the skin was not tested.
+- `Window::add_child` sits behind Tauri's `unstable` feature, outside
+  semver, so `Cargo.toml` pins `tauri` to `~2.12.3`. Re-run
+  `tools/escape.mjs` on every Tauri upgrade.
 
 A skin webview also has a real origin, so `localStorage` works and its
 scripts load from the protocol without the CORS problem of an opaque frame.
 
 **The protocol.** Skin to host is a `POST /msg` on the skin protocol with a
 JSON body. Rust parses it into a fixed enum and refuses anything else (400),
-and refuses requests from any webview but `skin` (403):
+unknown fields included, and refuses requests from any webview but `skin`
+(403):
 
 | Message | Handled by |
 |---|---|
@@ -63,8 +90,8 @@ and refuses requests from any webview but `skin` (403):
 | `{ "type": "volume", "value": 0..1 }`, `{ "type": "balance", "value": -1..1 }` | the trusted page, clamped |
 | `{ "type": "eq", "band": 0..9, "gain": -15..15 }` | the trusted page, clamped |
 | `{ "type": "seek", "seconds": n }` | accepted, ignored: live streams cannot seek |
-| `{ "type": "drag" }` | Rust: moves the window with the pointer |
-| `{ "type": "shape", "width", "height", "rects": [[x, y, w, h], …] }` | Rust: sizes the window and sets its region |
+| `{ "type": "drag" }` | Rust: moves the window with the pointer, only while our window is in front and under the pointer with the button down |
+| `{ "type": "shape", "width", "height", "rects": [[x, y, w, h], …] }` | Rust: sizes the window and sets its region. Ignored unless the view is 1–4096 px a side and every run is non-empty and inside it, with at most one run per two pixels |
 
 Host to skin: the trusted page calls the `skin_send` command, and Rust
 dispatches a `message` event in the skin webview. Today that is
@@ -74,15 +101,21 @@ second. The skin also gets `GET /` (the engine page) and `GET /files/<name>`
 
 **Window shape.** The skin computes its opaque runs from the view's
 `transparencyColor` and sends them; Rust combines them with
-`SetWindowRgn`. On bluegrid, the region Windows reports cuts exactly the
-19,200 `#FF00FF` pixels of `background.bmp`.
+`SetWindowRgn`, and again when the window moves to a monitor with another
+scale. On bluegrid, the region Windows reports cuts exactly the 19,200
+`#FF00FF` pixels of `background.bmp`. The rescale has not been tried on two
+monitors.
 
 **Dragging.** `start_dragging` returned Ok but did not move the window: the
 skin webview holds the mouse capture. Rust instead follows the cursor while
-the primary button is down. Not yet seen working with a real mouse.
+the primary button is down. The button state is system-wide, so the drag
+starts only while our window is in front and under the pointer; otherwise a
+skin could make the window follow a drag in another app. Not yet seen
+working with a real mouse.
 
 **Audio.** NTS 1 played and stopped from the stub skin's buttons, with the
-clock running. NTS 1 was on dead air during the test (a decoded sample
+clock running, and again on the release build with the CSP (volume at 0).
+NTS 1 was on dead air during the test (a decoded sample
 peaked at 0.00002), so the graph was checked on NTS 2: level 0.27 at full
 volume, 0.03 at 10%.
 

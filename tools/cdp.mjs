@@ -1,12 +1,13 @@
 // Usage: node tools/cdp.mjs <port> <main|skin> <js-expression>
 // Evaluates an expression (it may return a promise) in one of the app's two
 // webviews: "main", the trusted page, or "skin", the skin webview at
-// http://skin.localhost. Start the app with WebView2's DevTools port open:
+// http://skin.localhost. connect() also takes "frame", for tools/escape.mjs. Start the app with WebView2's DevTools port open:
 // WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--remote-debugging-port=<port>.
 export async function connect(port, which) {
   const targets = await (await fetch(`http://127.0.0.1:${port}/json`)).json();
   const isSkin = (t) => t.url.startsWith("http://skin.localhost");
-  const page = targets.find((t) => t.type === "page" && (which === "skin") === isSkin(t));
+  // "frame": the newest sub-frame with a target of its own (sandboxed frames run out of process).
+  const page = which === "frame" ? targets.findLast((t) => t.type === "iframe") : targets.find((t) => t.type === "page" && (which === "skin") === isSkin(t));
   if (!page) throw new Error(`no ${which} target among ${targets.map((t) => t.url).join(", ")}`);
   const ws = new WebSocket(page.webSocketDebuggerUrl);
   await new Promise((r) => ws.addEventListener("open", r));

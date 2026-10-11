@@ -4,7 +4,7 @@
 // (see build.rs). The two pages talk only through the `skin` protocol below;
 // docs/decisions.md (ATA-107) has the message list.
 use serde::Deserialize;
-use tauri::http::{Method, Request, Response, StatusCode};
+use tauri::http::{HeaderValue, Method, Request, Response, StatusCode};
 use tauri::webview::NewWindowResponse;
 use tauri::{
     AppHandle, Emitter, EventTarget, LogicalPosition, LogicalSize, Manager, Url, WebviewBuilder,
@@ -13,13 +13,20 @@ use tauri::{
 
 const SKIN_PAGE: &str = include_str!("../../src/skin/stub.html");
 
-/// What a skin may ask for. Anything else is refused before it reaches the
-/// trusted page.
-#[derive(Deserialize, serde::Serialize, Clone)]
+/// Sent with everything the skin protocol serves. Skins need no network and
+/// no frames: only their own files, inline scripts and `jscript:` eval.
+const SKIN_CSP: &str = "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; \
+    style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; frame-src 'none'; \
+    object-src 'none'; base-uri 'none'; form-action 'none'";
+
+/// What a skin may ask for. Anything else, extra fields included, is refused
+/// before it reaches the trusted page. Every variant has braces: serde ignores
+/// `deny_unknown_fields` on the unit variants of an internally tagged enum.
+#[derive(Deserialize, serde::Serialize, Clone, Debug, PartialEq)]
 #[serde(tag = "type", rename_all = "camelCase", deny_unknown_fields)]
 enum FromSkin {
-    Play,
-    Stop,
+    Play {},
+    Stop {},
     Volume {
         value: f64,
     },
@@ -34,7 +41,7 @@ enum FromSkin {
         gain: f64,
     },
     /// The pointer went down on the skin's body: move the window.
-    Drag,
+    Drag {},
     /// The view's size, and its opaque area as `[x, y, width, height]` runs.
     Shape {
         width: u32,
@@ -65,6 +72,15 @@ fn status(code: StatusCode) -> Response<Vec<u8>> {
 }
 
 fn skin_protocol(app: &AppHandle, from: &str, req: Request<Vec<u8>>) -> Response<Vec<u8>> {
+    let mut res = respond(app, from, req);
+    res.headers_mut().insert(
+        "Content-Security-Policy",
+        HeaderValue::from_static(SKIN_CSP),
+    );
+    res
+}
+
+fn respond(app: &AppHandle, from: &str, req: Request<Vec<u8>>) -> Response<Vec<u8>> {
     if from != "skin" {
         return status(StatusCode::FORBIDDEN);
     }
@@ -100,12 +116,28 @@ fn skin_file(name: &str) -> Response<Vec<u8>> {
     }
 }
 
+/// A view of at most 4096 px a side, with runs that are non-empty, inside it,
+/// and no more than one per two pixels (a bitmap's row runs never need more).
+fn valid_shape(width: u32, height: u32, rects: &[[u32; 4]]) -> bool {
+    let side = 1..=4096;
+    let inside = |&[x, y, w, h]: &[u32; 4]| {
+        w > 0
+            && h > 0
+            && x.checked_add(w).is_some_and(|r| r <= width)
+            && y.checked_add(h).is_some_and(|b| b <= height)
+    };
+    side.contains(&width)
+        && side.contains(&height)
+        && rects.len() <= (width * height / 2) as usize
+        && rects.iter().all(inside)
+}
+
 fn handle(app: &AppHandle, msg: FromSkin) {
     let Some(window) = app.get_window("main") else {
         return;
     };
     match msg {
-        FromSkin::Drag => {
+        FromSkin::Drag {} => {
             #[cfg(windows)]
             win32::drag(&window);
         }
@@ -114,10 +146,10 @@ fn handle(app: &AppHandle, msg: FromSkin) {
             height,
             rects,
         } => {
-            if (1..=4096).contains(&width) && (1..=4096).contains(&height) {
+            if valid_shape(width, height, &rects) {
                 let _ = window.set_size(LogicalSize::new(width, height));
                 #[cfg(windows)]
-                win32::apply(&window, &rects);
+                win32::apply(&window, rects);
             }
         }
         other => {
@@ -130,6 +162,7 @@ fn handle(app: &AppHandle, msg: FromSkin) {
 mod win32 {
     use std::ffi::c_void;
     use std::sync::atomic::{AtomicBool, Ordering};
+    use std::sync::Mutex;
     use std::time::Duration;
     use tauri::PhysicalPosition;
     type Hrgn = *mut c_void;
@@ -145,9 +178,13 @@ mod win32 {
         fn GetCursorPos(p: *mut [i32; 2]) -> i32;
         fn GetAsyncKeyState(key: i32) -> i16;
         fn GetSystemMetrics(index: i32) -> i32;
+        fn GetForegroundWindow() -> *mut c_void;
     }
     const SM_SWAPBUTTON: i32 = 23;
+    const RGN_OR: i32 = 2;
     static DRAGGING: AtomicBool = AtomicBool::new(false);
+    /// The last shape, so it can be redone when the window changes monitor scale.
+    static SHAPE: Mutex<Vec<[u32; 4]>> = Mutex::new(Vec::new());
 
     fn cursor() -> [i32; 2] {
         let mut p = [0; 2];
@@ -159,21 +196,31 @@ mod win32 {
     /// `start_dragging` (WM_NCLBUTTONDOWN) returned Ok but never moved the
     /// window: the skin webview holds the mouse capture. Following the cursor
     /// ourselves does not care who holds it.
+    ///
+    /// The button state is system-wide, so a skin could send `drag` while the
+    /// user holds the button in another app. Start only while our window is
+    /// in front, under the pointer, with the button down.
     pub fn drag(window: &tauri::Window) {
-        let Ok(origin) = window.outer_position() else {
+        let (Ok(hwnd), Ok(origin), Ok(size)) =
+            (window.hwnd(), window.outer_position(), window.outer_size())
+        else {
             return;
         };
-        if DRAGGING.swap(true, Ordering::SeqCst) {
-            return;
-        }
-        let window = window.clone();
         let start = cursor();
+        let over = (origin.x..origin.x + size.width as i32).contains(&start[0])
+            && (origin.y..origin.y + size.height as i32).contains(&start[1]);
+        let front = unsafe { GetForegroundWindow() } == hwnd.0;
         // VK_LBUTTON reads the physical left button; the primary one may be the right.
         let button = if unsafe { GetSystemMetrics(SM_SWAPBUTTON) } != 0 {
             2
         } else {
             1
         };
+        let down = unsafe { GetAsyncKeyState(button) } < 0;
+        if !(over && front && down) || DRAGGING.swap(true, Ordering::SeqCst) {
+            return;
+        }
+        let window = window.clone();
         std::thread::spawn(move || {
             while unsafe { GetAsyncKeyState(button) } < 0 {
                 let [x, y] = cursor();
@@ -186,17 +233,26 @@ mod win32 {
             DRAGGING.store(false, Ordering::SeqCst);
         });
     }
-    const RGN_OR: i32 = 2;
 
     /// Clips the window to the skin's opaque runs, given in CSS pixels.
-    pub fn apply(window: &tauri::Window, rects: &[[u32; 4]]) {
+    pub fn apply(window: &tauri::Window, rects: Vec<[u32; 4]>) {
+        *SHAPE.lock().unwrap() = rects;
+        reapply(window);
+    }
+
+    /// Sets the last shape as the window region, at the current scale.
+    pub fn reapply(window: &tauri::Window) {
         let (Ok(hwnd), Ok(scale)) = (window.hwnd(), window.scale_factor()) else {
             return;
         };
+        let rects = SHAPE.lock().unwrap();
+        if rects.is_empty() {
+            return;
+        }
         let px = |v: u32| (v as f64 * scale).round() as i32;
         unsafe {
             let rgn = CreateRectRgn(0, 0, 0, 0);
-            for &[x, y, w, h] in rects {
+            for &[x, y, w, h] in rects.iter() {
                 let r = CreateRectRgn(px(x), px(y), px(x + w), px(y + h));
                 CombineRgn(rgn, rgn, r, RGN_OR);
                 DeleteObject(r);
@@ -213,6 +269,14 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![skin_send])
         .register_uri_scheme_protocol("skin", |ctx, req| {
             skin_protocol(ctx.app_handle(), ctx.webview_label(), req)
+        })
+        .on_window_event(|_window, _event| {
+            // A new monitor scale resizes the window but leaves its region in
+            // the old device pixels.
+            #[cfg(windows)]
+            if let tauri::WindowEvent::ScaleFactorChanged { .. } = _event {
+                win32::reapply(_window);
+            }
         })
         .setup(|app| {
             let window = app.get_window("main").expect("main window");
@@ -238,3 +302,33 @@ pub fn run() {
 }
 
 const BROWSER_ARGS: &str = "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection --autoplay-policy=no-user-gesture-required";
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn shape_runs_must_fit_the_view() {
+        assert!(valid_shape(200, 200, &[[0, 0, 200, 1], [10, 199, 5, 1]]));
+        assert!(!valid_shape(200, 200, &[[u32::MAX, 0, 2, 1]]));
+        assert!(!valid_shape(200, 200, &[[199, 0, 2, 1]]));
+        assert!(!valid_shape(200, 200, &[[0, 0, 0, 1]]));
+        assert!(!valid_shape(0, 200, &[]));
+        assert!(!valid_shape(4, 4, &[[0, 0, 1, 1]; 9]));
+    }
+
+    #[test]
+    fn messages_refuse_unknown_fields() {
+        let parse = |s: &str| serde_json::from_str::<FromSkin>(s).ok();
+        assert_eq!(parse(r#"{"type":"play"}"#), Some(FromSkin::Play {}));
+        assert_eq!(parse(r#"{"type":"drag"}"#), Some(FromSkin::Drag {}));
+        assert_eq!(parse(r#"{"type":"play","evil":1}"#), None);
+        assert_eq!(parse(r#"{"type":"stop","evil":1}"#), None);
+        assert_eq!(parse(r#"{"type":"drag","evil":1}"#), None);
+        assert_eq!(parse(r#"{"type":"volume","value":0.5,"evil":1}"#), None);
+        assert_eq!(parse(r#"{"type":"bogus"}"#), None);
+        // The trusted page still gets the bare form.
+        let play = serde_json::to_string(&FromSkin::Play {}).unwrap();
+        assert_eq!(play, r#"{"type":"play"}"#);
+    }
+}
