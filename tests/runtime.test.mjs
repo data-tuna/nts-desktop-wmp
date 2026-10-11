@@ -260,3 +260,26 @@ test("now playing: the media's name and item info, the playlist, and a pick's li
   listeners.dblclick(row);
   assert.equal(sent.filter((m) => m.type === "launchUrl").length, 2);
 });
+
+test("a double click that starts a pick from its row does not open its page", () => {
+  const items = ["NTS 1", "NTS 2", "Pick A", "Pick B"];
+  const { sent, set } = load(`<theme><view width="100" height="200">
+       <playlist id="pl" left="0" top="0" width="100" height="200" fontSize="6"/>
+     </view></theme>`);
+  set({ channel: 2, title: items[2], link: "https://soundcloud.com/a", items });
+  // Rows are 16 px: 6 pt is 8 px, doubled.
+  const rowB = (detail) => ({ button: 0, clientX: 5, clientY: 3 * 16 + 8, detail });
+  const at = sent.length;
+  listeners.mousedown(rowB(1));
+  listeners.mouseup(rowB(1));
+  // The host's state lands between the two presses, as it does every 250 ms.
+  set({ channel: 3, title: items[3], link: "https://soundcloud.com/b" });
+  listeners.mousedown(rowB(2));
+  listeners.mouseup(rowB(2));
+  listeners.dblclick(rowB(2));
+  assert.deepEqual(sent.slice(at).filter((m) => m.type === "launchUrl"), []);
+  // Now that B is current, a double click on its row opens it.
+  listeners.mousedown(rowB(1));
+  listeners.dblclick(rowB(2));
+  assert.deepEqual(sent.slice(at).filter((m) => m.type === "launchUrl"), [{ type: "launchUrl", url: "https://soundcloud.com/b" }]);
+});

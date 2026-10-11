@@ -17,8 +17,9 @@ type Events = {
   finish(): void;
   /** Unreachable, removed, blocked, or not started in time. */
   error(reason: unknown): void;
-  /** The widget paused itself (Windows' media overlay reaches it directly). */
+  /** The widget paused or played by itself (Windows' media overlay reaches it directly). */
   paused(): void;
+  resumed(): void;
   /** The uploader's SoundCloud name, once the pick has loaded. */
   uploader(url: string, name: string): void;
 };
@@ -36,6 +37,8 @@ export function createWidget(on: Events): Widget & { setVolume(volume: number): 
   let ready = false;
   let playing = false;
   let wanted = false;
+  // Pauses we sent that the widget has not answered yet: their "pause" events are not the widget's own.
+  let echoes = 0;
   let time = 0;
   let volume = 100;
   let startTimer: ReturnType<typeof setTimeout> | undefined;
@@ -90,10 +93,15 @@ export function createWidget(on: Events): Widget & { setVolume(volume: number): 
       case "play":
         started();
         playing = true;
+        if (!wanted) {
+          wanted = true;
+          on.resumed();
+        }
         break;
       case "pause":
         playing = false;
-        if (wanted) {
+        if (echoes > 0) echoes--;
+        else if (wanted) {
           wanted = false;
           on.paused();
         }
@@ -111,20 +119,24 @@ export function createWidget(on: Events): Widget & { setVolume(volume: number): 
   const widget = {
     play(next: string) {
       wanted = true;
-      expectStart();
       if (next === url && ready) {
-        // The widget toggles on "play": never send it to a playing pick.
-        if (!playing) send("play");
+        // The widget toggles on "play": never send it to a pick that plays and stays playing.
+        if (playing && echoes === 0) return started();
+        expectStart();
+        send("play");
         return;
       }
+      expectStart();
       url = next;
       ready = playing = false;
+      echoes = 0;
       time = 0;
       frame.src = `${WIDGET}?url=${encodeURIComponent(url)}&auto_play=false&visual=false`;
     },
     pause() {
       started();
       wanted = false;
+      if (playing) echoes++;
       send("pause");
     },
     stop() {
@@ -137,6 +149,7 @@ export function createWidget(on: Events): Widget & { setVolume(volume: number): 
       if (!url) return;
       url = "";
       ready = playing = wanted = false;
+      echoes = 0;
       time = 0;
       // Removing the src attribute would leave the widget's page running, and playing.
       frame.src = "about:blank";

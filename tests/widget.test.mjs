@@ -26,6 +26,7 @@ function setup() {
     finish: () => events.push("finish"),
     error: (reason) => events.push(`error ${reason}`),
     paused: () => events.push("paused"),
+    resumed: () => events.push("resumed"),
     uploader: (url, name) => events.push(`uploader ${name}`),
   });
   return { widget, events };
@@ -84,4 +85,35 @@ test("a pick that has not started in 15 s, or errors, is given up and unloaded",
   from("error", "gone");
   assert.deepEqual(events, ["error timeout", "error gone"]);
   assert.equal(frame.src, "about:blank");
+});
+
+test("play on a playing pick arms no give-up timer", () => {
+  const { widget, events } = setup();
+  widget.play("https://soundcloud.com/a/f");
+  from("ready");
+  from("play");
+  widget.play("https://soundcloud.com/a/f");
+  mock.timers.tick(20_000);
+  assert.deepEqual(events, []);
+  assert.notEqual(frame.src, "about:blank");
+});
+
+test("a play the widget makes itself is reported; a quick pause and play is ours, not the widget's", () => {
+  const { widget, events } = setup();
+  widget.play("https://soundcloud.com/a/g");
+  from("ready");
+  from("play");
+  from("pause");
+  from("play");
+  assert.deepEqual(events, ["paused", "resumed"]);
+  // Pause then play before the widget answers: both go out, and the echo of our pause is not reported.
+  frame.posted = [];
+  widget.pause();
+  widget.play("https://soundcloud.com/a/g");
+  assert.deepEqual(frame.posted, ["pause", "play"]);
+  from("pause");
+  from("play");
+  assert.deepEqual(events, ["paused", "resumed"]);
+  mock.timers.tick(20_000);
+  assert.deepEqual(events, ["paused", "resumed"]);
 });

@@ -703,6 +703,8 @@ export class Skin {
   private resImages = new Map<string, Img | undefined>();
   private logged = new Set<string>();
   private pressed: El | null = null;
+  /** The playlist row a double click may open: the current pick's, when the first press landed on it. */
+  private linkRow = -1;
   /** Whether the pressed button showed down before the press (sticky buttons). */
   private wasDown = false;
   private hovered: El | null = null;
@@ -1252,7 +1254,7 @@ export class Skin {
       if (found?.interactive() && found.enabled) this.byUser(() => this.fire(found, "ondblclick"));
       // A pick links back to SoundCloud, as its terms ask: a double click on
       // the title, or on the pick's playlist row. A press still drags the window.
-      else if (this.state.link && (found?.kind === "playlist" ? found.rowAt(this.point(ev)[1] - found.origin()[1]) === this.state.channel : found?.kind === "text" && TITLE.test(found.attr("value") ?? "")))
+      else if (this.state.link && (found?.kind === "playlist" ? found.rowAt(this.point(ev)[1] - found.origin()[1]) === this.linkRow : found?.kind === "text" && TITLE.test(found.attr("value") ?? "")))
         this.send({ type: "launchUrl", url: this.state.link });
     });
     window.addEventListener("mouseup", (ev) => {
@@ -1336,9 +1338,10 @@ export class Skin {
     const i = list.rowAt(this.point(ev)[1] - list.origin()[1]);
     if (i < 0) return;
     this.send({ type: "select", index: i });
-    // Set locally too, so the row shows as current before the host's next state;
-    // the old item's link goes with it, so a double click opens nothing stale.
-    if (i !== this.state.channel) this.state.link = "";
+    // A double click opens a pick only if its row was already the current pick
+    // at the first press: one that starts it should not open its page as well.
+    if (!(ev.detail > 1)) this.linkRow = i === this.state.channel && this.state.link ? i : -1;
+    // Set locally too, so the row shows as current before the host's next state.
     this.state.channel = i;
     this.paint();
   }

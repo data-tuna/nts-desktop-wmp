@@ -42,7 +42,12 @@ the evidence.
   pick's page, else `""`) and `items` (the playlist's titles).
 - **Selecting the item already playing** (a double click's two presses on
   its row) leaves it playing, and the widget is never sent `play` while it
-  plays, since it toggles on it.
+  plays, since it toggles on it. A row's double click opens a pick's page
+  only if that row was already the current pick at the first press, so
+  double-clicking a row to start a pick does not also open it.
+- **The widget can be driven from outside** (the overlay, media keys): a
+  pause or play it makes itself pauses or plays the player, so the two
+  never disagree. The echo of a pause we sent is not counted as its own.
 - **Windows' media overlay** gets the title, the show and the artwork
   through `navigator.mediaSession`, with play, pause, stop, next and
   previous wired back to the player. Not yet seen in the overlay itself;

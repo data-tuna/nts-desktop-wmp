@@ -154,7 +154,7 @@ export function objects(host: Host) {
     get openstate() { return host.openState; },
     get status() { return host.status(); },
     get url() { return s().url; },
-    set url(_: unknown) { log("player.URL cannot be set: the app plays NTS 1 and NTS 2"); },
+    set url(_: unknown) { log("player.URL cannot be set: the app plays its own playlist"); },
     // Only http(s), only from a click, and only through Rust, which checks
     // again (lib.rs): a skin's timer or onLoad opens nothing.
     launchurl: (url: unknown) => {

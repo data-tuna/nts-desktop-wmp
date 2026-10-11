@@ -33,6 +33,7 @@ const widget = createWidget({
   },
   error: () => player.stop(),
   paused: () => player.pause(),
+  resumed: () => player.play(),
   uploader: (url, name) => {
     const pick = picks.get(url);
     if (pick) pick.uploader = name;
