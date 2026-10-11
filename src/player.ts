@@ -23,6 +23,32 @@ export const CHANNELS: Item[] = [
   { title: "NTS 2", url: "https://streams.radiomast.io/nts2" },
 ];
 
+/** 6 s of silence as an 8 kHz WAV: what the element holds while paused or
+ * stopped. WebView2 leaves media shorter than about 5 s out of the session. */
+export const silence = (() => {
+  let url = "";
+  return () => {
+    if (url) return url;
+    const n = 6 * 8000;
+    const wav = new Uint8Array(44 + n).fill(128);
+    const v = new DataView(wav.buffer);
+    const tag = (at: number, text: string) => [...text].forEach((c, i) => (wav[at + i] = c.charCodeAt(0)));
+    tag(0, "RIFF");
+    v.setUint32(4, 36 + n, true);
+    tag(8, "WAVEfmt ");
+    v.setUint32(16, 16, true); // fmt chunk size
+    v.setUint16(20, 1, true); // PCM
+    v.setUint16(22, 1, true); // mono
+    v.setUint32(24, 8000, true); // samples a second
+    v.setUint32(28, 8000, true); // bytes a second
+    v.setUint16(32, 1, true); // bytes a frame
+    v.setUint16(34, 8, true); // bits a sample; 8-bit silence is 128
+    tag(36, "data");
+    v.setUint32(40, n, true);
+    return (url = URL.createObjectURL(new Blob([wav], { type: "audio/wav" })));
+  };
+})();
+
 // Backoff: 1 s, 2 s, 4 s, then every 8 s until the stream is back.
 const RETRY_MIN_MS = 1000;
 const RETRY_MAX_MS = 8000;
@@ -34,7 +60,7 @@ type PlayState = "playing" | "paused" | "stopped" | "buffering" | "reconnecting"
 
 type Media = Pick<
   HTMLMediaElement,
-  "src" | "currentTime" | "paused" | "readyState" | "play" | "pause" | "load" | "removeAttribute" | "addEventListener"
+  "src" | "loop" | "currentTime" | "paused" | "readyState" | "play" | "pause" | "load" | "removeAttribute" | "addEventListener"
 >;
 
 /** `items` starts with the channels; the caller appends mixtapes and picks to it as they arrive. */
@@ -58,10 +84,20 @@ export function createPlayer(audio: Media, items: Item[] = [...CHANNELS], widget
     audio.removeAttribute("src");
     audio.load();
   };
-  // Pause and stop keep the src: without it WebView2 ends the media session,
-  // and the Play key and Windows' overlay can no longer reach the app. A
-  // paused stream buffers a little, then stalls; Play loads it afresh.
-  const hold = () => audio.pause();
+  // Pause and stop swap the stream for a silent local clip: removing the src
+  // ends WebView2's media session (the Play key and Windows' overlay could no
+  // longer reach the app), and a paused stream keeps its connection open.
+  // The clip must play for a moment to join the session; a clip that never
+  // played does not, and Windows drops the app just the same.
+  const hold = () => {
+    audio.pause();
+    audio.src = silence();
+    audio.loop = true;
+    audio.play().then(
+      () => audio.src === silence() && audio.pause(),
+      () => {},
+    );
+  };
   const load = () => {
     lastTime = 0;
     movedAt = Date.now();
@@ -71,6 +107,7 @@ export function createPlayer(audio: Media, items: Item[] = [...CHANNELS], widget
       return;
     }
     widget?.unload();
+    audio.loop = false;
     audio.src = items[channel].url;
     audio.play().catch((e: Error) => {
       // Autoplay refused: wait for the listener's Play rather than retry forever.
