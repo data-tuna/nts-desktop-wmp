@@ -103,6 +103,8 @@ class El {
   // Geometry, worked out on first use: `jscript:` expressions in one
   // element's attributes may read another's.
   geo(name: "left" | "top" | "width" | "height"): number {
+    // Text with no width fits what it shows now, which changes (the clock).
+    if (name === "width" && this.kind === "text" && this.attr("width") === undefined) return this.natural(name);
     let v = this.memo.get(name);
     if (v === undefined) {
       this.memo.set(name, 0); // an expression that loops back to itself reads 0
