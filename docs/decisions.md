@@ -271,8 +271,9 @@ rather than through Webamp. WMP skins matter as much as the Winamp app does.
   - **works:** none of that. Video, item playlists and popups that are not
     drawn do not count against a skin: a radio has no video.
   The checks miss a skin that draws but looks wrong. A sample of the
-  screenshots was looked over; Kwanzaa, for one, is all visualiser and
-  shows black candles until ATA-114.
+  screenshots was looked over; Kwanzaa, for one, is all visualiser, so its
+  candles are black while nothing plays. Rebuilt after ATA-114's
+  visualisations merged: the same 59, 97 and 60.
 - **On launch** (`skins.rs`): the skin picked in the picker, or else a
   random `works` skin. It comes from the cache
   (`%LOCALAPPDATA%\com.datatuna.ntswmp\skins\<md5>.wmz`), checked against
