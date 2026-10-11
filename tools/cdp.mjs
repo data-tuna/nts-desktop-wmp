@@ -7,7 +7,9 @@ export async function connect(port, which) {
   const targets = await (await fetch(`http://127.0.0.1:${port}/json`)).json();
   const isSkin = (t) => t.url.startsWith("http://skin.localhost");
   // "frame": the newest sub-frame with a target of its own (sandboxed frames run out of process).
-  const page = which === "frame" ? targets.findLast((t) => t.type === "iframe") : targets.find((t) => t.type === "page" && (which === "skin") === isSkin(t));
+  // "main" is the trusted page at "/", not the skin picker (picker.html).
+  const isMain = (t) => !isSkin(t) && new URL(t.url).pathname === "/";
+  const page = which === "frame" ? targets.findLast((t) => t.type === "iframe") : targets.find((t) => t.type === "page" && (which === "skin" ? isSkin(t) : isMain(t)));
   if (!page) throw new Error(`no ${which} target among ${targets.map((t) => t.url).join(", ")}`);
   const ws = new WebSocket(page.webSocketDebuggerUrl);
   await new Promise((r) => ws.addEventListener("open", r));
