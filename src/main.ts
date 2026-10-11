@@ -4,6 +4,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { createPlayer } from "./player";
+import { bands, samples } from "./skin/effects";
 
 const BANDS = [31, 62, 125, 250, 500, 1000, 2000, 4000, 8000, 16000];
 const SETTINGS_KEY = "player";
@@ -16,8 +17,14 @@ const gain = ctx.createGain();
 const pan = ctx.createStereoPanner();
 const eq = BANDS.map((frequency) => new BiquadFilterNode(ctx, { type: "peaking", frequency, Q: 1.4 }));
 const analyser = ctx.createAnalyser();
-[ctx.createMediaElementSource(audio), gain, pan, ...eq, analyser].reduce((a, b) => (a.connect(b), b));
+const source = ctx.createMediaElementSource(audio);
+[source, gain, pan, ...eq, analyser].reduce((a, b) => (a.connect(b), b));
 analyser.connect(ctx.destination);
+// The visualisations read the stream before the volume, as WMP's do, so
+// they move at any volume and when muted.
+// Loud music tops out near -15 dB, so the bars keep some headroom.
+const visAnalyser = new AnalyserNode(ctx, { minDecibels: -90, maxDecibels: -15 });
+source.connect(visAnalyser);
 
 const player = createPlayer(audio);
 
@@ -26,7 +33,8 @@ type FromSkin =
   | { type: "volume" | "balance"; value: number }
   | { type: "mute"; value: boolean }
   | { type: "seek"; seconds: number }
-  | { type: "eq"; band: number; gain: number };
+  | { type: "eq"; band: number; gain: number }
+  | { type: "effects"; on: boolean };
 
 const clamp = (v: unknown, lo: number, hi: number, fallback: number) =>
   typeof v === "number" && Number.isFinite(v) ? Math.min(hi, Math.max(lo, v)) : fallback;
@@ -49,6 +57,9 @@ const settings = (() => {
   };
 })();
 
+/** Whether the skin shows a visualisation, which wants analyser frames. */
+let effectsOn = false;
+
 function apply() {
   gain.gain.value = settings.mute ? 0 : settings.volume;
   pan.pan.value = settings.balance;
@@ -64,6 +75,7 @@ function onSkin(m: FromSkin) {
   else if (m.type === "stop") player.stop();
   else if (m.type === "next") player.step(1);
   else if (m.type === "previous") player.step(-1);
+  else if (m.type === "effects") effectsOn = m.on;
   else if (m.type === "seek") {
     // ponytail: seek is accepted but a live stream has nowhere to seek to.
     // Mixtapes are live too; revisit if a seekable source ever arrives.
@@ -87,13 +99,30 @@ function level() {
   return Math.sqrt(buf.reduce((s, v) => s + v * v, 0) / buf.length);
 }
 
-// ponytail: 4 updates a second covers the clock and title. The visualiser
-// (ATA-114) will want levels at frame rate; measure this path then.
+// 4 updates a second covers the clock and title. The visualisation gets its
+// own frames, below.
 setInterval(() => {
   // duration 0: a live stream, which has no length and cannot seek (WMP's convention).
   const state = { type: "state", ...player.state(), duration: 0, ...settings, level: level() };
   void invoke("skin_send", { msg: state }).catch(() => {});
 }, 250);
+
+// Analyser frames for the skin's visualisation, about 30 a second, only
+// while one is on screen and the stream plays. requestAnimationFrame stops
+// while the window is minimised, and the frames with it.
+const spectrum = new Uint8Array(visAnalyser.frequencyBinCount);
+const wave = new Uint8Array(visAnalyser.fftSize);
+let lastFrame = 0;
+function visFrame(now: number) {
+  requestAnimationFrame(visFrame);
+  if (!effectsOn || player.state().playState !== "playing" || now - lastFrame < 30) return;
+  lastFrame = now;
+  visAnalyser.getByteFrequencyData(spectrum);
+  visAnalyser.getByteTimeDomainData(wave);
+  const msg = { type: "vis", bars: bands(spectrum, ctx.sampleRate, 32), wave: samples(wave, 96) };
+  void invoke("skin_send", { msg }).catch(() => {});
+}
+requestAnimationFrame(visFrame);
 
 if (import.meta.env.DEV) {
   // ATA-107 comparison only: the other host the spike tried, a sandboxed

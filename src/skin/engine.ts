@@ -8,6 +8,7 @@
 import { CHANNELS } from "../player.ts";
 import { constants, type Node } from "./wms.ts";
 import { css, keyed, mappedElement, parseColor, rgbAt, runs, type Pixels } from "./pixels.ts";
+import { drawEffect, EFFECTS, effectIndex, type Frame, type Memory } from "./effects.ts";
 import { CONSTANTS, OS_MEDIA_CHANGING, OS_MEDIA_OPEN, objects, playState, resImage, resScript, resString, wmpObject, type Host } from "./runtime.ts";
 
 export type Img = Pixels & { bitmap: CanvasImageSource };
@@ -74,6 +75,8 @@ class El {
   // Reused offscreen canvases, one per purpose.
   private canvases = new Map<string, HTMLCanvasElement>();
   api: object | null = null;
+  /** An effects element's peaks and trails. */
+  readonly memory: Memory = { peaks: [], trail: null };
   move: ReturnType<typeof setTimeout> | null = null;
 
   readonly node: Node;
@@ -306,11 +309,7 @@ class El {
     else if (this.kind === "progress") this.paintProgress(g);
     else if (this.kind === "text") this.paintText(g);
     else if (this.kind === "playlist") this.paintPlaylist(g);
-    else if (this.kind === "effects") {
-      // ponytail: a black placeholder until the visualisations (ATA-114).
-      g.fillStyle = css(this.color("backgroundcolor") ?? 0);
-      g.fillRect(this.x, this.y, this.w, this.h);
-    }
+    else if (this.kind === "effects") this.paintEffects(g);
     g.restore();
   }
 
@@ -514,6 +513,15 @@ class El {
     if (this.skin.str(this, "fontstyle").toLowerCase().includes("underline")) g.fillRect(left, y + this.fontPx() + 1, width, 1);
   }
 
+  /** The visualisation, from the latest frame while the player plays. */
+  private paintEffects(g: CanvasRenderingContext2D) {
+    const skin = this.skin;
+    skin.effectsShown = true;
+    const fg = this.color("foregroundcolor");
+    const frame = skin.state.playState === "playing" ? skin.frame : null;
+    drawEffect(g, skin.effect(this), frame, [this.x, this.y, this.w, this.h], css(this.color("backgroundcolor") ?? 0), fg === null ? null : css(fg), this.memory);
+  }
+
   /** The playlist's row height, in px. */
   private rowHeight(): number {
     return Math.round(this.fontPx() * 2);
@@ -561,10 +569,13 @@ class El {
     if (this.kind === "container") {
       if (lx < 0 || ly < 0 || lx >= this.w || ly >= this.h) return null;
       for (let i = this.kids.length - 1; i >= 0; i--) {
+        // The background's own pixels hide the children behind it: a click
+        // there is on the body, not on anemone's visualisation underneath.
+        if (this.kids[i].z < 0 && this.drawnAt(lx, ly)) return this;
         const found = this.kids[i].hit(lx, ly);
         if (found) return found;
       }
-      return null;
+      return this.drawnAt(lx, ly) ? this : null;
     }
     if (this.skin.bool(this, "passthrough", false)) return null;
     if (lx < 0 || ly < 0 || lx >= this.w || ly >= this.h) return null;
@@ -581,6 +592,14 @@ class El {
       return pos && this.gray(pos, lx, ly) !== null ? this : null;
     }
     return this;
+  }
+
+  /** Whether a container's background image is drawn at (x, y): not its
+   * transparencyColor, nor its clippingColor. */
+  private drawnAt(x: number, y: number): boolean {
+    const bg = this.img("backgroundimage");
+    const rgb = bg ? rgbAt(bg, x, y) : -1;
+    return rgb >= 0 && rgb !== this.color("transparencycolor") && rgb !== this.color("clippingcolor");
   }
 
   /** Whether (x, y) is a drawn pixel of `img`, given the transparencyColor. */
@@ -639,11 +658,10 @@ class El {
 
 // Members every element has, beyond its attributes.
 const COMMON = new Set(["left", "top", "width", "height", "visible", "enabled", "value", "down", "id", "textwidth", "moveto", "alphablendto", "setfocus"]);
-// Methods by tag, for what the engine does not draw yet. Effects' next and
-// previous change the visualisation (ATA-114).
+// An effects element's own members.
+const EFFECT_MEMBERS = ["next", "previous", "currenteffecttype", "currentpreset", "currenteffecttitle"];
+// Methods by tag, for what the engine does not draw yet.
 const IDLE_METHODS: Record<string, string[]> = {
-  effects: ["next", "previous", "setfocus"],
-  wmpeffects: ["next", "previous", "setfocus"],
   playlist: ["setcolumnresizemode", "getcolumnresizemode"],
   itemsplaylist: ["setcolumnresizemode", "getcolumnresizemode"],
   popup: ["appenditem", "deleteitem", "show"],
@@ -653,6 +671,11 @@ export class Skin {
   readonly canvas = document.createElement("canvas");
   readonly measure = document.createElement("canvas").getContext("2d")!;
   readonly view: El;
+  /** The latest analyser frame from the host, and whether a visualisation
+   * was on screen at the last paint (the host sends frames only then). */
+  frame: Frame | null = null;
+  effectsShown = false;
+  private effectsOn = false;
   state: State = { playState: "stopped", channel: 0, title: "", time: 0, duration: 0, volume: 1, mute: false, balance: 0, eq: [], level: 0 };
   /** Bumped by every change scripts or the player make; geometry is cached per generation. */
   gen = 0;
@@ -795,7 +818,7 @@ export class Skin {
     const member = (k: string) => {
       const lk = k.toLowerCase();
       if (extra && lk in extra) return "extra";
-      if (methods.includes(lk) || COMMON.has(lk) || e.props.has(lk)) return lk;
+      if (methods.includes(lk) || COMMON.has(lk) || e.props.has(lk) || (e.kind === "effects" && EFFECT_MEMBERS.includes(lk))) return lk;
       // Handlers are not properties: `onLoad="OnLoad();"` must find the
       // skin's function, not the attribute.
       if (e.attr(lk) !== undefined && !HANDLER.test(lk)) return lk;
@@ -852,6 +875,16 @@ export class Skin {
       case "returntomediacenter": return () => this.log("view.returnToMediaCenter: there is no full mode");
       case "size": return () => this.log("view.size: resizing by hand is not supported");
     }
+    if (e.kind === "effects") {
+      const i = this.effect(e);
+      switch (name) {
+        case "next": return () => this.stepEffect(e, 1);
+        case "previous": return () => this.stepEffect(e, -1);
+        case "currenteffecttype": return EFFECTS[i].type;
+        case "currentpreset": return EFFECTS[i].preset;
+        case "currenteffecttitle": return EFFECTS[i].title;
+      }
+    }
     if (methods.includes(name)) return () => this.log(`${e.node.tag}.${name} does nothing yet`);
     return this.typed(this.value(e, name).v);
   }
@@ -869,6 +902,20 @@ export class Skin {
     if (e === this.view && name === "timerinterval") this.restartTimer();
     this.changed();
     if (old !== v) this.fire(e, `${name}_onchange`);
+  }
+
+  /** The effect an effects element shows: its currentEffectType and
+   * currentPreset, set by script or bound to `mediacenter`. */
+  effect(e: El): number {
+    return effectIndex(this.str(e, "currenteffecttype"), this.num(e, "currentpreset") ?? 0);
+  }
+
+  /** effects.next() and previous(): the next effect, round the list. Each
+   * property's _onchange runs, so the skin can save it to `mediacenter`. */
+  private stepEffect(e: El, by: number) {
+    const { type, preset } = EFFECTS[(this.effect(e) + by + EFFECTS.length) % EFFECTS.length];
+    this.setProp(e, "currenteffecttype", type);
+    this.setProp(e, "currentpreset", preset);
   }
 
   /** Slides an element to (x, y) over `ms`, then runs its onEndMove. */
@@ -1089,10 +1136,23 @@ export class Skin {
         this.send({ type: "shape", ...shape });
       }
     }
+    this.effectsShown = false;
     const g = this.draw(this.canvas, w, h);
     g.globalCompositeOperation = "destination-in";
     g.drawImage(this.shapeMask, 0, 0);
     g.globalCompositeOperation = "source-over";
+    // Frames only while a visualisation is on screen: none while it is hidden.
+    if (this.started && this.effectsShown !== this.effectsOn) {
+      this.effectsOn = this.effectsShown;
+      this.send({ type: "effects", on: this.effectsOn });
+    }
+  }
+
+  /** An analyser frame from the host: repaint on the next display frame,
+   * if a visualisation shows it. */
+  setFrame(f: Frame) {
+    this.frame = f;
+    if (this.effectsOn) this.animate();
   }
 
   private draw(c: HTMLCanvasElement, w: number, h: number): CanvasRenderingContext2D {
@@ -1177,7 +1237,7 @@ export class Skin {
 
   private at(ev: MouseEvent): El | null {
     const [x, y] = this.point(ev);
-    return this.view.kids.reduceRight<El | null>((found, kid) => found ?? kid.hit(x, y), null);
+    return this.view.hit(x + this.view.x, y + this.view.y);
   }
 
   private listen() {

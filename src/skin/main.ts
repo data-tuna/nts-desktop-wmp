@@ -3,6 +3,7 @@
 import { unzip } from "./wmz.ts";
 import { decode, parse } from "./wms.ts";
 import { Skin, type Img, type Send, type State } from "./engine.ts";
+import type { Frame } from "./effects.ts";
 
 const send: Send = (msg) => void fetch("/msg", { method: "POST", body: JSON.stringify(msg) });
 
@@ -43,6 +44,7 @@ load().then(
     skin.start();
     window.addEventListener("message", (e) => {
       if (e.data?.type === "state") skin.setState(e.data as State);
+      else if (e.data?.type === "vis") skin.setFrame(e.data as Frame);
     });
   },
   (e) => {

@@ -78,9 +78,14 @@ enum FromSkin {
     LaunchUrl {
         url: String,
     },
+    /// Whether a visualisation is on screen, so wants analyser frames.
+    Effects {
+        on: bool,
+    },
 }
 
-/// Trusted page to skin: play state, time, title, levels. The trusted page is
+/// Trusted page to skin: play state, time, title, levels, and analyser
+/// frames for the visualisation. The trusted page is
 /// the only caller (the skin webview has no capability for this command).
 #[tauri::command]
 fn skin_send(app: AppHandle, msg: serde_json::Value) -> Result<(), String> {
@@ -374,12 +379,21 @@ pub fn run() {
         .register_uri_scheme_protocol("skin", |ctx, req| {
             skin_protocol(ctx.app_handle(), ctx.webview_label(), req)
         })
-        .on_window_event(|_window, _event| {
+        .on_window_event(|window, event| {
             // A new monitor scale resizes the window but leaves its region in
             // the old device pixels.
             #[cfg(windows)]
-            if let tauri::WindowEvent::ScaleFactorChanged { .. } = _event {
-                win32::reapply(_window);
+            if let tauri::WindowEvent::ScaleFactorChanged { .. } = event {
+                win32::reapply(window);
+            }
+            // WebView2 is not told when the window is minimised, so both
+            // pages would go on drawing, the visualisation included. Hidden,
+            // they stop until it is restored; the audio plays on.
+            if let tauri::WindowEvent::Resized(_) = event {
+                let hide = window.is_minimized().unwrap_or(false);
+                for webview in window.webviews() {
+                    let _ = if hide { webview.hide() } else { webview.show() };
+                }
             }
         })
         .setup(|app| {
@@ -471,6 +485,11 @@ mod tests {
                 url: "https://www.nts.live/".into()
             })
         );
+        assert_eq!(
+            parse(r#"{"type":"effects","on":true}"#),
+            Some(FromSkin::Effects { on: true })
+        );
+        assert_eq!(parse(r#"{"type":"effects","on":"yes"}"#), None);
         // The trusted page still gets the bare form.
         let play = serde_json::to_string(&FromSkin::Play {}).unwrap();
         assert_eq!(play, r#"{"type":"play"}"#);

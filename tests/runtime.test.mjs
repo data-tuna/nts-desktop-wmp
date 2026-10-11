@@ -45,9 +45,9 @@ const STATE = { playState: "stopped", channel: 0, title: "NTS 1", time: 0, durat
 
 /** A started skin from markup and scripts, the messages it sends, and a way
  * to evaluate skin code against it. */
-function load(wms, scripts = {}, state = STATE) {
+function load(wms, scripts = {}, state = STATE, images = new Map()) {
   const sent = [];
-  const skin = new Skin(parse(wms), new Map(), (m) => sent.push(m), new Map(Object.entries(scripts)), "test:");
+  const skin = new Skin(parse(wms), images, (m) => sent.push(m), new Map(Object.entries(scripts)), "test:");
   skin.setState(state);
   skin.start();
   const js = (code) => skin.run(skin.view, `return (${code});`);
@@ -204,7 +204,7 @@ test("the view timer and moveTo run their handlers", async () => {
     `<theme><view width="100" height="100" timerInterval="10" onTimer="ticks++;">
        <subview id="m" left="0" top="40" width="10" height="10" onEndMove="moved = [left, top];"/>
      </view></theme>`,
-    { "c.js": "" },
+    {},
   );
   js("(ticks = 0, moved = null, m.moveTo(20, 0, 30))");
   await new Promise((r) => setTimeout(r, 120));
@@ -223,4 +223,52 @@ test("wmploc stand-ins: our own strings and glyphs, nothing for the rest", () =>
   assert.equal(play.width, 9);
   assert.ok(play.data.some((v) => v === 255));
   assert.equal(resImage("res://wmploc/RT_IMAGE/#9999"), null);
+});
+
+test("effects step through the visualisations, save them through their _onchange, and ask for frames only while shown", async () => {
+  const { js, sent } = load(`<theme><view width="100" height="100">
+       <effects id="vis" width="50" height="40"
+         currentEffectType="wmpprop:mediacenter.effectType" currentEffectType_onchange="mediacenter.effectType=currentEffectType;"
+         currentPreset="wmpprop:mediacenter.effectPreset" currentPreset_onchange="mediacenter.effectPreset=currentPreset;"/>
+     </view></theme>`);
+  assert.deepEqual(js("[vis.currentEffectType, vis.currentPreset, vis.currentEffectTitle]"), ["Bars and Waves", 0, "Bars"]);
+  js("vis.next()");
+  assert.deepEqual(js("[vis.currentEffectTitle, mediacenter.effectType, mediacenter.effectPreset]"), ["Scope", "Bars and Waves", 1]);
+  js("vis.next()");
+  assert.deepEqual(js("[vis.currentEffectTitle, mediacenter.effectType, mediacenter.effectPreset]"), ["Ambience", "Ambience", 0]);
+  js("vis.next()");
+  assert.equal(js("vis.currentEffectTitle"), "Bars", "round the list");
+  js("vis.previous()");
+  assert.equal(js("vis.currentEffectTitle"), "Ambience");
+  const effects = () => sent.filter((m) => m.type === "effects").map((m) => m.on);
+  assert.deepEqual(effects(), [true]);
+  js("vis.visible = false");
+  await Promise.resolve();
+  assert.deepEqual(effects(), [true, false], "hidden: no more frames");
+});
+
+test("a click on a subview's drawn pixels stays there; through its transparency it reaches the visualisation behind", () => {
+  // 20×20: the left half the transparency colour, the right half drawn.
+  const data = new Uint8ClampedArray(20 * 20 * 4);
+  for (let i = 0; i < 400; i++) data.set(i % 20 < 10 ? [0, 255, 0, 255] : [200, 0, 0, 255], i * 4);
+  const { js, sent } = load(
+    `<theme><view width="20" height="20">
+       <effects id="vis" zIndex="-1" width="20" height="20" onClick="clicks++;"/>
+       <subview backgroundImage="body.bmp" transparencyColor="#00FF00"/>
+     </view></theme>`,
+    {},
+    STATE,
+    new Map([["body.bmp", { width: 20, height: 20, data, bitmap: {} }]]),
+  );
+  js("clicks = 0");
+  const click = (x) => {
+    const at = { button: 0, clientX: x, clientY: 5 };
+    listeners.mousedown(at);
+    listeners.mouseup(at);
+  };
+  click(5);
+  assert.equal(js("clicks"), 1, "through the hole");
+  click(15);
+  assert.equal(js("clicks"), 1, "not through the body");
+  assert.equal(sent.at(-1).type, "drag", "the body moves the window");
 });
