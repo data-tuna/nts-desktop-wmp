@@ -43,9 +43,10 @@ Written in English.
                           wmz.ts unzips, wms.ts decodes and parses the .wms,
                           engine.ts lays out and paints the view, runs the
                           skin's scripts and handles the pointer, runtime.ts
-                          is the WMP object model the scripts see, pixels.ts
-                          holds the pixel helpers its tests share. main.ts is
-                          the entry; index.html the page.
+                          is the WMP object model the scripts see, effects.ts
+                          draws the visualisations, pixels.ts holds the pixel
+                          helpers its tests share. main.ts is the entry;
+                          index.html the page.
     skins/house/          The house skin, the one skin that ships: house.wms,
                           the layered SVGs in art/ it is drawn from, build.mjs
                           that renders them to bitmaps and zips house.wmz,
@@ -347,12 +348,14 @@ build, the tests and `cargo fmt --check`.
 `theme.currentViewID` are logged and ignored, so circle's video, playlist
 and settings views and 9SeriesDefault's compact view never open.
 
-**Video, item and drop-down playlists, and popups are not drawn,** and the
-visualiser is a black placeholder (ATA-114). `<playlist>` lists the
-channels, mixtapes and picks, and scrolls with the wheel; it has no
-columns or scroll bar. Their methods (`setColumnResizeMode`, the effects'
-`next`/`previous`, `appendItem`) are logged and do nothing. 9SeriesDefault's
-screen is black where WMP showed navy: that colour is WMP's visualiser's.
+**Video, item and drop-down playlists, and popups are not drawn.**
+`<playlist>` lists the channels, mixtapes and picks, and scrolls with the
+wheel; it has no columns or scroll bar. Their methods
+(`setColumnResizeMode`, `appendItem`) are logged and do nothing.
+
+**Three visualisations, no Milkdrop** (ATA-114): bars, scope and ambience,
+our own. The chosen effect is not saved across launches (`mediacenter`
+starts empty each time).
 
 **The media overlay is unverified.** The trusted page sets
 `navigator.mediaSession` (title, show, artwork; checked over DevTools), but
