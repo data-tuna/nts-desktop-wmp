@@ -36,7 +36,7 @@ pub fn list() -> &'static [Skin] {
     })
 }
 
-fn working() -> impl Iterator<Item = &'static Skin> {
+pub fn working() -> impl Iterator<Item = &'static Skin> {
     list().iter().filter(|s| s.status == "works")
 }
 
@@ -49,6 +49,11 @@ pub fn random() -> Option<&'static Skin> {
     // RandomState is seeded from the OS each time: random enough for a skin.
     let i = RandomState::new().hash_one(0u8) as usize;
     working().nth(i.checked_rem(n)?)
+}
+
+/// The archive.org page that credits the skin.
+pub fn page(skin: &Skin) -> Url {
+    item_url("https://archive.org/details", &skin.path)
 }
 
 fn item_url(base: &str, path: &str) -> Url {
@@ -199,35 +204,82 @@ pub enum Worn {
     House,
 }
 
-static WORN: Mutex<Worn> = Mutex::new(Worn::House);
-static ARRIVED: Condvar = Condvar::new();
-
-pub fn wear(worn: Worn) {
-    *WORN.lock().unwrap() = worn;
-    ARRIVED.notify_all();
+/// `fetch` numbers each fetch, so only the latest one is worn: a launch
+/// download that lands after a pick, or after the first paint gave up on
+/// it, goes into the cache and nowhere else.
+struct State {
+    worn: Worn,
+    fetch: u64,
 }
 
-/// What to draw, waiting up to `wait` for a skin still on its way. `None`
-/// is the house skin.
+static STATE: Mutex<State> = Mutex::new(State {
+    worn: Worn::House,
+    fetch: 0,
+});
+static ARRIVED: Condvar = Condvar::new();
+
+fn begin() -> u64 {
+    let mut state = STATE.lock().unwrap();
+    state.fetch += 1;
+    state.worn = Worn::Fetching;
+    state.fetch
+}
+
+fn finish(fetch: u64, worn: Worn) {
+    let mut state = STATE.lock().unwrap();
+    if state.fetch == fetch {
+        state.worn = worn;
+        ARRIVED.notify_all();
+    }
+}
+
+/// The skin webview drew the house skin, whatever was on its way.
+pub fn wear_house() {
+    let mut state = STATE.lock().unwrap();
+    state.fetch += 1;
+    state.worn = Worn::House;
+}
+
+/// What to draw, waiting up to `wait` for a skin still on its way, then
+/// giving up on it. `None` is the house skin.
 pub fn worn(wait: Duration) -> Option<(&'static Skin, Arc<Vec<u8>>)> {
-    let (worn, _) = ARRIVED
-        .wait_timeout_while(WORN.lock().unwrap(), wait, |w| matches!(w, Worn::Fetching))
+    let (mut state, _) = ARRIVED
+        .wait_timeout_while(STATE.lock().unwrap(), wait, |s| {
+            matches!(s.worn, Worn::Fetching)
+        })
         .unwrap();
-    match &*worn {
+    if matches!(state.worn, Worn::Fetching) {
+        state.fetch += 1;
+        state.worn = Worn::House;
+    }
+    match &state.worn {
         Worn::Skin(skin, bytes) => Some((skin, bytes.clone())),
         _ => None,
     }
 }
 
+/// The skin on the window now, for the picker: `None` for the house skin,
+/// and whether another is on its way.
+pub fn status() -> (Option<&'static Skin>, bool) {
+    match STATE.lock().unwrap().worn {
+        Worn::Skin(skin, _) => (Some(skin), false),
+        Worn::Fetching => (None, true),
+        Worn::House => (None, false),
+    }
+}
+
 /// Fetches `skin` and wears it, or the house skin if that fails.
 pub fn load(app: &AppHandle, skin: &'static Skin) -> Result<(), String> {
-    wear(Worn::Fetching);
+    fetch_and_wear(app, skin, begin())
+}
+
+fn fetch_and_wear(app: &AppHandle, skin: &'static Skin, id: u64) -> Result<(), String> {
     let result = fetch(app, skin);
     match &result {
-        Ok(bytes) => wear(Worn::Skin(skin, Arc::new(bytes.clone()))),
+        Ok(bytes) => finish(id, Worn::Skin(skin, Arc::new(bytes.clone()))),
         Err(e) => {
             eprintln!("skin {e}; wearing the house skin");
-            wear(Worn::House);
+            finish(id, Worn::House);
         }
     }
     result.map(|_| ())
@@ -242,9 +294,9 @@ pub fn start(app: &AppHandle) {
         None => random(),
     };
     if let Some(skin) = skin {
-        wear(Worn::Fetching);
+        let id = begin();
         let app = app.clone();
-        std::thread::spawn(move || load(&app, skin));
+        std::thread::spawn(move || fetch_and_wear(&app, skin, id));
     }
 }
 
@@ -279,6 +331,23 @@ mod tests {
     }
 
     #[test]
+    fn only_the_latest_fetch_is_worn() {
+        let skin = &list()[0];
+        let bytes = Arc::new(vec![1u8]);
+        let launch = begin();
+        let pick = begin();
+        finish(pick, Worn::Skin(skin, bytes.clone()));
+        // The launch download lands after the pick: it is not worn.
+        finish(launch, Worn::House);
+        assert!(worn(Duration::ZERO).is_some());
+        // The first paint gives up on a fetch; its late result is not worn.
+        let slow = begin();
+        assert!(worn(Duration::from_millis(10)).is_none());
+        finish(slow, Worn::Skin(skin, bytes));
+        assert!(worn(Duration::ZERO).is_none());
+    }
+
+    #[test]
     fn md5_is_lowercase_hex() {
         assert_eq!(md5_hex(b""), "d41d8cd98f00b204e9800998ecf8427e");
     }
@@ -307,6 +376,7 @@ mod tests {
         assert_eq!(left, ["a.wmz", "b.wmz", "d.wmz", "notes.txt"]);
     }
 }
+
 /// Reaches archive.org: `cargo test -- --ignored`.
 #[cfg(test)]
 mod net {

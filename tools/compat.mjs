@@ -59,9 +59,15 @@ const FAILED = /failed|could not be worked out|missing image|missing script|cann
 
 let current = "";
 let shape = null;
-const server = preview(PORT, () => current, (msg) => {
-  if (msg.type === "shape") shape = msg;
-});
+let house = false;
+const server = preview(
+  PORT,
+  () => current,
+  (msg) => {
+    if (msg.type === "shape") shape = msg;
+  },
+  () => (house = true),
+);
 
 const profile = join(cache, "edge-profile");
 rmSync(profile, { recursive: true, force: true });
@@ -71,6 +77,7 @@ for (let i = 0; i < 50 && !target; i++) {
   await sleep(200);
   target = await fetch(`http://127.0.0.1:${DEVTOOLS}/json`).then((r) => r.json()).then((t) => t.find((x) => x.type === "page"), () => undefined);
 }
+if (!target) throw new Error(`Edge did not open DevTools on port ${DEVTOOLS}`);
 const ws = new WebSocket(target.webSocketDebuggerUrl);
 await new Promise((r) => ws.addEventListener("open", r));
 let id = 0;
@@ -78,7 +85,10 @@ const pending = new Map();
 let logs = [];
 ws.addEventListener("message", (m) => {
   const msg = JSON.parse(m.data);
-  if (msg.id) return pending.get(msg.id)?.(msg.result ?? {});
+  if (msg.id) {
+    pending.get(msg.id)?.(msg.result ?? {});
+    return pending.delete(msg.id);
+  }
   if (msg.method === "Runtime.consoleAPICalled") logs.push(msg.params.args.map((a) => a.value ?? a.description).join(" "));
   if (msg.method === "Runtime.exceptionThrown") logs.push(`Uncaught ${msg.params.exceptionDetails.exception?.description ?? msg.params.exceptionDetails.text}`);
 });
@@ -96,12 +106,14 @@ for (const f of skins) {
     continue;
   }
   shape = null;
+  house = false;
   logs = [];
   await cdp("Page.navigate", { url: `http://localhost:${PORT}/?play` });
   // Long enough for onLoad, a few timers and the first state messages.
   await sleep(2500);
-  // The page falls back to the house skin when a skin will not load.
-  const error = (await evaluate("document.getElementById('error')?.textContent ?? null")) ?? logs.find((l) => l.includes("wearing the house skin")) ?? null;
+  // The page falls back to the house skin when a skin will not load; the
+  // reason is the warning it logged.
+  const error = (await evaluate("document.getElementById('error')?.textContent ?? null")) ?? (house ? (logs.find((l) => l.startsWith("skin: ")) ?? "the engine could not load it") : null);
   const canvas = await evaluate("(() => { const c = document.querySelector('canvas'); return c ? [c.width, c.height] : null; })()");
   // Key colour left on the canvas would show in the window as pink: a
   // transparency the engine did not cut.

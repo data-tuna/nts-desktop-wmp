@@ -753,8 +753,8 @@
   "status": "partial",
   "notes": [
    "unknown element <visualization>, skipped",
-   "drawer_visualization: toggleEqVis() failed: ReferenceError: toggleEqVis is not defined",
-   "drawer_video: toggleEqVis() failed: ReferenceError: toggleEqVis is not defined"
+   "drawer_video: toggleEqVis() failed: ReferenceError: toggleEqVis is not defined",
+   "drawer_visualization: toggleEqVis() failed: ReferenceError: toggleEqVis is not defined"
   ]
  },
  {
@@ -825,7 +825,7 @@
   "size": 202768,
   "status": "partial",
   "notes": [
-   "shows 36612 pixels of key colour #FF00FF"
+   "shows 36144 pixels of key colour #FF00FF"
   ]
  },
  {

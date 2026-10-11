@@ -72,6 +72,10 @@ const ATTACKS = {
   "__TAURI_INTERNALS__.invoke skin_send (app command)": invoke("skin_send"),
   "__TAURI_INTERNALS__.invoke set_size": invoke("plugin:window|set_size", { label: "main", value: { Logical: { width: 321, height: 123 } } }),
   "__TAURI_INTERNALS__.invoke app version": invoke("plugin:app|version", {}),
+  // The picker's commands (ATA-112): only the picker webview may call them.
+  "__TAURI_INTERNALS__.invoke list_skins": invoke("list_skins", {}),
+  "__TAURI_INTERNALS__.invoke choose_skin": invoke("choose_skin", { path: null }),
+  "__TAURI_INTERNALS__.invoke open_link": invoke("open_link", { url: "https://www.nts.live/supporters" }),
   "forced postMessage fallback": (m) => `(async () => {
     if (!window.__TAURI_INTERNALS__) return "no __TAURI_INTERNALS__";
     const real = window.fetch;

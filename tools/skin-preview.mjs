@@ -40,8 +40,9 @@ const fakeHost = `<script>
 })();
 </script>`;
 
-/** Serves the page and the skin `wmz()` names; each message the skin sends goes to `onMsg`. */
-export function preview(port, wmz, onMsg) {
+/** Serves the page and the skin `wmz()` names; each message the skin sends
+ * goes to `onMsg`, and `onHouse` hears when the page falls back to the house skin. */
+export function preview(port, wmz, onMsg, onHouse = () => {}) {
   return createServer((req, res) => {
     if (req.method === "POST" && req.url === "/msg") {
       let body = "";
@@ -59,7 +60,7 @@ export function preview(port, wmz, onMsg) {
     try {
       const path = new URL(req.url, "http://x").pathname;
       if (path === "/skin.wmz") return res.writeHead(200).end(readFileSync(wmz()));
-      if (path === "/house.wmz") return res.writeHead(200).end(readFileSync(new URL("skins/house/house.wmz", root)));
+      if (path === "/house.wmz") return onHouse(), res.writeHead(200).end(readFileSync(new URL("skins/house/house.wmz", root)));
       if (path === "/engine.js") return res.writeHead(200, { "Content-Type": "text/javascript" }).end(readFileSync(new URL("dist-skin/engine.js", root)));
       if (path !== "/") return res.writeHead(404).end();
       const page = readFileSync(new URL("src/skin/index.html", root), "utf8").replace('<script src="/engine.js">', `${fakeHost}<script src="/engine.js">`);

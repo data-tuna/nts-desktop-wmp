@@ -133,7 +133,11 @@ fn respond(app: &AppHandle, from: &str, req: Request<Vec<u8>>) -> Response<Vec<u
             .body(engine_js())
             .unwrap(),
         (&Method::GET, "/skin.wmz") => skin_file(),
-        (&Method::GET, "/house.wmz") => Response::builder().body(HOUSE_SKIN.to_vec()).unwrap(),
+        // The skin page asks for it when a skin will not load.
+        (&Method::GET, "/house.wmz") => {
+            skins::wear_house();
+            Response::builder().body(HOUSE_SKIN.to_vec()).unwrap()
+        }
         (&Method::POST, "/msg") => match serde_json::from_slice::<FromSkin>(req.body()) {
             Ok(msg) => {
                 handle(app, msg);
@@ -174,11 +178,15 @@ struct SkinList {
     choice: Option<String>,
     /// The skin on the window now; none for the house skin.
     worn: Option<String>,
+    /// Whether a skin is on its way.
+    fetching: bool,
 }
 
 #[derive(serde::Serialize)]
 struct PickerSkin {
     path: String,
+    /// Its archive.org page, the credit.
+    page: String,
     size: u64,
     cached: bool,
 }
@@ -186,18 +194,19 @@ struct PickerSkin {
 /// The picker's list: every skin marked as working.
 #[tauri::command]
 fn list_skins(app: AppHandle) -> SkinList {
+    let (worn, fetching) = skins::status();
     SkinList {
-        skins: skins::list()
-            .iter()
-            .filter(|s| s.status == "works")
+        skins: skins::working()
             .map(|s| PickerSkin {
                 path: s.path.clone(),
+                page: skins::page(s).into(),
                 size: s.size,
                 cached: skins::is_cached(&app, s),
             })
             .collect(),
         choice: skins::choice(&app),
-        worn: skins::worn(Duration::ZERO).map(|(s, _)| s.path.clone()),
+        worn: worn.map(|s| s.path.clone()),
+        fetching,
     }
 }
 

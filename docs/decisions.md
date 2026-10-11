@@ -274,8 +274,11 @@ rather than through Webamp. WMP skins matter as much as the Winamp app does.
   it serves a second later. The first paint waits up to 8 s for it, then
   settles for the house skin while the download finishes into the cache.
   A skin that fails to download, fails its md5, or that the engine cannot
-  load gives the house skin. The cache keeps 100 MB, oldest out first, as
-  the Winamp app's does.
+  load gives the house skin. Only the latest fetch is worn: a launch
+  download that lands after a pick, or after the first paint gave up on
+  it, goes into the cache and nowhere else. The cache keeps 100 MB, oldest
+  out first, as the Winamp app's does; a worn skin is touched on each
+  launch, so a kept one stays.
 - **TLS:** `ureq` with the system's TLS (SChannel on Windows). Its
   `native-tls-no-default` feature panics on every https request (ureq 3.4.2
   checks for the `native-tls` feature), so the dependency uses
@@ -288,8 +291,11 @@ rather than through Webamp. WMP skins matter as much as the Winamp app does.
   `https://www.nts.live/supporters`. It lists the working skins with their
   publisher folder and a link to each skin's archive.org page, notes the
   download size of those not cached, and credits the archive and links to
-  NTS's supporters page. archive.org has no preview per skin, so the
-  picker shows none; picking one puts it on the window.
+  NTS's supporters page. It asks the app every 2 s what is on the window,
+  so it follows a launch download landing or a skin falling back to the
+  house skin. archive.org has no preview per skin, so the picker shows
+  none; picking one puts it on the window. "A random skin on every launch"
+  also puts a new random skin on at once, so the choice shows.
 - **Remembering the choice** (Mika for Ata, 2026-10-11, carried over from
   ATA-109): a skin picked in the picker opens on every launch and downloads
   nothing. "A random skin on every launch" in the picker forgets the
@@ -300,26 +306,26 @@ rather than through Webamp. WMP skins matter as much as the Winamp app does.
 Checked on a release build on a hidden desktop, with `--mute-audio`,
 timing from process start to the skin's first canvas:
 - **Ten launches in a row**, from an empty cache, wore ten different skins
-  and all played NTS 1. Each downloaded its skin and drew in 2.5 to 4.2 s;
-  a launch on a cached skin draws in 1.1 s. An earlier run of ten, before
-  the retry, wore nine (claw twice; that launch took 1.1 s, from the cache).
+  and all played NTS 1. Each downloaded its skin and drew in 2.4 to 4.2 s;
+  a launch on a cached skin draws in 1.1 to 1.3 s. (One earlier run of ten
+  wore nine: claw twice, the second time from the cache in 1.1 s.)
 - **archive.org blocked** (the webview with `--host-resolver-rules="MAP
   archive.org ~NOTFOUND, MAP *.archive.org ~NOTFOUND"`; Rust ignores
   Chromium's flags, so its downloads went to a dead `HTTPS_PROXY`) with an
   empty cache: the house skin, playing, in 6.0 s with the connection
-  refused (two tries), and in 9.7 s with it hanging (the 8 s wait; before
-  the retry).
+  refused (two tries), and in 9.0 s with it hanging (the 8 s wait).
 - **The picker** opened from a right click, listed 59 skins, and put the
-  pick on the window (Kenwood_MPXP, then Television). Relaunches wore it
-  again in 1.1 to 1.3 s with no download. With Kenwood_MPXP removed from
-  the cache and the network blocked, the house skin showed and `skin.json`
-  still named it. "A random skin on every launch" set `{"skin":null}` and
-  the next launches were random again.
-- **Isolation:** `tools/escape.mjs` gives the ATA-107 result on this build.
-  From the skin webview, `list_skins`, `choose_skin` and `open_link` are
-  each refused by the ACL ("not allowed by ACL"), and so is `list_skins`
-  from the trusted page: only the picker's own webview has them. A skin can
-  open the picker (`{ "type": "picker" }`), which is all a right click does.
+  pick on the window (Kenwood_MPXP, Television, Thomas in three runs).
+  Relaunches wore it again in 1.1 to 1.3 s with no download. With the kept
+  skin removed from the cache and the network blocked, the house skin
+  showed and `skin.json` still named it. "A random skin on every launch"
+  set `{"skin":null}` and the next launches were random again.
+- **Isolation:** `tools/escape.mjs` gives the ATA-107 result on this build,
+  and now also tries the picker's commands from the skin: `list_skins`,
+  `choose_skin` and `open_link` are each refused by the ACL, and so is
+  `list_skins` from the trusted page. Only the picker's own webview has
+  them. A skin can open the picker (`{ "type": "picker" }`), which is all
+  a right click does.
 - Not tried: a real right click with a real mouse (the input came through
   DevTools), and the picker's links, which open the default browser.
 
