@@ -14,6 +14,9 @@ export default defineConfig({
   server: {
     port: 1430,
     strictPort: true,
+    // Vite's default CORS lets any *.localhost origin read the dev server,
+    // the skin webview (http://skin.localhost) included.
+    cors: false,
     host: host || false,
     hmr: host
       ? {
