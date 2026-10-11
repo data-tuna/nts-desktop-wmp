@@ -116,6 +116,8 @@ unknown fields included, and refuses requests from any webview but `skin`
 | `{ "type": "seek", "seconds": n }` | accepted, ignored: live streams cannot seek |
 | `{ "type": "drag" }` | Rust: moves the window with the pointer, only while our window is in front and under the pointer with the button down |
 | `{ "type": "shape", "width", "height", "rects": [[x, y, w, h], …] }` | Rust: sizes the window and sets its region. Ignored unless the view is 1–4096 px a side and every run is non-empty and inside it, with at most ceil(width / 2) runs per row |
+| `{ "type": "close" }`, `{ "type": "minimize" }` | Rust: closes or minimizes the window (ATA-110) |
+| `{ "type": "launchUrl", "url": "…" }` | Rust: opens the URL in the default browser, only if it parses as http(s), is at most 2048 characters, and comes 3 s or more after the last one (ATA-110) |
 
 Host to skin: the trusted page calls the `skin_send` command, and Rust
 dispatches a `message` event in the skin webview. Today that is, four times
@@ -185,6 +187,94 @@ A separate app in its own repository, drawing WMP skins with its own engine
 rather than through Webamp. WMP skins matter as much as the Winamp app does.
 
 ## Skins
+
+### The script runtime and the WMP object model (ATA-110, 2026-10-11)
+
+Skins now run their scripts. Written from Microsoft's reference and from
+what the 7 ATA-103 skins call; no code from Webamp Modern.
+
+- **Where scripts run.** In the skin webview, as before, which no capability
+  names. Each file a view's `scriptFile` lists runs as global code (indirect
+  `eval`) inside `with (__wmpScope)`. The scope holds element ids, then
+  `player`, `theme`, `mediacenter` and the `ps*`/`os*` constants; anything
+  else falls through to the global object, where the skin's own functions
+  and variables live. Handlers and `jscript:` attributes run inside a second
+  `with`, for the element's own members (`value`, `down`, `left`). A script
+  that fails to parse is logged, and its literal constants are kept so the
+  layout still works (ATA-108's fallback).
+- **Objects.** `runtime.ts`. WMP's objects are COM objects, so members are
+  case-insensitive (`player.PlayState`). They read the host's state message
+  and send its messages: `player.controls` (play, pause, stop, next,
+  previous), `player.settings` (volume, balance, mute, set locally at once so
+  bindings follow before the host replies), `currentMedia` (the channel's
+  title, `getItemInfo("title")`, `"Type"` is `broadcast`), `currentPlaylist`
+  (NTS 1 and NTS 2, so circle's track number reads 001 or 002), the
+  equalizer's ten `gainLevel`s, `theme.loadPreference`/`savePreference`
+  (per skin, in `localStorage`; an unsaved one reads `"--"`, booleans save as
+  `"True"`/`"False"` as JScript wrote them), and `player.launchURL`. What a
+  radio cannot do returns a safe default: no video (`imageSourceWidth` 0), no
+  DVD, no library, no scanning, no presets. Unknown members are logged once
+  and read as undefined.
+- **Play and open states.** `playing` is psPlaying, `buffering` psBuffering,
+  `reconnecting` psReconnecting, `paused` psPaused, `stopped` psStopped. The
+  open state is osMediaOpen once the host names a channel; a channel switch
+  passes through osMediaChanging. `<player>` fires its `*_onchange` and
+  `playStateChange(NewState)`/`openStateChange(NewState)` handlers, open
+  state first.
+- **Handlers.** `onLoad` (after the scripts, before the first paint),
+  `onTimer` with `timerInterval`, `onClick`, `onDblClick`, `onMouseDown`,
+  `onMouseOver`/`onMouseOut`, `value_onchange` and `onDragEnd` on sliders,
+  `onEndMove` after `moveTo`, `onClose` when the skin closes the window, and
+  `<property>_onchange` whenever a script sets that property. A sticky
+  button's `down` flips before its `onClick` reads it; one whose `down` is
+  bound (`wmpprop:player.settings.mute`) goes back to the binding after. A
+  named transport button still does its own job and then runs its
+  `onClick`; a mute button with an `onClick` mutes through it.
+- **Bindings and expressions.** `wmpprop:` reads the object model or another
+  element (`wmpprop:bgTransports.left`); `wmpenabled:`/`wmpdisabled:` follow
+  the transport. Both, and `jscript:`, are worked out again after every
+  change, so they follow the player and whatever scripts set. A property a
+  script sets wins over the markup.
+- **Resizing.** A script can resize the view (Classic shrinks to 176 px tall
+  while audio plays, as WMP does). Plain numbers then move and stretch by
+  `horizontalAlignment`/`verticalAlignment` (`right`, `bottom`, `center`,
+  `stretch`), by how far the parent has grown since load; `jscript:`
+  geometry is worked out again instead, so the two never add up. An element
+  centred with no position of its own sits in the middle of its parent
+  (Classic's logo). The skin sends a new `shape` whenever its shape changes.
+- **wmploc.dll.** Our own stand-ins, never Microsoft's: `RT_TEXT/#132` is an
+  empty script, since none of the 7 skins calls a function it defines (the
+  `next()`/`previous()` ATA-103 counted are the effects element's own
+  methods); `RT_STRING/#2063` is "Disconnected" and the other ids read empty,
+  so 9SeriesDefault's format strings fall back to the bare value; three 9×9
+  glyphs stand in for the `RT_IMAGE` status icons (playing, paused,
+  stopped).
+- **Painting, revised against the previews.** Three things ATA-108 drew from
+  markup alone turned out wrong once scripts showed more of each skin:
+  - A container's `backgroundColor` lies under everything it holds and shows
+    through its background's `transparencyColor` (bluegrid's black screen).
+    With a `clippingColor` and no `backgroundColor`, that colour is black:
+    circle's digit slots are black, with the digits cut out of the window.
+  - Children with a negative `zIndex` are drawn on the parent's surface, not
+    clipped to their subview: Asimov_Radio's head hangs 160 px below the
+    radio subview that holds it.
+  - `clippingColor` cuts what lies beneath the subview (anemone's visualiser,
+    under the ring that clips it) and its plain children (circle's arrow
+    buttons carry the colour), but not child subviews, which have regions
+    of their own (circle's digits).
+- **Repeated attributes: the last one wins** (reversing ATA-108's "the first
+  wins"). circle's `durationText` has `top="11" … top="63"` and its preview
+  draws it at 63; cerulean's screens repeat `left`/`top`, and only the last
+  values put them where its script expects (`top` 0 is its `scrUp`).
+
+Checked on the 7 skins in the preview tool and on a release build on a
+hidden desktop (`--mute-audio`, the level read from the host's state):
+each opens on the pane its preview shows, shows "NTS 1" and the elapsed
+time where it has a place for them, and plays, stops and changes the volume
+through its own controls. anemone's and cerulean's volume live on panes
+their scripts open (anemone widens to 635 px; cerulean slides its screen up
+with `moveTo`), and were reached through those. `tools/escape.mjs` gives the
+same result as ATA-107.
 
 ### The engine: one canvas, static first (ATA-108, 2026-10-11)
 
