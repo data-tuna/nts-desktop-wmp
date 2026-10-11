@@ -147,9 +147,11 @@ test("a sticky mute button flips down for its onClick, then follows the player a
 
 test("a statement that throws keeps the functions declared below it", () => {
   const { js } = load(`<theme><view width="1" height="1" scriptFile="t.js" onLoad="ThrowLoaded = true;"/></theme>`, {
-    "t.js": "/*\nfunction CommentedOut() {}\n*/\nvar a = 1;\nmediacenter.missing.member;\nfunction DeclaredBelowThrow() { return 7; }",
+    "t.js": "/*\nfunction CommentedOut() {}\n*/\nvar a = 1;\nmediacenter.missing.member;\nfunction DeclaredBelowThrow() { return 7; }\n\tfunction Indented() { function NestedInIndented() {} return 8; }",
   });
   assert.equal(js("DeclaredBelowThrow()"), 7);
+  assert.equal(js("Indented()"), 8, "indented declarations too");
+  assert.equal(js("typeof NestedInIndented"), "undefined", "but not functions nested in them");
   assert.equal(js("ThrowLoaded"), true);
 });
 

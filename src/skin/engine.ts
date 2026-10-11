@@ -719,8 +719,9 @@ export class Skin {
         // Inside the block, a top-level function becomes global only when
         // its declaration is reached; JScript hoists them all. Copy them out
         // first, so a statement that throws loses nothing declared below it
-        // (`typeof`: the scan also finds functions in comments).
-        const hoist = [...code.matchAll(/^function\s+([A-Za-z_$][\w$]*)/gm)].map(([, name]) => `if (typeof ${name} == "function") globalThis.${name} = ${name};`).join(" ");
+        // (`typeof`: the scan also finds functions in comments, and nested ones,
+        // which are not in scope here).
+        const hoist = [...code.matchAll(/^[ \t]*function\s+([A-Za-z_$][\w$]*)/gm)].map(([, name]) => `if (typeof ${name} == "function") globalThis.${name} = ${name};`).join(" ");
         // oxlint-disable-next-line no-eval -- skin code runs in this webview by design (ATA-107)
         (0, eval)(`with (__wmpScope) { ${hoist}\n${code}\n}`);
       } catch (e) {
