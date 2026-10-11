@@ -68,3 +68,25 @@ export function runs(p: Pixels): [number, number, number, number][] {
   }
   return rects;
 }
+
+/** What lies over a visualisation, from the view painted twice with the
+ * visualisation as a solid white box and as a solid black one. `mask`'s
+ * alpha is how much of the visualisation shows at each pixel; `cover` is
+ * everything else there, to be added on top ("lighter"), which is exact
+ * because a visualisation is opaque. Both are straight (not premultiplied)
+ * RGBA, as ImageData holds. */
+export function overlay(white: Uint8ClampedArray, black: Uint8ClampedArray) {
+  const mask = new Uint8ClampedArray(white.length);
+  const cover = new Uint8ClampedArray(white.length);
+  for (let i = 0; i < white.length; i += 4) {
+    const a = black[i + 3];
+    // The visualisation's share: white minus black, premultiplied, in 0..255.
+    const shown = (((white[i] + white[i + 1] + white[i + 2]) * white[i + 3]) / 3 - ((black[i] + black[i + 1] + black[i + 2]) * a) / 3) / 255;
+    mask[i + 3] = shown;
+    const rest = a - shown;
+    if (rest <= 0) continue;
+    for (let c = 0; c < 3; c++) cover[i + c] = (black[i + c] * a) / rest;
+    cover[i + 3] = rest;
+  }
+  return { mask, cover };
+}
