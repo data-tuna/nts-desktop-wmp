@@ -160,7 +160,7 @@ class El {
 
   text(): string {
     const s = this.skin.state;
-    if (this.role === "currentposition") return fmt(s.time);
+    if (this.role === "currentposition") return this.skin.elapsed();
     if (this.role === "status") return s.playing ? "Playing" : "Ready";
     if (this.role === "duration") return "";
     return this.skin.str(this, "value");
@@ -567,7 +567,7 @@ export class Skin {
     if (/^eq\.gainlevel\d+$/.test(p)) return 0;
     const props: Record<string, unknown> = {
       "player.controls.currentposition": this.state.time,
-      "player.controls.currentpositionstring": fmt(this.state.time),
+      "player.controls.currentpositionstring": this.elapsed(),
       "player.currentmedia.duration": 0,
       "player.currentmedia.durationstring": "",
       "player.currentmedia.name": this.state.title,
@@ -576,6 +576,11 @@ export class Skin {
       "player.settings.balance": 0,
     };
     return props[p];
+  }
+
+  /** The elapsed time as WMP shows it: blank while stopped. */
+  elapsed(): string {
+    return this.state.playing ? fmt(this.state.time) : "";
   }
 
   /** Whether a named transport control is enabled, or null for other names.
