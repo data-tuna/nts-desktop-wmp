@@ -113,16 +113,17 @@ setInterval(() => {
 // while the window is minimised, so requestAnimationFrame, and the frames,
 // stop then.
 const spectrum = new Uint8Array(visAnalyser.frequencyBinCount);
-// The scope shows the first 2048 samples (43 ms): the whole 8192 would alias at 96 points.
-const wave = new Uint8Array(2048);
+const wave = new Uint8Array(visAnalyser.fftSize);
 let lastFrame = 0;
 function visFrame(now: number) {
   requestAnimationFrame(visFrame);
   if (!effectsOn || player.state().playState !== "playing" || now - lastFrame < 30) return;
   lastFrame = now;
   visAnalyser.getByteFrequencyData(spectrum);
+  // The scope shows the newest 2048 samples (43 ms at 48 kHz): all 8192
+  // would alias at 96 points, and a shorter buffer gets the oldest ones.
   visAnalyser.getByteTimeDomainData(wave);
-  const msg = { type: "vis", bars: bands(spectrum, ctx.sampleRate, 32), wave: samples(wave, 96) };
+  const msg = { type: "vis", bars: bands(spectrum, ctx.sampleRate, 32), wave: samples(wave.subarray(-2048), 96) };
   void invoke("skin_send", { msg }).catch(() => {});
 }
 requestAnimationFrame(visFrame);
