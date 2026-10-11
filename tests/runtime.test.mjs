@@ -6,8 +6,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
+// Pointer listeners, so a test can click: the skin's canvas registers last.
+const listeners = {};
+const listen = (type, f) => (listeners[type] = f);
 function canvas() {
-  const c = { width: 0, height: 0, style: {}, title: "", addEventListener() {}, getBoundingClientRect: () => ({ left: 0, top: 0, width: c.width, height: c.height }) };
+  const c = { width: 0, height: 0, style: {}, title: "", addEventListener: listen, getBoundingClientRect: () => ({ left: 0, top: 0, width: c.width, height: c.height }) };
   const g = new Proxy(
     { canvas: c },
     {
@@ -27,7 +30,7 @@ const store = new Map();
 Object.assign(globalThis, {
   document: { createElement: canvas },
   window: globalThis,
-  addEventListener() {},
+  addEventListener: listen,
   requestAnimationFrame: () => 0,
   ImageData: class {},
   localStorage: { getItem: (k) => store.get(k) ?? null, setItem: (k, v) => store.set(k, String(v)) },
@@ -122,6 +125,24 @@ test("a handler sees its element's own members first, case-insensitively", () =>
   assert.deepEqual(js("seen"), ["Hi", false, CONSTANTS.psStopped]);
   js("b.Down = true");
   assert.deepEqual(js("[b.UPTOOLTIP, b.down]"), ["Hi", true]);
+});
+
+test("a sticky mute button flips down for its onClick, then follows the player again", async () => {
+  const { js, set } = load(`<theme><view width="20" height="20">
+       <muteButton id="m" left="0" top="0" width="20" height="20" sticky="true" onclick="seen = down;"/>
+     </view></theme>`);
+  const click = () => {
+    const at = { button: 0, clientX: 5, clientY: 5 };
+    listeners.mousedown(at);
+    listeners.mouseup(at);
+  };
+  click();
+  assert.equal(js("seen"), true, "onClick reads the flipped state");
+  set({ mute: true });
+  set({ mute: false });
+  assert.equal(js("m.down"), false, "the player's mute shows again after the click");
+  set({ mute: true });
+  assert.equal(js("m.down"), true);
 });
 
 test("the player objects send the protocol's messages and update bindings at once", () => {

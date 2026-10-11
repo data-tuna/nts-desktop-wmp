@@ -619,6 +619,7 @@ export class Skin {
   /** player.openState: open once the host names a channel. */
   openState = 0;
   private started = false;
+  private players: El[] = [];
   private compiled = new Map<string, (...args: unknown[]) => unknown>();
   private keyCache = new WeakMap<Img, Map<string, HTMLCanvasElement>>();
   private resImages = new Map<string, Img | undefined>();
@@ -722,6 +723,7 @@ export class Skin {
     }
     // Geometry as it is at load, for alignment.
     for (const e of this.view.all()) for (const name of ["left", "top", "width", "height"] as const) if (e.kind !== "none") e.geo(name);
+    this.players = [...this.view.all()].filter((e) => e.node.tag === "player");
     this.started = true;
     this.openState = this.state.title ? OS_MEDIA_OPEN : 0;
     this.fire(this.view, "onload");
@@ -1000,10 +1002,11 @@ export class Skin {
   }
 
   /** Something scripts or the player changed: work geometry out again,
-   * and repaint (and reshape the window) once the current handler is done. */
-  changed() {
+   * and repaint (and reshape the window, unless only the clock moved) once
+   * the current handler is done. */
+  changed(reshape = true) {
     this.gen++;
-    this.shapeMask = null;
+    if (reshape) this.shapeMask = null;
     if (this.painting) return;
     this.painting = true;
     queueMicrotask(() => {
@@ -1063,8 +1066,9 @@ export class Skin {
     const before = { ps: playState(old.playState), status: this.status(), title: old.title, channel: old.channel };
     this.state = s;
     // Repaint for what skins show, not for the level or a sub-second clock.
-    const shown = (t: State) => JSON.stringify([t.playState, t.title, Math.floor(t.time), t.volume, t.mute, t.balance, t.eq]);
+    const shown = (t: State) => JSON.stringify([t.playState, t.title, t.volume, t.mute, t.balance, t.eq]);
     if (shown(old) !== shown(s)) this.changed();
+    else if (Math.floor(old.time) !== Math.floor(s.time)) this.changed(false);
     if (this.started) this.events(before);
   }
 
@@ -1072,7 +1076,7 @@ export class Skin {
    * the open state, then the play state. A channel switch passes through
    * osMediaChanging, as a new item does in WMP. */
   private events(before: { ps: number; status: string; title: string; channel: number }) {
-    const players = [...this.view.all()].filter((e) => e.node.tag === "player");
+    const players = this.players;
     const fire = (name: string, value?: unknown) => {
       for (const p of players) {
         this.fire(p, `${name}_onchange`);
@@ -1159,10 +1163,11 @@ export class Skin {
       else {
         const inside = this.at(ev) === e;
         // A sticky button toggles its down property on a click, before its
-        // onClick reads it. One whose down is bound (`wmpprop:`) goes back
-        // to the binding after the handler, which has set what it shows.
-        const bound = BINDING.test(e.attr("down") ?? "");
-        if (inside && this.bool(e, "sticky", false)) e.props.set("down", !this.wasDown);
+        // onClick reads it. One whose down follows the player (a `wmpprop:`
+        // binding, or a mute button's own) goes back to it after the
+        // handler, which has set what it shows.
+        const bound = BINDING.test(e.attr("down") ?? "") || (e.role === "mute" && !e.has("down"));
+        if (inside && this.bool(e, "sticky", false)) this.setProp(e, "down", !this.wasDown);
         if (inside) this.click(e);
         if (bound) e.props.delete("down");
       }

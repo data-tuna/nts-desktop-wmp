@@ -285,7 +285,7 @@ against the 7 ATA-103 skins; no code from Webamp Modern.
   platform's `DecompressionStream`, so Rust only serves bytes and no zip
   library ships. File names are looked up lower-cased.
 - **Parse.** A forgiving tokenizer, not `DOMParser`: real skins repeat
-  attributes (the first wins), put raw `&&` and `<` in script attributes, and
+  attributes (the first wins; reversed in ATA-110), put raw `&&` and `<` in script attributes, and
   close `<buttonGroup>` with `</buttongroup>`.
 - **Paint.** Everything is painted back to front on one canvas the size of
   the view. A subview is drawn on its own layer: children with a negative
