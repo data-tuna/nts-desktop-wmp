@@ -4,7 +4,7 @@
   skin code will run, in the "skin" webview at http://skin.localhost, and
   talks to the trusted page only through the protocol in docs/decisions.md.
   It draws the skin's background.bmp, cuts the window to its
-  transparencyColor, and sends play, stop and volume.
+  transparencyColor, and sends the player commands (ATA-109).
 -->
 <html lang="en">
   <head>
@@ -12,28 +12,38 @@
     <style>
       html, body { margin: 0; overflow: hidden; background: #000; user-select: none; }
       canvas { display: block; }
-      #controls { position: absolute; left: 50px; top: 150px; display: flex; gap: 4px; align-items: center; }
-      #state { position: absolute; left: 50px; top: 178px; color: #9cf; font: 11px/1.4 Tahoma, sans-serif; white-space: pre; }
-      button { font: 11px Tahoma, sans-serif; }
-      input { width: 60px; }
+      #controls { position: absolute; left: 40px; top: 128px; display: flex; flex-wrap: wrap; width: 170px; gap: 2px 3px; align-items: center; }
+      #state { position: absolute; left: 40px; top: 178px; color: #9cf; font: 11px/1.4 Tahoma, sans-serif; white-space: pre; }
+      button, label { font: 10px Tahoma, sans-serif; color: #9cf; }
+      button { color: #000; padding: 0 3px; }
+      #volume { width: 50px; }
+      #seek { width: 60px; }
+      /* A live stream has no length: the seek bar sits disabled at the start. */
+      #seek:disabled { opacity: 0.4; }
     </style>
   </head>
   <body>
     <canvas id="bg"></canvas>
     <div id="state">waiting for the host</div>
     <div id="controls">
+      <button id="previous" aria-label="Previous channel">|&lt;</button>
       <button id="play">Play</button>
+      <button id="pause">Pause</button>
       <button id="stop">Stop</button>
+      <button id="next" aria-label="Next channel">&gt;|</button>
+      <input id="seek" type="range" min="0" max="1" value="0" disabled aria-label="Seek" />
       <input id="volume" type="range" min="0" max="100" value="80" aria-label="Volume" />
+      <label><input id="mute" type="checkbox" />Mute</label>
     </div>
     <script>
       // Skin to host: a POST the Rust protocol handler checks against a fixed
       // list of messages. Host to skin: "message" events with { type: "state" }.
       const send = (msg) => fetch("/msg", { method: "POST", body: JSON.stringify(msg) });
 
-      document.getElementById("play").onclick = () => send({ type: "play" });
-      document.getElementById("stop").onclick = () => send({ type: "stop" });
+      for (const type of ["play", "pause", "stop", "next", "previous"])
+        document.getElementById(type).onclick = () => send({ type });
       document.getElementById("volume").oninput = (e) => send({ type: "volume", value: e.target.value / 100 });
+      document.getElementById("mute").onchange = (e) => send({ type: "mute", value: e.target.checked });
 
       // Dragging by the body: anywhere that is not a control.
       document.addEventListener("mousedown", (e) => {
@@ -43,8 +53,12 @@
       window.addEventListener("message", (e) => {
         const s = e.data;
         if (s?.type !== "state") return;
-        document.getElementById("state").textContent =
-          `${s.title}  ${s.playing ? "Playing" : "Stopped"} ${fmt(s.time)}  level ${s.level.toFixed(2)}`;
+        document.getElementById("state").textContent = `${s.title}  ${s.playState} ${fmt(s.time)}  level ${s.level.toFixed(2)}`;
+        // The host's saved settings, unless the listener is using the control.
+        const volume = document.getElementById("volume");
+        if (document.activeElement !== volume) volume.value = Math.round(s.volume * 100);
+        document.getElementById("mute").checked = s.mute;
+        document.getElementById("seek").disabled = !(s.duration > 0);
       });
       const fmt = (t) => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, "0")}`;
 
