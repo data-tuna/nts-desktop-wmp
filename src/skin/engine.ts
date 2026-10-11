@@ -1,6 +1,7 @@
 // The skin engine, static half: draws a skin's first view as it looks before
-// any of its scripts run, and drives the player through the named controls. Scripts, `wmpprop:` bindings beyond the player's own state, and
-// the WMP object model come with the script runtime (ATA-110).
+// any of its scripts run, and drives the player through the named controls.
+// Scripts, `wmpprop:` bindings beyond the player's own state, and the WMP
+// object model come with the script runtime (ATA-110).
 //
 // Everything is painted back to front on one canvas the size of the view, so
 // the window shape is the opaque pixels of the skin's images, and a subview's
@@ -73,6 +74,8 @@ class El {
     // A plain slider bound to the volume is a volume slider, and so on.
     const bound = /^wmpprop:player\.(?:settings\.(volume|balance)|controls\.(currentposition))$/i.exec(node.attrs.value ?? "");
     this.role = bound ? (bound[1] ?? "seek").toLowerCase() : node.tag.replace(/(button|element|slider|text)$/, "");
+    // A button whose down state is the player's mute is a mute button (9SeriesDefault's bMute).
+    if (/^wmpprop:player\.settings\.mute$/i.test(node.attrs.down ?? "")) this.role = "mute";
     if (NOT_YET.has(node.tag)) skin.log(`<${node.tag}> is not drawn yet`);
     if (this.kind === "none" || this.kind === "element" && parent?.kind !== "group") return;
     const adopt = (child: Node) => {
@@ -207,8 +210,15 @@ class El {
     return { from: border, span: Math.max(0, length - 2 * border - t), thumb };
   }
 
+  /** Pressed, or held down: by a sticky click, or by the player's mute or a
+   * `down` binding, which then win over clicks. */
+  shownDown(): boolean {
+    if (this.role === "mute") return this.down || this.skin.state.mute;
+    return this.down || (this.attr("down") !== undefined && this.skin.bool(this, "down", false));
+  }
+
   tooltip(): string {
-    return (this.down && this.attr("downtooltip")) || this.attr("uptooltip") || this.attr("tooltip") || "";
+    return (this.shownDown() && this.attr("downtooltip")) || this.attr("uptooltip") || this.attr("tooltip") || "";
   }
 
   interactive(): boolean {
@@ -219,8 +229,8 @@ class El {
   stateImage(owner: El): Img | undefined {
     const pick = (...names: string[]) => names.map((n) => owner.img(n)).find(Boolean);
     if (!this.enabled) return pick("disabledimage", "image");
-    if (this.down && this.hover) return pick("hoverdownimage", "downimage", "image");
-    if (this.down) return pick("downimage", "image");
+    if (this.shownDown() && this.hover) return pick("hoverdownimage", "downimage", "image");
+    if (this.shownDown()) return pick("downimage", "image");
     if (this.hover) return pick("hoverimage", "image");
     return pick("image");
   }
@@ -602,7 +612,8 @@ export class Skin {
     return p === "stopped" ? "Ready" : p[0].toUpperCase() + p.slice(1);
   }
 
-  /** The elapsed time as WMP shows it: blank while stopped or paused. */
+  /** The elapsed time: blank while stopped, as in WMP, and while paused,
+   * because pausing drops the stream (player.ts) and its clock reads 0. */
   elapsed(): string {
     return this.playing ? fmt(this.state.time) : "";
   }
@@ -807,8 +818,9 @@ export class Skin {
       } else {
         const sticky = this.bool(e, "sticky", false);
         const inside = this.at(ev) === e;
-        // A sticky button toggles on a click and keeps its state otherwise.
-        e.down = sticky && (inside ? !this.wasDown : this.wasDown);
+        // A sticky button toggles on a click and keeps its state otherwise;
+        // one with a `down` binding shows the binding instead.
+        e.down = e.attr("down") === undefined && e.role !== "mute" && sticky && (inside ? !this.wasDown : this.wasDown);
         if (inside) this.click(e);
       }
       this.paint();

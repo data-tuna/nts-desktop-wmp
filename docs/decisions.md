@@ -226,7 +226,10 @@ against the 7 ATA-103 skins; no code from Webamp Modern.
   the opposite of the host's mute. Sliders bound to the volume or balance,
   named or not, start at the host's saved values and send `volume` and
   `balance`, scaled from the slider's own range; EQ sliders show the saved
-  gains. The elapsed time is blank while stopped or paused, as in WMP.
+  gains. A button whose `down` is bound to `player.settings.mute`
+  (9SeriesDefault's) is a mute button, and draws pressed only while the
+  host is muted. The elapsed time is blank while stopped, as in WMP, and
+  while paused, because pausing drops the stream and its clock reads 0.
 
 ### Source: archive.org, one per launch, a compatibility list (proposed by Lama, confirmed by Ata, 2026-10-10)
 
