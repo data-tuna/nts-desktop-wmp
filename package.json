@@ -14,9 +14,11 @@
     "check": "npm run lint && npm run build && npm test",
     "tauri": "tauri",
     "test": "node --test \"tests/*.test.mjs\"",
-    "build:skin": "vite build --config vite.skin.config.ts"
+    "build:skin": "vite build --config vite.skin.config.ts",
+    "build:house": "node skins/house/build.mjs"
   },
   "devDependencies": {
+    "@resvg/resvg-js": "^2.6.2",
     "@tauri-apps/cli": "^2",
     "oxlint": "^1.87.0",
     "typescript": "~6.0.3",

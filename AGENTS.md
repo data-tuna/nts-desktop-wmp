@@ -42,6 +42,11 @@ Written in English.
                           is the WMP object model the scripts see, pixels.ts
                           holds the pixel helpers its tests share. main.ts is
                           the entry; index.html the page.
+    skins/house/          The house skin, the one skin that ships: house.wms,
+                          the layered SVGs in art/ it is drawn from, build.mjs
+                          that renders them to bitmaps and zips house.wmz,
+                          and house.wmz itself, committed and built into the
+                          binary.
     src-tauri/            The Rust shell (Tauri 2). Window config in tauri.conf.json,
                           permissions in capabilities/.
     src-tauri/icons/      App icons. For now the Winamp app's pixel-art radio.
@@ -58,6 +63,7 @@ Written in English.
     npm run lint          oxlint, warnings fail
     npm run build         Frontend only: dist/, and the skin engine in dist-skin/
     npm run build:skin    The skin engine alone (dist-skin/engine.js)
+    npm run build:house   Rebuild skins/house/house.wmz from its sources
     npm test              node --test on tests/ (Node 22.18+ runs the .ts imports)
     npm run check         lint + typecheck + build + test; CI runs this plus cargo fmt
     npm run tauri build   Release binary and the NSIS installer (slow, minutes)
@@ -102,8 +108,8 @@ come from the archive.org item `windowsmediaplayerskinsarchive`, are cached on
 the user's machine, and never enter this repository or the installer
 (`.gitignore` blocks `*.wmz`). The repository may hold a compatibility list of
 skin names and checksums, never the skins. The only skin that ships is our
-own house skin. Be polite to archive.org: one skin per launch, no bulk
-downloads.
+own house skin, `skins/house/`, the one `.wmz` the repository holds. Be
+polite to archive.org: one skin per launch, no bulk downloads.
 
 **Skin scripts never run where they can reach Tauri.** A skin's JScript is
 untrusted code. It runs only in the `skin` webview, which no capability
@@ -168,14 +174,22 @@ variables land on the skin webview's global object, where handlers and
 `jscript:` attributes find them, and `eval("eq" + i + ".down = …")` inside a
 skin function still sees element ids. Each file first copies its top-level
 functions to the global object: inside the `with` block they would
-otherwise appear only when execution reaches them. Element members are case-insensitive,
-as COM's are, but handler attributes are not members: `onLoad="OnLoad();"`
-must reach the function, not the attribute. Two skins never share a webview,
+otherwise appear only when execution reaches them. Element members are
+case-insensitive, as COM's are, but handler attributes are not members:
+`onLoad="OnLoad();"` must reach the function, not the attribute. Two skins never share a webview,
 so their globals never meet.
 
 **Node's `TextDecoder("windows-1252")` is Latin-1.** It gets 0x80-0x9F
 wrong (`€`, curly quotes), so `wms.ts` maps that range itself. WebView2 gets
 it right, which is why only the tests would notice.
+
+**The house skin's bitmaps are built, never edited.** Change an SVG in
+`skins/house/art/` or `house.wms`, run `npm run build:house`, and commit
+`house.wmz` with it; a test fails when they disagree. Anything that touches
+the key colour (`#FF00FF`) must have crisp edges (`shape-rendering=
+"crispEdges"`, or sit 1.5 px inside a crisp shape): a smoothed edge blends
+into it and leaves a pink fringe the transparency key cannot remove. The
+build refuses pixels that are not opaque.
 
 **`tauri dev` needs port 1430 free.** Vite runs with `strictPort`, so a
 leftover dev server makes the next launch fail rather than pick another port.
@@ -212,7 +226,7 @@ Start it with WebView2's DevTools port open. The variable replaces the
 browser arguments in `tauri.conf.json`, so repeat them:
 
     $env:WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS = "--remote-debugging-port=9355 --disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection --autoplay-policy=no-user-gesture-required"
-    $env:NTS_WMP_SKIN = "C:\path\to\a\skin.wmz"      the skin to draw
+    $env:NTS_WMP_SKIN = "C:\path\to\a\skin.wmz"      the skin to draw; unset, the house skin
     npm run tauri dev
 
 or, to keep the window off the screen entirely, start the built exe on a
@@ -283,8 +297,9 @@ build, the tests and `cargo fmt --check`.
 `theme.currentViewID` are logged and ignored, so circle's video, playlist
 and settings views and 9SeriesDefault's compact view never open.
 
-**Playlists, video and popups are not drawn,** and the visualiser is a black
-placeholder (ATA-114). Their methods (`setColumnResizeMode`, the effects'
+**Video, item and drop-down playlists, and popups are not drawn,** and the
+visualiser is a black placeholder (ATA-114). `<playlist>` lists the two
+channels only. Their methods (`setColumnResizeMode`, the effects'
 `next`/`previous`, `appendItem`) are logged and do nothing. 9SeriesDefault's
 screen is black where WMP showed navy: that colour is WMP's visualiser's.
 
@@ -294,3 +309,6 @@ has no length.
 **A skin's `onClose` runs only when it closes the window itself** (its close
 button or `view.close()`), not when Windows closes the app, so preferences a
 skin saves there may not be saved.
+
+**The house skin has no close or minimize button yet,** though the skin
+protocol now has messages for both (ATA-110).

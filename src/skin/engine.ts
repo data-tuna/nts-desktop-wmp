@@ -5,6 +5,7 @@
 // the window shape is the opaque pixels of the skin's images, and a subview's
 // clippingColor is a compositing step. Element semantics follow Microsoft's
 // skin reference (learn.microsoft.com/windows/win32/wmp/skin-programming-reference).
+import { CHANNELS } from "../player.ts";
 import { constants, type Node } from "./wms.ts";
 import { css, keyed, mappedElement, parseColor, rgbAt, runs, type Pixels } from "./pixels.ts";
 import { CONSTANTS, OS_MEDIA_CHANGING, OS_MEDIA_OPEN, objects, playState, resImage, resScript, resString, wmpObject, type Host } from "./runtime.ts";
@@ -25,10 +26,10 @@ export type State = {
 };
 export type Send = (msg: { type: string; [k: string]: unknown }) => void;
 
-type Kind = "container" | "button" | "group" | "element" | "slider" | "custom" | "progress" | "text" | "effects" | "none";
+type Kind = "container" | "button" | "group" | "element" | "slider" | "custom" | "progress" | "text" | "effects" | "playlist" | "none";
 
-// Drawn later or never: video and playlists need media, popups need menus.
-const NOT_YET = new Set(["video", "wmpvideo", "playlist", "itemsplaylist", "dropdownplaylist", "popup"]);
+// Drawn later or never: video needs media, the other playlists and popups need menus.
+const NOT_YET = new Set(["video", "wmpvideo", "itemsplaylist", "dropdownplaylist", "popup"]);
 // Elements with nothing to draw.
 const SILENT = new Set(["player", "network", "mediacenter", "equalizersettings", "videosettings", "theme"]);
 
@@ -38,6 +39,7 @@ function kindOf(tag: string): Kind {
   if (tag === "customslider") return "custom";
   if (tag === "progressbar") return "progress";
   if (tag === "effects" || tag === "wmpeffects") return "effects";
+  if (tag === "playlist") return "playlist";
   if (tag.endsWith("button")) return "button"; // button, imagebutton, playbutton, …
   if (tag.endsWith("element")) return "element"; // buttonelement, playelement, …
   if (tag.endsWith("slider")) return "slider"; // slider, seekslider, volumeslider, …
@@ -291,8 +293,8 @@ class El {
   // Painting. `g` has its origin at the parent's top-left.
   paint(g: CanvasRenderingContext2D) {
     if (!this.visible || this.kind === "none" || this.kind === "element") return;
-    // Visualisations and text are drawn inside the window's shape, not part of it.
-    if (this.skin.shaping && (this.kind === "effects" || this.kind === "text")) return;
+    // Visualisations, text and the playlist are drawn inside the window's shape, not part of it.
+    if (this.skin.shaping && (this.kind === "effects" || this.kind === "text" || this.kind === "playlist")) return;
     const alpha = this.skin.num(this, "alphablend");
     g.save();
     if (alpha !== null) g.globalAlpha = Math.min(1, Math.max(0, alpha / 255));
@@ -303,6 +305,7 @@ class El {
     else if (this.kind === "custom") this.paintCustom(g);
     else if (this.kind === "progress") this.paintProgress(g);
     else if (this.kind === "text") this.paintText(g);
+    else if (this.kind === "playlist") this.paintPlaylist(g);
     else if (this.kind === "effects") {
       // ponytail: a black placeholder until the visualisations (ATA-114).
       g.fillStyle = css(this.color("backgroundcolor") ?? 0);
@@ -325,33 +328,36 @@ class El {
     // slots show); children with a negative zIndex, on the parent's surface
     // and not clipped to this one (Asimov_Radio's head hangs below the radio
     // that holds it); the background with its holes; the other children.
-    const color = !this.has("backgroundcolor") && this.has("clippingcolor") && this.has("backgroundimage") ? 0 : this.color("backgroundcolor");
-    g.save();
-    g.translate(this.x, this.y);
-    if (color !== null) {
-      g.fillStyle = css(color);
-      g.fillRect(0, 0, w, h);
-    }
-    for (const kid of this.kids) if (kid.z < 0) kid.paint(g);
-    g.restore();
     const bg = this.img("backgroundimage");
     const clipColor = this.color("clippingcolor");
     const clipImg = this.img("clippingimage") ?? bg;
     const clip = clipColor !== null && clipImg ? this.skin.maskImage(clipImg, [clipColor]) : null;
-    const cut = (c: CanvasRenderingContext2D, x = 0, y = 0) => {
+    const cut = (c: CanvasRenderingContext2D) => {
       if (!clip) return;
       c.save();
       c.globalCompositeOperation = "destination-out";
-      c.drawImage(clip, x, y);
+      c.drawImage(clip, 0, 0);
       c.restore();
     };
-    // clippingColor cuts the window: whatever lies beneath (anemone's
-    // visualiser, under the subview whose ring clips it), the background,
-    // and the plain children (circle's arrow buttons carry the colour). A
-    // child subview has a region of its own and is not cut (circle's
-    // digits sit in a clipped slot). Children are painted in order, the
-    // plain ones in runs that are cut before the next subview goes on.
-    cut(g, this.x, this.y);
+    const color = !this.has("backgroundcolor") && clip ? 0 : this.color("backgroundcolor");
+    if (color !== null) {
+      // Inside this subview's own region only: the house skin's dial sits
+      // on the body's ring, which shows round the dial's clipped corners.
+      const fill = this.canvas("fill", w, h);
+      fill.fillStyle = css(color);
+      fill.fillRect(0, 0, w, h);
+      cut(fill);
+      g.drawImage(fill.canvas, this.x, this.y);
+    }
+    g.save();
+    g.translate(this.x, this.y);
+    for (const kid of this.kids) if (kid.z < 0) kid.paint(g);
+    g.restore();
+    // clippingColor cuts the background and the plain children (circle's
+    // arrow buttons carry the colour), but not a child subview, which has a
+    // region of its own (circle's digits sit in a clipped slot). Children
+    // are painted in order, the plain ones in runs that are cut before the
+    // next subview goes on.
     const layer = this.canvas("layer", w, h);
     const run = this.canvas("run", w, h);
     const flush = () => {
@@ -506,6 +512,44 @@ class El {
     }
     g.fillText(text, left, y + 1);
     if (this.skin.str(this, "fontstyle").toLowerCase().includes("underline")) g.fillRect(left, y + this.fontPx() + 1, width, 1);
+  }
+
+  /** The playlist's row height, in px. */
+  private rowHeight(): number {
+    return Math.round(this.fontPx() * 2);
+  }
+
+  /** The playlist row under a point in the parent's coordinates, or -1. */
+  rowAt(py: number): number {
+    const i = Math.floor((py - this.y) / this.rowHeight());
+    return i >= 0 && i < CHANNELS.length ? i : -1;
+  }
+
+  /** The playlist: the channels, one row each, the current one in the
+   * playing colours. */
+  private paintPlaylist(g: CanvasRenderingContext2D) {
+    const { x, y, w, h } = this;
+    const bg = this.color("backgroundcolor");
+    if (bg !== null) {
+      g.fillStyle = css(bg);
+      g.fillRect(x, y, w, h);
+    }
+    g.beginPath();
+    g.rect(x, y, w, h);
+    g.clip();
+    g.font = this.font();
+    g.textBaseline = "middle";
+    const row = this.rowHeight();
+    CHANNELS.forEach(({ title }, i) => {
+      const playing = i === this.skin.state.channel;
+      const rowBg = playing ? this.color("itemplayingbackgroundcolor") : null;
+      if (rowBg !== null) {
+        g.fillStyle = css(rowBg);
+        g.fillRect(x, y + i * row, w, row);
+      }
+      g.fillStyle = css((playing ? this.color("itemplayingcolor") : null) ?? this.color("foregroundcolor") ?? 0xffffff);
+      g.fillText(title, x + 6, y + i * row + row / 2);
+    });
   }
 
   // Hit testing, in the parent's coordinates. Returns the topmost interactive
@@ -706,6 +750,8 @@ export class Skin {
   /** Runs the view's scripts and its onLoad, starts its timer, and paints. */
   start() {
     const files = (this.view.attr("scriptfile") ?? "").split(";").map((f) => f.trim()).filter(Boolean);
+    // What skin code sees; also what DevTools can read (AGENTS.md).
+    (globalThis as Record<string, unknown>).__wmpScope = this.scope;
     for (const file of files) {
       const code = resScript(file) ?? this.scripts.get(file.replace(/^.*[\\/]/, "").toLowerCase());
       if (code === undefined) {
@@ -715,7 +761,6 @@ export class Skin {
       try {
         // Global code, so the skin's functions and variables are shared by
         // its files, its handlers and its attributes, as in WMP.
-        (globalThis as Record<string, unknown>).__wmpScope = this.scope;
         // Inside the block, a top-level function becomes global only when
         // its declaration is reached; JScript hoists them all. Copy them out
         // first, so a statement that throws loses nothing declared below it
@@ -1078,7 +1123,7 @@ export class Skin {
     const before = { ps: playState(old.playState), status: this.status(), title: old.title, channel: old.channel };
     this.state = s;
     // Repaint for what skins show, not for the level or a sub-second clock.
-    const shown = (t: State) => JSON.stringify([t.playState, t.title, t.volume, t.mute, t.balance, t.eq]);
+    const shown = (t: State) => JSON.stringify([t.playState, t.channel, t.title, t.volume, t.mute, t.balance, t.eq]);
     if (shown(old) !== shown(s)) this.changed();
     else if (Math.floor(old.time) !== Math.floor(s.time)) this.changed(false);
     if (this.started) this.events(before);
@@ -1157,6 +1202,8 @@ export class Skin {
         found.down = true;
         this.fire(found, "onmousedown");
         this.paint();
+      } else if (found?.kind === "playlist") {
+        this.pick(found, ev);
       } else if (found || this.opaque(ev)) {
         // The body of the skin: move the window.
         this.send({ type: "drag" });
@@ -1240,6 +1287,18 @@ export class Skin {
     } finally {
       this.userAction = false;
     }
+  }
+
+  /** A click on a playlist row selects that channel: the player's next and
+   * previous step through the channels, playing if it was playing. */
+  private pick(list: El, ev: MouseEvent) {
+    const i = list.rowAt(this.point(ev)[1] - list.origin()[1]);
+    if (i < 0) return;
+    const steps = (i - this.state.channel + CHANNELS.length) % CHANNELS.length;
+    for (let n = 0; n < steps; n++) this.send({ type: "next" });
+    // Set locally too, so a second click before the host's next state does not step again.
+    this.state.channel = i;
+    this.paint();
   }
 
   private click(e: El) {
