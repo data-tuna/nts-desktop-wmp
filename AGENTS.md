@@ -356,10 +356,6 @@ a Stop media key, stops the player, and WebView2 then drops the session, so
 the Play key cannot start it again: use the window or the tray. Pause, and
 Stop from the skin or the tray, keep the session.
 
-**A paused stream keeps its connection.** Pause and stop keep the
-`<audio>` src so the session survives; WebView2 buffers about 2 MB, then
-the connection stalls until Play loads the stream afresh.
-
 **A launch while the app is closing does nothing.** The closing copy still
 holds the single-instance lock, so the new one hands over to it and exits.
 

@@ -324,11 +324,19 @@ fn handle(app: &AppHandle, msg: FromSkin) {
             rects,
         } => {
             if valid_shape(width, height, &rects) {
+                let resized = window
+                    .inner_size()
+                    .and_then(|s| Ok(s.to_logical::<u32>(window.scale_factor()?)))
+                    .is_ok_and(|s| (s.width, s.height) != (width, height));
                 let _ = window.set_size(LogicalSize::new(width, height));
                 #[cfg(windows)]
                 win32::apply(&window, rects);
-                // A bigger skin can push a remembered position off screen.
-                let _ = pull_on_screen(&window);
+                // A bigger skin can push a remembered position off screen. Only
+                // on a new size: a mask change must not move a window the
+                // listener parked partly off screen.
+                if resized {
+                    let _ = pull_on_screen(&window);
+                }
             }
         }
         FromSkin::Close {} => {
@@ -512,7 +520,8 @@ async fn now_playing(app: AppHandle, title: String, credit: Option<Credit>) -> R
     match &credit {
         Some(c) => {
             tray.credit
-                .set_text(credit_text(c))
+                // A lone & in a menu item marks a mnemonic: "Rhythm & Sound" needs &&.
+                .set_text(credit_text(c).replace('&', "&&"))
                 .map_err(|e| e.to_string())?;
             if !had {
                 let _ = tray.menu.insert(&tray.credit, 5);

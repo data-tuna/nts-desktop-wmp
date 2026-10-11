@@ -76,6 +76,11 @@ const ATTACKS = {
   "__TAURI_INTERNALS__.invoke list_skins": invoke("list_skins", {}),
   "__TAURI_INTERNALS__.invoke choose_skin": invoke("choose_skin", { path: null }),
   "__TAURI_INTERNALS__.invoke open_link": invoke("open_link", { url: "https://www.nts.live/supporters" }),
+  // The trusted page's and the credit's commands (ATA-115).
+  "__TAURI_INTERNALS__.invoke now_playing": invoke("now_playing", { title: "escaped", credit: null }),
+  "__TAURI_INTERNALS__.invoke credit": invoke("credit", {}),
+  "__TAURI_INTERNALS__.invoke credit_size": invoke("credit_size", { width: 4096 }),
+  "__TAURI_INTERNALS__.invoke open_credit": invoke("open_credit", {}),
   "forced postMessage fallback": (m) => `(async () => {
     if (!window.__TAURI_INTERNALS__) return "no __TAURI_INTERNALS__";
     const real = window.fetch;
