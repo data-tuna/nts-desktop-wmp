@@ -7,13 +7,14 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build",
+    "build": "tsc && vite build && npm run build:skin",
     "preview": "vite preview",
     "typecheck": "tsc",
-    "lint": "oxlint --deny-warnings src vite.config.ts",
+    "lint": "oxlint --deny-warnings src vite.config.ts vite.skin.config.ts",
     "check": "npm run lint && npm run build && npm test",
     "tauri": "tauri",
-    "test": "node --test \"tests/*.test.mjs\""
+    "test": "node --test \"tests/*.test.mjs\"",
+    "build:skin": "vite build --config vite.skin.config.ts"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2",
