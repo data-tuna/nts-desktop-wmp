@@ -10,12 +10,23 @@ import { constants, type Node } from "./wms.ts";
 import { css, keyed, mappedElement, parseColor, rgbAt, runs, type Pixels } from "./pixels.ts";
 import { CONSTANTS, OS_MEDIA_CHANGING, OS_MEDIA_OPEN, objects, playState, resImage, resScript, resString, wmpObject, type Host } from "./runtime.ts";
 
+/** A text showing the current item's name, title or author. */
+const TITLE = /currentmedia\.(name\b|getiteminfo\(\s*["'](title|author)["'])/i;
 export type Img = Pixels & { bitmap: CanvasImageSource };
 /** The host's state message (docs/decisions.md, ATA-109). */
 export type State = {
   playState: "playing" | "buffering" | "reconnecting" | "paused" | "stopped";
   channel: number;
   title: string;
+  /** The current item's stream or page (player.URL). */
+  url: string;
+  /** player.currentMedia's item info: the show (or a pick's credit) and where it comes from. */
+  author: string;
+  location: string;
+  /** The page a click on the title opens: a pick's SoundCloud page, or "". */
+  link: string;
+  /** The playlist's titles; `channel` is the current one's index. */
+  items: string[];
   time: number;
   duration: number;
   volume: number;
@@ -519,14 +530,24 @@ class El {
     return Math.round(this.fontPx() * 2);
   }
 
-  /** The playlist row under a point in the parent's coordinates, or -1. */
-  rowAt(py: number): number {
-    const i = Math.floor((py - this.y) / this.rowHeight());
-    return i >= 0 && i < CHANNELS.length ? i : -1;
+  /** The playlist's first row in sight, and the item it last scrolled to. */
+  private scroll = 0;
+  private scrolledTo = -1;
+
+  /** Scrolls the playlist by `by` rows. */
+  scrollBy(by: number) {
+    const rows = Math.max(1, Math.floor(this.h / this.rowHeight()));
+    this.scroll = Math.max(0, Math.min(this.skin.state.items.length - rows, this.scroll + by));
   }
 
-  /** The playlist: the channels, one row each, the current one in the
-   * playing colours. */
+  /** The playlist row under a point in the parent's coordinates, or -1. */
+  rowAt(py: number): number {
+    const i = Math.floor((py - this.y) / this.rowHeight()) + this.scroll;
+    return i >= this.scroll && i < this.skin.state.items.length ? i : -1;
+  }
+
+  /** The playlist: the channels, mixtapes and picks, one row each, the
+   * current one in the playing colours and scrolled into sight when it changes. */
   private paintPlaylist(g: CanvasRenderingContext2D) {
     const { x, y, w, h } = this;
     const bg = this.color("backgroundcolor");
@@ -540,8 +561,19 @@ class El {
     g.font = this.font();
     g.textBaseline = "middle";
     const row = this.rowHeight();
-    CHANNELS.forEach(({ title }, i) => {
-      const playing = i === this.skin.state.channel;
+    const { items, channel } = this.skin.state;
+    const rows = Math.max(1, Math.floor(h / row));
+    if (channel !== this.scrolledTo) {
+      this.scrolledTo = channel;
+      if (channel < this.scroll || channel >= this.scroll + rows) {
+        this.scroll = 0;
+        this.scrollBy(channel);
+      }
+    }
+    items.forEach((title, n) => {
+      const i = n - this.scroll;
+      if (i < 0 || i > rows) return;
+      const playing = n === channel;
       const rowBg = playing ? this.color("itemplayingbackgroundcolor") : null;
       if (rowBg !== null) {
         g.fillStyle = css(rowBg);
@@ -653,7 +685,7 @@ export class Skin {
   readonly canvas = document.createElement("canvas");
   readonly measure = document.createElement("canvas").getContext("2d")!;
   readonly view: El;
-  state: State = { playState: "stopped", channel: 0, title: "", time: 0, duration: 0, volume: 1, mute: false, balance: 0, eq: [], level: 0 };
+  state: State = { playState: "stopped", channel: 0, title: "", url: "", author: "", location: "", link: "", items: CHANNELS.map((c) => c.title), time: 0, duration: 0, volume: 1, mute: false, balance: 0, eq: [], level: 0 };
   /** Bumped by every change scripts or the player make; geometry is cached per generation. */
   gen = 0;
   private byId = new Map<string, El>();
@@ -671,6 +703,8 @@ export class Skin {
   private resImages = new Map<string, Img | undefined>();
   private logged = new Set<string>();
   private pressed: El | null = null;
+  /** The playlist row a double click may open: the current pick's, when the first press landed on it. */
+  private linkRow = -1;
   /** Whether the pressed button showed down before the press (sticky buttons). */
   private wasDown = false;
   private hovered: El | null = null;
@@ -1123,7 +1157,7 @@ export class Skin {
     const before = { ps: playState(old.playState), status: this.status(), title: old.title, channel: old.channel };
     this.state = s;
     // Repaint for what skins show, not for the level or a sub-second clock.
-    const shown = (t: State) => JSON.stringify([t.playState, t.channel, t.title, t.volume, t.mute, t.balance, t.eq]);
+    const shown = (t: State) => JSON.stringify([t.playState, t.channel, t.title, t.author, t.location, t.items, t.volume, t.mute, t.balance, t.eq]);
     if (shown(old) !== shown(s)) this.changed();
     else if (Math.floor(old.time) !== Math.floor(s.time)) this.changed(false);
     if (this.started) this.events(before);
@@ -1209,9 +1243,19 @@ export class Skin {
         this.send({ type: "drag" });
       }
     });
+    c.addEventListener("wheel", (ev) => {
+      const found = this.at(ev);
+      if (found?.kind !== "playlist") return;
+      found.scrollBy(Math.sign(ev.deltaY));
+      this.paint();
+    });
     c.addEventListener("dblclick", (ev) => {
       const found = this.at(ev);
       if (found?.interactive() && found.enabled) this.byUser(() => this.fire(found, "ondblclick"));
+      // A pick links back to SoundCloud, as its terms ask: a double click on
+      // the title, or on the pick's playlist row. A press still drags the window.
+      else if (this.state.link && (found?.kind === "playlist" ? found.rowAt(this.point(ev)[1] - found.origin()[1]) === this.linkRow : found?.kind === "text" && TITLE.test(found.attr("value") ?? "")))
+        this.send({ type: "launchUrl", url: this.state.link });
     });
     window.addEventListener("mouseup", (ev) => {
       const e = this.pressed;
@@ -1289,14 +1333,15 @@ export class Skin {
     }
   }
 
-  /** A click on a playlist row selects that channel: the player's next and
-   * previous step through the channels, playing if it was playing. */
+  /** A click on a playlist row selects that item, playing it if the player was playing. */
   private pick(list: El, ev: MouseEvent) {
     const i = list.rowAt(this.point(ev)[1] - list.origin()[1]);
     if (i < 0) return;
-    const steps = (i - this.state.channel + CHANNELS.length) % CHANNELS.length;
-    for (let n = 0; n < steps; n++) this.send({ type: "next" });
-    // Set locally too, so a second click before the host's next state does not step again.
+    this.send({ type: "select", index: i });
+    // A double click opens a pick only if its row was already the current pick
+    // at the first press: one that starts it should not open its page as well.
+    if (!(ev.detail > 1)) this.linkRow = i === this.state.channel && this.state.link ? i : -1;
+    // Set locally too, so the row shows as current before the host's next state.
     this.state.channel = i;
     this.paint();
   }
