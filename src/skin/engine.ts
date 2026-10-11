@@ -516,9 +516,9 @@ class El {
       const step = this.skin.num(this, "scrollingamount") ?? 1;
       const delay = Math.max(16, this.skin.num(this, "scrollingdelay") ?? 100);
       const loop = width + w / 2;
-      left = x - ((Math.floor(performance.now() / delay) * step) % loop);
+      left = x - ((Math.floor(this.skin.clock / delay) * step) % loop);
       g.fillText(text, left + loop, y + 1);
-      this.skin.later(delay - (performance.now() % delay), this.skin.overFx(this));
+      this.skin.later(delay - (this.skin.clock % delay), this.skin.overFx(this));
     }
     g.fillText(text, left, y + 1);
     if (this.skin.str(this, "fontstyle").toLowerCase().includes("underline")) g.fillRect(left, y + this.fontPx() + 1, width, 1);
@@ -528,7 +528,7 @@ class El {
    * it what covers the visualisation, and drawFx draws it on top. */
   private paintEffects(g: CanvasRenderingContext2D) {
     const skin = this.skin;
-    if (skin.fxSolid === "#fff") skin.fxFound.push(this);
+    if (skin.finding) skin.fxFound.push(this);
     skin.effectsShown = true;
     g.fillStyle = skin.fxSolid;
     g.fillRect(this.x, this.y, this.w, this.h);
@@ -724,8 +724,11 @@ export class Skin {
    * only those parts, not the whole skin (ATA-116). */
   private fx: { el: El; x: number; y: number; part: [number, number, number, number]; mask: HTMLCanvasElement; cover: HTMLCanvasElement }[] = [];
   /** The colour effects elements paint while a full paint looks for them,
-   * and those it found. */
+   * whether it is looking, and those it found. */
   fxSolid = "#fff";
+  finding = false;
+  /** The time a paint draws scrolling text at, the same for both its passes. */
+  clock = 0;
   fxFound: El[] = [];
   /** When the next scrolling-text step is due, its timer, and whether a
    * text that steps then overlaps a visualisation. */
@@ -1199,6 +1202,7 @@ export class Skin {
       }
     }
     this.effectsShown = false;
+    this.clock = performance.now();
     if (!refind && this.fx.length) {
       // Only a scrolling text moved, clear of the visualisations: what
       // covers them is as it was.
@@ -1209,9 +1213,11 @@ export class Skin {
     }
     this.fxFound = [];
     this.fxSolid = "#fff";
+    this.finding = true;
     // On a canvas of its own: reading pixels back from the window's canvas
     // would move it off the GPU.
     const g = this.drawShaped(this.probe.canvas);
+    this.finding = false;
     // The view again, with each visualisation black instead of white: the
     // difference is how much of it shows through what is drawn over it.
     const found = this.fxFound.map((el) => {

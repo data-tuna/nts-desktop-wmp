@@ -80,12 +80,12 @@ Written in English.
     npm run check         lint + typecheck + build + test; CI runs this plus cargo fmt
     npm run tauri build   Release binary and the NSIS installer (slow, minutes)
 
+    cargo fmt --manifest-path src-tauri/Cargo.toml --check
+
 Releasing: bump `version` in `package.json` and `src-tauri/Cargo.toml`, merge,
 then push the tag (`git tag v0.1.1 && git push origin v0.1.1`). The release
 workflow signs the installer for the updater with the repository secrets;
 `docs/decisions.md` (ATA-116) says where the key is kept.
-
-    cargo fmt --manifest-path src-tauri/Cargo.toml --check
 
 Rust lives in `%USERPROFILE%\.cargo\bin`. A shell that cannot find `cargo` is
 missing that directory on `PATH`.

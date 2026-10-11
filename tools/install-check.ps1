@@ -91,7 +91,9 @@ if (-not (Test-Path $exe)) { throw "$exe is missing" }
 "installed $($entry.DisplayVersion) in $dir"
 
 Start-Process $exe | Out-Null
-Check-Playing "installed"
+# With -UpdateTo the update starts at launch and can replace the app while
+# it is being checked, so only the updated copy is checked.
+if (-not $UpdateTo) { Check-Playing "installed" }
 
 if ($UpdateTo) {
   # The app checks for a newer release on launch, installs it and restarts.
