@@ -79,6 +79,11 @@ class El {
     return this.node.attrs[name];
   }
 
+  /** A colour attribute, evaluated like any other (`jscript:NormalTextColor`). */
+  color(name: string): number | null {
+    return parseColor(this.skin.str(this, name) || undefined);
+  }
+
   img(name: string): Img | undefined {
     return this.skin.image(this.attr(name));
   }
@@ -224,7 +229,7 @@ class El {
     else if (this.kind === "text") this.paintText(g);
     else if (this.kind === "effects") {
       // ponytail: a black placeholder until the visualisations (ATA-114).
-      g.fillStyle = css(parseColor(this.attr("backgroundcolor")) ?? 0);
+      g.fillStyle = css(this.color("backgroundcolor") ?? 0);
       g.fillRect(this.x, this.y, this.w, this.h);
     }
     g.restore();
@@ -232,7 +237,7 @@ class El {
 
   /** Draws `img` with its transparencyColor (the element's, or `owner`'s) cut out. */
   drawImage(g: CanvasRenderingContext2D, img: Img | undefined, x: number, y: number, owner: El = this) {
-    if (img) g.drawImage(this.skin.keyedImage(img, owner.attr("transparencycolor")), x, y);
+    if (img) g.drawImage(this.skin.keyedImage(img, owner.color("transparencycolor")), x, y);
   }
 
   private paintContainer(g: CanvasRenderingContext2D) {
@@ -242,7 +247,7 @@ class El {
     const behind = this.kids.filter((k) => k.z < 0);
     for (const kid of behind) kid.paint(layer);
     const bg = this.img("backgroundimage");
-    const color = parseColor(this.attr("backgroundcolor"));
+    const color = this.color("backgroundcolor");
     if (color !== null || bg) {
       const back = this.canvas("back", w, h);
       if (color !== null) {
@@ -260,7 +265,7 @@ class El {
         fill(bg.bitmap);
         // transparencyColor shows what is behind the background, children
         // with a negative zIndex included.
-        const clear = [this.attr("transparencycolor"), this.attr("clippingcolor")].map(parseColor).filter((c) => c !== null);
+        const clear = [this.color("transparencycolor"), this.color("clippingcolor")].filter((c) => c !== null);
         if (clear.length) {
           back.globalCompositeOperation = "destination-out";
           fill(this.skin.maskImage(bg, clear));
@@ -271,7 +276,7 @@ class El {
     }
     for (const kid of this.kids) if (kid.z >= 0) kid.paint(layer);
     // clippingColor cuts the children too.
-    const clipColor = parseColor(this.attr("clippingcolor"));
+    const clipColor = this.color("clippingcolor");
     const clipImg = this.img("clippingimage") ?? bg;
     if (clipColor !== null && clipImg) {
       layer.globalCompositeOperation = "destination-out";
@@ -291,10 +296,10 @@ class El {
       if (el.kind !== "element" || !el.visible) continue;
       const img = el.stateImage(this);
       if (!img || img === this.img("image")) continue;
-      const color = parseColor(el.attr("mappingcolor"));
+      const color = el.color("mappingcolor");
       if (color === null) continue;
       const part = el.canvas("part", map.width, map.height);
-      part.drawImage(this.skin.keyedImage(img, this.attr("transparencycolor")), 0, 0);
+      part.drawImage(this.skin.keyedImage(img, this.color("transparencycolor")), 0, 0);
       part.globalCompositeOperation = "destination-in";
       part.drawImage(this.skin.maskImage(map, [color]), 0, 0);
       part.globalCompositeOperation = "source-over";
@@ -312,7 +317,7 @@ class El {
       g.beginPath();
       g.rect(...(clip ?? [x, y, w, h]));
       g.clip();
-      const src = this.skin.keyedImage(img, this.attr("transparencycolor"));
+      const src = this.skin.keyedImage(img, this.color("transparencycolor"));
       if (tiled) {
         g.translate(x, y);
         g.fillStyle = g.createPattern(src, "repeat")!;
@@ -351,7 +356,7 @@ class El {
     if (!pos || !strip) return;
     const frames = Math.max(1, Math.floor(strip.width / pos.width));
     const frame = Math.round(this.fraction() * (frames - 1));
-    const src = this.skin.keyedImage(strip, this.attr("transparencycolor"));
+    const src = this.skin.keyedImage(strip, this.color("transparencycolor"));
     g.drawImage(src, frame * pos.width, 0, pos.width, pos.height, this.x, this.y, pos.width, pos.height);
   }
 
@@ -370,7 +375,7 @@ class El {
 
   private paintText(g: CanvasRenderingContext2D) {
     const { x, y, w, h } = this;
-    const bg = parseColor(this.attr("backgroundcolor"));
+    const bg = this.color("backgroundcolor");
     if (bg !== null) {
       g.fillStyle = css(bg);
       g.fillRect(x, y, w, h);
@@ -383,7 +388,7 @@ class El {
     g.font = this.font();
     g.textBaseline = "top";
     const fgName = !this.enabled && this.attr("disabledforegroundcolor") ? "disabledforegroundcolor" : this.hover && this.attr("hoverforegroundcolor") ? "hoverforegroundcolor" : "foregroundcolor";
-    g.fillStyle = css(parseColor(this.attr(fgName)) ?? 0);
+    g.fillStyle = css(this.color(fgName) ?? 0);
     const width = g.measureText(text).width;
     const justify = (this.attr("justification") ?? "left").toLowerCase();
     let left = justify === "center" ? x + (w - width) / 2 : justify === "right" ? x + w - width : x;
@@ -420,7 +425,7 @@ class El {
     if (this.kind === "group") {
       const map = this.img("mappingimage");
       const els = this.kids.filter((e) => e.kind === "element" && e.visible);
-      const i = map ? mappedElement(map, lx, ly, els.map((e) => parseColor(e.attr("mappingcolor")))) : -1;
+      const i = map ? mappedElement(map, lx, ly, els.map((e) => e.color("mappingcolor"))) : -1;
       if (i >= 0) return els[i];
       return this.solid(this.img("image"), lx, ly) ? this : null;
     }
@@ -436,7 +441,7 @@ class El {
   private solid(img: Img | undefined, x: number, y: number): boolean {
     if (!img) return true;
     const rgb = rgbAt(img, x, y);
-    return rgb >= 0 && rgb !== parseColor(this.attr("transparencycolor"));
+    return rgb >= 0 && rgb !== this.color("transparencycolor");
   }
 
   /** A position image's grey level at (x, y), 0..1, or null if not grey. */
@@ -634,8 +639,7 @@ export class Skin {
   }
 
   /** `img` with the given colour made transparent, cached. */
-  keyedImage(img: Img, color: string | undefined): CanvasImageSource {
-    const rgb = parseColor(color);
+  keyedImage(img: Img, rgb: number | null): CanvasImageSource {
     return rgb === null ? img.bitmap : this.cached(img, `key${rgb}`, () => keyed(img, [rgb]));
   }
 
@@ -749,6 +753,7 @@ export class Skin {
     c.addEventListener("mousedown", (ev) => {
       if (ev.button !== 0) return;
       const found = this.at(ev);
+      if (found?.interactive() && !found.enabled) return;
       if (found?.interactive() && found.enabled) {
         this.pressed = found;
         this.wasDown = found.down;

@@ -101,10 +101,10 @@ test("parse forgives what hand-written skins do", () => {
 
 test("constants reads top-level literals and nothing else", () => {
   const found = constants([
-    'var leftOffset = 260;\r\nvar color = "#FF00FF" // pink\nvar on = true\n  var inner = 5;\nvar sum = leftOffset+40;\nvar neg = -2.5;',
+    'var leftOffset = 260;\r\nvar color = "#FF00FF" // pink\nvar on = true\n  var inner = 5;\nvar sum = leftOffset+40;\nvar neg = -2.5;\nvar pad = 08;\nvar off = false;',
     "var leftOffset = 1;",
   ]);
-  assert.deepEqual(Object.fromEntries(found), { leftOffset: 260, color: "#FF00FF", on: true, neg: -2.5 });
+  assert.deepEqual(Object.fromEntries(found), { leftOffset: 260, color: "#FF00FF", on: true, neg: -2.5, pad: 8, off: false });
 });
 
 /** A width×height image filled from a function of (x, y) to 0xRRGGBB. */

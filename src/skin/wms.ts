@@ -119,6 +119,6 @@ export function constants(scripts: string[]): Map<string, unknown> {
   const line = /^var\s+([A-Za-z_$][\w$]*)\s*=\s*(-?\d+(?:\.\d+)?|"[^"\\]*"|'[^'\\]*'|true|false)\s*;?[ \t]*(?:\/\/[^\r\n]*)?\r?$/gm;
   for (const script of scripts)
     for (const [, name, literal] of script.matchAll(line))
-      if (!found.has(name)) found.set(name, /^['"]/.test(literal) ? literal.slice(1, -1) : JSON.parse(literal));
+      if (!found.has(name)) found.set(name, /^['"]/.test(literal) ? literal.slice(1, -1) : literal === "true" || (literal !== "false" && Number(literal)));
   return found;
 }
