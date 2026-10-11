@@ -53,12 +53,12 @@ export function keyed(p: Pixels, colors: number[], keep = false): Uint8ClampedAr
 }
 
 /** Opaque pixels as one `[x, y, width, 1]` rectangle per horizontal run. */
-export function runs(p: Pixels, threshold = 128): [number, number, number, number][] {
+export function runs(p: Pixels): [number, number, number, number][] {
   const rects: [number, number, number, number][] = [];
   for (let y = 0; y < p.height; y++) {
     let start = -1;
     for (let x = 0; x <= p.width; x++) {
-      const solid = x < p.width && p.data[(y * p.width + x) * 4 + 3] >= threshold;
+      const solid = x < p.width && p.data[(y * p.width + x) * 4 + 3] >= 128;
       if (solid && start < 0) start = x;
       if (!solid && start >= 0) {
         rects.push([start, y, x - start, 1]);

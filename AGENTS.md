@@ -252,7 +252,8 @@ runtime (ATA-110). The engine logs each attribute it skips.
 
 **Some controls do nothing yet.** Minimize and close have no message in the
 skin protocol, and other `onClick` handlers need scripts; they are logged.
-Previous and next are drawn disabled: a live stream has neither.
+Previous, next and seek sliders are drawn disabled: a live stream has
+none of them.
 
 **The volume the skin shows starts at 100.** The host does not send its
 volume to the skin, and its gain starts at 1.

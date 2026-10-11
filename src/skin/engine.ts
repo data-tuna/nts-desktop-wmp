@@ -63,9 +63,15 @@ class El {
     const bound = /^wmpprop:player\.(?:settings\.(volume|balance)|controls\.(currentposition))$/i.exec(node.attrs.value ?? "");
     this.role = bound ? (bound[1] ?? "seek").toLowerCase() : node.tag.replace(/(button|element|slider|text)$/, "");
     if (NOT_YET.has(node.tag)) skin.log(`<${node.tag}> is not drawn yet`);
-    else if (this.kind === "none" && !SILENT.has(node.tag)) skin.log(`unknown element <${node.tag}>, skipped`);
     if (this.kind === "none" || this.kind === "element" && parent?.kind !== "group") return;
-    for (const child of node.children) this.kids.push(new El(child, this, skin));
+    const adopt = (child: Node) => {
+      // An unknown wrapper is skipped, but what it wraps is still drawn.
+      if (kindOf(child.tag) === "none" && !SILENT.has(child.tag) && !NOT_YET.has(child.tag)) {
+        skin.log(`unknown element <${child.tag}>, skipped`);
+        child.children.forEach(adopt);
+      } else this.kids.push(new El(child, this, skin));
+    };
+    node.children.forEach(adopt);
     this.kids.sort((a, b) => a.z - b.z); // stable: equal zIndex keeps document order
   }
 
@@ -131,7 +137,7 @@ class El {
   get enabled(): boolean {
     // The named transport controls follow the player, whatever the skin says.
     const auto = this.skin.controlEnabled(this.role);
-    if (auto !== null && (this.kind === "button" || this.kind === "element")) return auto;
+    if (auto !== null && this.interactive()) return auto;
     return this.skin.bool(this, "enabled", true) && (this.parent?.kind !== "group" || this.parent.enabled);
   }
 
@@ -161,7 +167,7 @@ class El {
     const min = this.skin.num(this, "min") ?? (role === "balance" ? -100 : 0);
     const max = this.skin.num(this, "max") ?? 100;
     let value = this.dragValue ?? this.skin.num(this, "value");
-    if (value === null) value = role === "volume" ? this.skin.volume : role === "balance" ? 0 : role === "seek" ? 0 : min;
+    if (value === null) value = role === "volume" ? min + (this.skin.volume / 100) * (max - min) : role === "balance" ? (min + max) / 2 : min;
     return [min, max, Math.min(max, Math.max(min, value))];
   }
 
@@ -486,8 +492,9 @@ export class Skin {
   private keyCache = new WeakMap<Img, Map<string, HTMLCanvasElement>>();
   private logged = new Set<string>();
   private pressed: El | null = null;
+  /** Whether the pressed button was down before the press (sticky buttons). */
+  private wasDown = false;
   private hovered: El | null = null;
-  private frame = 0;
   private animating = false;
   /** True while painting the window shape. */
   shaping = false;
@@ -571,7 +578,9 @@ export class Skin {
   controlEnabled(role: string): boolean | null {
     if (role === "play") return !this.state.playing;
     if (role === "pause" || role === "stop") return this.state.playing;
-    if (["prev", "next", "ffwd", "rew"].includes(role)) return false;
+    // Tag names (prevbutton, ffwdelement, seekslider) and the
+    // player.controls names that wmpenabled: uses.
+    if (["prev", "previous", "next", "ffwd", "fastforward", "rew", "fastreverse", "seek"].includes(role)) return false;
     return null;
   }
 
@@ -697,27 +706,21 @@ export class Skin {
   animate() {
     if (this.animating) return;
     this.animating = true;
-    this.frame = requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
       this.animating = false;
       this.paint();
     });
   }
 
-  stop() {
-    cancelAnimationFrame(this.frame);
+  /** The pointer in view coordinates. */
+  private point(ev: MouseEvent): [number, number] {
+    const r = this.canvas.getBoundingClientRect();
+    return [((ev.clientX - r.left) * this.canvas.width) / r.width, ((ev.clientY - r.top) * this.canvas.height) / r.height];
   }
 
   private at(ev: MouseEvent): El | null {
-    const r = this.canvas.getBoundingClientRect();
-    const x = ((ev.clientX - r.left) * this.canvas.width) / r.width;
-    const y = ((ev.clientY - r.top) * this.canvas.height) / r.height;
+    const [x, y] = this.point(ev);
     return this.view.kids.reduceRight<El | null>((found, kid) => found ?? kid.hit(x, y), null);
-  }
-
-  private local(ev: MouseEvent, e: El): [number, number] {
-    const r = this.canvas.getBoundingClientRect();
-    const [ox, oy] = e.origin();
-    return [((ev.clientX - r.left) * this.canvas.width) / r.width - ox, ((ev.clientY - r.top) * this.canvas.height) / r.height - oy];
   }
 
   private listen() {
@@ -748,6 +751,7 @@ export class Skin {
       const found = this.at(ev);
       if (found?.interactive() && found.enabled) {
         this.pressed = found;
+        this.wasDown = found.down;
         if (found.kind === "slider" || found.kind === "custom") this.slide(found, ev, false);
         found.down = true;
         this.paint();
@@ -766,7 +770,8 @@ export class Skin {
       } else {
         const sticky = this.bool(e, "sticky", false);
         const inside = this.at(ev) === e;
-        e.down = sticky && inside ? !e.down : false;
+        // A sticky button toggles on a click and keeps its state otherwise.
+        e.down = sticky && (inside ? !this.wasDown : this.wasDown);
         if (inside) this.click(e);
       }
       this.paint();
@@ -775,26 +780,26 @@ export class Skin {
 
   /** Whether the pixel under the pointer is part of the skin. */
   private opaque(ev: MouseEvent): boolean {
-    const r = this.canvas.getBoundingClientRect();
-    const x = Math.floor(((ev.clientX - r.left) * this.canvas.width) / r.width);
-    const y = Math.floor(((ev.clientY - r.top) * this.canvas.height) / r.height);
-    return this.canvas.getContext("2d")!.getImageData(x, y, 1, 1).data[3] > 0;
+    const [x, y] = this.point(ev);
+    return this.canvas.getContext("2d")!.getImageData(Math.floor(x), Math.floor(y), 1, 1).data[3] > 0;
   }
 
   private slide(e: El, ev: MouseEvent, done: boolean) {
-    const [x, y] = this.local(ev, e);
-    const v = e.valueAt(x, y);
-    if (v !== null) e.dragValue = v;
-    if (e.role === "volume" && v !== null) {
-      this.volume = v;
-      this.send({ type: "volume", value: Math.min(1, Math.max(0, v / 100)) });
-    } else if (e.role === "balance" && v !== null) this.send({ type: "balance", value: Math.min(1, Math.max(-1, v / 100)) });
-    if (done) {
-      if (e.role === "seek" && e.dragValue !== null) this.send({ type: "seek", seconds: e.dragValue });
-      // Volume and balance keep the dragged value; anything bound to the
-      // player goes back to the player's value.
-      if (e.role !== "volume" && e.role !== "balance") e.dragValue = null;
+    const [x, y] = this.point(ev);
+    const [ox, oy] = e.origin();
+    const v = e.valueAt(x - ox, y - oy);
+    if (v !== null) {
+      e.dragValue = v;
+      // Whatever the slider's own range, the protocol wants 0..1 and -1..1.
+      const t = e.fraction();
+      if (e.role === "volume") {
+        this.volume = t * 100;
+        this.send({ type: "volume", value: t });
+      } else if (e.role === "balance") this.send({ type: "balance", value: t * 2 - 1 });
     }
+    // Volume and balance keep the dragged value; anything else bound to the
+    // player goes back to the player's value. Seeking is disabled: live.
+    if (done && e.role !== "volume" && e.role !== "balance") e.dragValue = null;
     this.paint();
   }
 

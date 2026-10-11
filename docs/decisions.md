@@ -187,9 +187,10 @@ against the 7 ATA-103 skins; no code from Webamp Modern.
   reading a literal runs none of the script. Anything else is logged and
   skipped until the script runtime (ATA-110).
 - **Player state.** The named controls follow the host's state: Play is
-  enabled while stopped, Stop and Pause while playing, Previous and Next
-  never (a live stream has neither). Pause sends `stop`. Sliders bound to
-  the volume or balance, named or not, send `volume` and `balance`.
+  enabled while stopped, Stop and Pause while playing; Previous, Next, fast
+  forward and rewind, and seek sliders never (a live stream has none of
+  them). Pause sends `stop`. Sliders bound to the volume or balance, named
+  or not, send `volume` and `balance`, scaled from the slider's own range.
 
 ### Source: archive.org, one per launch, a compatibility list (proposed by Lama, confirmed by Ata, 2026-10-10)
 
