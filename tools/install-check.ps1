@@ -30,11 +30,31 @@ public static class Win {
 "@
 
 # The app's connections to a radiomast audio edge, by local port.
+# An edge's reverse name is not always radiomast's (one was a hosting
+# provider's), so also take the addresses streams.radiomast.io sends this
+# machine to now.
+function Edges {
+  $ips = @()
+  foreach ($i in 1..10) {
+    foreach ($ch in "nts1", "nts2") {
+      try {
+        $r = Invoke-WebRequest -UseBasicParsing -Method Head -MaximumRedirection 0 "https://streams.radiomast.io/$ch" -ErrorAction SilentlyContinue
+        $edge = ([uri]$r.Headers.Location).Host
+        $ips += Resolve-DnsName $edge -Type A -ErrorAction Stop | ForEach-Object { [pscustomobject]@{ IP = $_.IPAddress; Host = $edge } }
+      } catch {}
+    }
+  }
+  $ips | Sort-Object IP -Unique
+}
+
 function Stream {
   $ids = (Get-Process nts-desktop-wmp, msedgewebview2 -ErrorAction SilentlyContinue).Id
   Get-NetTCPConnection -State Established -ErrorAction SilentlyContinue | Where-Object { $ids -contains $_.OwningProcess -and $_.RemotePort -eq 443 } | ForEach-Object {
-    $name = try { (Resolve-DnsName $_.RemoteAddress -Type PTR -ErrorAction Stop | Select-Object -First 1).NameHost } catch { "" }
+    $ip = $_.RemoteAddress
+    $name = try { (Resolve-DnsName $ip -Type PTR -ErrorAction Stop | Select-Object -First 1).NameHost } catch { "" }
+    $known = $script:edges | Where-Object IP -eq $ip | Select-Object -First 1
     if ($name -like "audio-edge-*.radiomast.io") { [pscustomobject]@{ Port = $_.LocalPort; Host = $name } }
+    elseif ($known) { [pscustomobject]@{ Port = $_.LocalPort; Host = "$($known.Host) ($ip)" } }
   }
 }
 
@@ -52,6 +72,8 @@ function Shot([string]$file) {
 # 15 s, which is the stream playing (a failed stream drops it and
 # reconnects), then checks the skin it downloaded.
 function Check-Playing([string]$name) {
+  $script:edges = @(Edges)
+  "radiomast edges for this machine: $(($script:edges | ForEach-Object { "$($_.Host) $($_.IP)" }) -join ', ')" | Add-Content "$Out/$name-poll.txt"
   $deadline = (Get-Date).AddSeconds(150)
   while ((Get-Date) -lt $deadline) {
     Start-Sleep 5
