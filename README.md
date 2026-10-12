@@ -11,13 +11,32 @@ the sister app to
 you listen a lot, support the station directly:
 [nts.live/supporters](https://www.nts.live/supporters).
 
-Status: in progress. `npm run tauri dev` opens the player on NTS 1 in a
+Status: in progress. The app opens on NTS 1 in a
 random skin from the archive, one of the 59 the engine draws well so far.
 Right-click the skin to pick another; the app keeps your pick. The tray icon
 plays, stops and switches channels, the media keys work, and only one copy
 runs at a time. The window opens where you left it. Without a
 network it wears Bootleg House, the one skin drawn for this project.
 Windows comes first, then macOS.
+
+## Install (Windows)
+
+Download `NTS.Radio.Bootleg.Media.Player_<version>_x64-setup.exe` from the
+latest [release](https://github.com/data-tuna/nts-desktop-wmp/releases/latest)
+and run it. It installs for your user only, needs no administrator rights,
+and adds a Start menu and a desktop shortcut.
+
+Windows SmartScreen will warn you. The installer is not code-signed, so
+Windows shows "Windows protected your PC": click **More info**, then **Run
+anyway**. Your browser may also flag the download as uncommon; keep it.
+
+The app updates itself. Each time it starts, it checks GitHub for a newer
+release; if there is one, it installs it and restarts, which interrupts the
+stream for a few seconds. Updates are signed, and the app refuses one whose
+signature does not match.
+
+Uninstall from Settings > Apps. Downloaded skins stay in
+`%LOCALAPPDATA%\com.datatuna.ntswmp`; delete that folder to remove them.
 
 ## Credits
 

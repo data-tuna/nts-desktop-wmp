@@ -6,7 +6,7 @@ import assert from "node:assert/strict";
 import { deflateRawSync } from "node:zlib";
 import { unzip } from "../src/skin/wmz.ts";
 import { constants, decode, parse } from "../src/skin/wms.ts";
-import { keyed, mappedElement, parseColor, runs } from "../src/skin/pixels.ts";
+import { keyed, mappedElement, overlay, parseColor, runs } from "../src/skin/pixels.ts";
 
 /** A zip with one entry per [name, bytes, deflate?], as skin tools write them. */
 function zip(entries) {
@@ -170,4 +170,25 @@ test("effects: bars are log-spaced spectrum peaks, the wave is evenly sampled, a
   assert.equal(effectIndex("ambience", 7), 2, "unknown preset: the type's first");
   assert.equal(effectIndex("", 0), 0);
   assert.equal(effectIndex("{some-clsid}", 3), 0);
+});
+
+test("overlay: a visualisation redrawn under its mask and cover matches the skin painted over it", () => {
+  // Per pixel: what lies over the visualisation (straight RGBA, alpha 0..1),
+  // or null outside the window shape.
+  const over = [[0, 0, 0, 0], [255, 0, 0, 1], [0, 0, 255, 0.5], null];
+  const paint = (fx) => over.flatMap((o) => {
+    if (!o) return [0, 0, 0, 0];
+    return [0, 1, 2].map((c) => o[c] * o[3] + fx * (1 - o[3])).concat(255);
+  });
+  const { mask, cover } = overlay(new Uint8ClampedArray(paint(255)), new Uint8ClampedArray(paint(0)));
+  for (const fx of [0, 90, 200]) {
+    const want = paint(fx);
+    for (let i = 0; i < want.length; i += 4) {
+      for (let c = 0; c < 3; c++) {
+        const got = (mask[i + 3] / 255) * fx + (cover[i + c] * cover[i + 3]) / 255;
+        assert.ok(Math.abs(got - want[i + c]) <= 2, `pixel ${i / 4} channel ${c}: ${got} for ${want[i + c]}`);
+      }
+      assert.ok(Math.abs(mask[i + 3] + cover[i + 3] - want[i + 3]) <= 1, `pixel ${i / 4} alpha`);
+    }
+  }
 });

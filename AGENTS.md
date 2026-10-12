@@ -65,7 +65,8 @@ Written in English.
     docs/decisions.md     Decisions, research findings, and why.
     tests/                `node --test` tests and their fixtures.
     tools/                DevTools and window probes; see Observing the app.
-    .github/workflows/    ci.yml checks every PR on windows-latest.
+    .github/workflows/    ci.yml checks every PR on windows-latest; release.yml
+                          publishes a v* tag and installs it on a fresh runner.
 
 ## Commands
 
@@ -82,6 +83,11 @@ Written in English.
     npm run tauri build   Release binary and the NSIS installer (slow, minutes)
 
     cargo fmt --manifest-path src-tauri/Cargo.toml --check
+
+Releasing: bump `version` in `package.json` and `src-tauri/Cargo.toml`, merge,
+then push the tag (`git tag v0.1.1 && git push origin v0.1.1`). The release
+workflow signs the installer for the updater with the repository secrets;
+`docs/decisions.md` (ATA-116) says where the key is kept.
 
 Rust lives in `%USERPROFILE%\.cargo\bin`. A shell that cannot find `cargo` is
 missing that directory on `PATH`.
@@ -290,6 +296,8 @@ hidden desktop (a debug build needs `npx vite` running for its pages):
     powershell -File tools/window-shot.ps1 "NTS Radio Bootleg Media Player" shot.png
     powershell -File tools/region-shot.ps1 "NTS Radio Bootleg Media Player" shot.png
     powershell -File tools/ram.ps1 nts-desktop-wmp
+    powershell -File tools/cpu.ps1 nts-desktop-wmp 30   % of one core, whole tree
+    powershell -File tools/install-check.ps1 <setup.exe>  Installs for real; see below
     node tools/proxy.mjs 8899                    A CONNECT proxy you can cut; see below
 
 A debug build reads `dist-skin/engine.js` each time the skin page loads, so
@@ -304,6 +312,12 @@ A stand-in host in that page answers the skin with state as the trusted page
 does, but plays nothing; `/?play` starts it playing, as the app does on
 launch. In either place, `__wmpScope` in the skin webview is what skin code
 sees: `__wmpScope.player.status`, `__wmpScope.<element id>.visible`.
+
+`install-check.ps1` installs the app, plays it, and uninstalls it, as the
+release workflow does on a fresh runner: on this machine it would install a
+real copy, so leave it to the workflow. `cpu.ps1` and `ram.ps1` take the
+first process with that name, so stop other copies first, or copy the exe
+under another name.
 
 `region-shot.ps1` greys out what the window region cuts away, as Windows
 reports it. `escape.mjs` reloads the trusted page when it finishes, since its
@@ -380,7 +394,11 @@ until this one gets its own.
 **PR CI does not build the Rust side.** It runs typecheck, lint, the frontend
 build, the tests and `cargo fmt --check`.
 
-**No release workflow or updater yet.**
+**A visualisation costs about 20–30 points of a core** (ATA-116). With one
+showing, the app uses about 25–35 % of a core (5–7 % without). Each frame
+redraws only the visualisation, so most of that is the frames' trip: an IPC
+call from the trusted page, a script evaluated in the skin webview, a
+composite of both webviews.
 
 **Only a skin's first view is drawn.** `theme.openView` and
 `theme.currentViewID` are logged and ignored, so circle's video, playlist

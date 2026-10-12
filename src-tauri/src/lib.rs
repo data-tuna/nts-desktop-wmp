@@ -16,7 +16,8 @@ use tauri::{
     AppHandle, Emitter, EventTarget, LogicalPosition, LogicalSize, Manager, PhysicalPosition,
     PhysicalRect, Url, WebviewBuilder, WebviewUrl, WebviewWindowBuilder, Window, Wry,
 };
-use tauri_plugin_window_state::{StateFlags, WindowExt as _};
+use tauri_plugin_updater::UpdaterExt;
+use tauri_plugin_window_state::{AppHandleExt as _, StateFlags, WindowExt as _};
 
 const SKIN_PAGE: &str = include_str!("../../src/skin/index.html");
 
@@ -822,6 +823,7 @@ pub fn run() {
                 .skip_initial_state("main")
                 .build(),
         )
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .invoke_handler(tauri::generate_handler![
             skin_send,
             list_skins,
@@ -885,10 +887,35 @@ pub fn run() {
             .on_navigation(is_skin_url)
             .on_new_window(|_, _| NewWindowResponse::Deny);
             window.add_child(skin, LogicalPosition::new(0.0, 0.0), size)?;
+            // A dev build would otherwise replace itself with the release.
+            if !cfg!(debug_assertions) {
+                let app = app.handle().clone();
+                tauri::async_runtime::spawn(async move {
+                    // Offline or no release yet: play on, try next launch.
+                    if let Err(error) = update(app).await {
+                        eprintln!("update check failed: {error}");
+                    }
+                });
+            }
             Ok(())
         })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+/// Installs a newer GitHub release, if there is one, and restarts into it.
+/// On Windows the installer closes the app itself, so the stream drops for
+/// the few seconds the install takes.
+async fn update(app: AppHandle) -> tauri_plugin_updater::Result<()> {
+    if let Some(update) = app.updater()?.check().await? {
+        // The installer ends the app without the exit that saves the position.
+        if let Err(error) = app.save_window_state(StateFlags::POSITION) {
+            eprintln!("could not save the window position: {error}");
+        }
+        update.download_and_install(|_, _| {}, || {}).await?;
+        app.restart();
+    }
+    Ok(())
 }
 
 const BROWSER_ARGS: &str = "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection --autoplay-policy=no-user-gesture-required --enable-features=HardwareMediaKeyHandling";

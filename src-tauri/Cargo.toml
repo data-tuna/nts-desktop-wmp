@@ -1,6 +1,6 @@
 [package]
 name = "nts-desktop-wmp"
-version = "0.0.1"
+version = "0.1.0"
 description = "Unofficial Windows Media Player-style desktop player for NTS Radio"
 authors = ["data-tuna"]
 license = "MIT"
@@ -28,6 +28,8 @@ ureq = { version = "3", default-features = false, features = ["native-tls"] }
 md-5 = "0.11"
 tauri-plugin-single-instance = "2"
 tauri-plugin-window-state = "2"
+# No rustls or zip: SChannel, as for ureq; the signed artifact is the -setup.exe itself.
+tauri-plugin-updater = { version = "2", default-features = false, features = ["native-tls"] }
 
 # Size over speed: https://tauri.app/concept/size/#cargo-configuration
 [profile.release]

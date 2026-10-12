@@ -7,7 +7,7 @@
 // skin reference (learn.microsoft.com/windows/win32/wmp/skin-programming-reference).
 import { CHANNELS } from "../player.ts";
 import { constants, type Node } from "./wms.ts";
-import { css, keyed, mappedElement, parseColor, rgbAt, runs, type Pixels } from "./pixels.ts";
+import { css, keyed, mappedElement, overlay, parseColor, rgbAt, runs, type Pixels } from "./pixels.ts";
 import { drawEffect, EFFECTS, effectIndex, type Frame, type Memory } from "./effects.ts";
 import { CONSTANTS, OS_MEDIA_CHANGING, OS_MEDIA_OPEN, objects, playState, resImage, resScript, resString, wmpObject, type Host } from "./runtime.ts";
 
@@ -516,21 +516,31 @@ class El {
       const step = this.skin.num(this, "scrollingamount") ?? 1;
       const delay = Math.max(16, this.skin.num(this, "scrollingdelay") ?? 100);
       const loop = width + w / 2;
-      left = x - ((Math.floor(performance.now() / delay) * step) % loop);
+      left = x - ((Math.floor(this.skin.clock / delay) * step) % loop);
       g.fillText(text, left + loop, y + 1);
-      this.skin.animate();
+      this.skin.later(delay - (this.skin.clock % delay), this.skin.overFx(this));
     }
     g.fillText(text, left, y + 1);
     if (this.skin.str(this, "fontstyle").toLowerCase().includes("underline")) g.fillRect(left, y + this.fontPx() + 1, width, 1);
   }
 
-  /** The visualisation, from the latest frame while the player plays. */
+  /** A solid box where the visualisation goes: Skin.paint works out from
+   * it what covers the visualisation, and drawFx draws it on top. */
   private paintEffects(g: CanvasRenderingContext2D) {
     const skin = this.skin;
+    if (skin.finding) skin.fxFound.push(this);
     skin.effectsShown = true;
+    g.fillStyle = skin.fxSolid;
+    g.fillRect(this.x, this.y, this.w, this.h);
+  }
+
+  /** The visualisation, from the latest frame while the player plays, at
+   * (x, y) on the canvas. */
+  drawFx(g: CanvasRenderingContext2D, x: number, y: number) {
+    const skin = this.skin;
     const fg = this.color("foregroundcolor");
     const frame = skin.state.playState === "playing" ? skin.frame : null;
-    drawEffect(g, skin.effect(this), frame, [this.x, this.y, this.w, this.h], css(this.color("backgroundcolor") ?? 0), fg === null ? null : css(fg), this.memory);
+    drawEffect(g, skin.effect(this), frame, [x, y, this.w, this.h], css(this.color("backgroundcolor") ?? 0), fg === null ? null : css(fg), this.memory);
   }
 
   /** The playlist's row height, in px. */
@@ -708,6 +718,27 @@ export class Skin {
   frame: Frame | null = null;
   effectsShown = false;
   private effectsOn = false;
+  /** How the visualisations were found at the last full paint: each one's
+   * place on the canvas, the part of the canvas it touches, how much of it
+   * shows there and what lies over it (pixels.ts `overlay`). A frame redraws
+   * only those parts, not the whole skin (ATA-116). */
+  private fx: { el: El; x: number; y: number; part: [number, number, number, number]; mask: HTMLCanvasElement; cover: HTMLCanvasElement }[] = [];
+  /** The colour effects elements paint while a full paint looks for them,
+   * whether it is looking, and those it found. */
+  fxSolid = "#fff";
+  finding = false;
+  /** The time a paint draws scrolling text at, the same for both its passes. */
+  clock = 0;
+  fxFound: El[] = [];
+  /** When the next scrolling-text step is due, its timer, and whether a
+   * text that steps then overlaps a visualisation. */
+  private stepAt = Infinity;
+  private stepTimer: ReturnType<typeof setTimeout> | undefined;
+  private stepOverFx = false;
+  /** The biggest repaint asked for since the last display frame. */
+  private pending: "fx" | "scroll" | "all" = "fx";
+  /** Where full paints are drawn and read back (see paint). */
+  private readonly probe = document.createElement("canvas").getContext("2d", { willReadFrequently: true })!;
   state: State = { playState: "stopped", channel: 0, title: "", url: "", author: "", location: "", link: "", items: CHANNELS.map((c) => c.title), time: 0, duration: 0, volume: 1, mute: false, balance: 0, eq: [], level: 0 };
   /** Bumped by every change scripts or the player make; geometry is cached per generation. */
   gen = 0;
@@ -1155,7 +1186,7 @@ export class Skin {
 
   /** Paints the view onto the canvas, inside the window shape, and sends
    * the window its new shape when that changed. */
-  paint() {
+  paint(refind = true) {
     const { w, h } = this.view;
     if (w <= 0 || h <= 0) return;
     if (!this.shapeMask) {
@@ -1171,22 +1202,106 @@ export class Skin {
       }
     }
     this.effectsShown = false;
-    const g = this.draw(this.canvas, w, h);
-    g.globalCompositeOperation = "destination-in";
-    g.drawImage(this.shapeMask, 0, 0);
-    g.globalCompositeOperation = "source-over";
-    // Frames only while a visualisation is on screen: none while it is hidden.
+    this.clock = performance.now();
+    if (!refind && this.fx.length) {
+      // Only a scrolling text moved, clear of the visualisations: what
+      // covers them is as it was.
+      this.fxSolid = "#000";
+      this.drawShaped(this.canvas);
+      this.paintFx();
+      return this.effectsChanged();
+    }
+    this.fxFound = [];
+    this.fxSolid = "#fff";
+    this.finding = true;
+    // On a canvas of its own: reading pixels back from the window's canvas
+    // would move it off the GPU.
+    const g = this.drawShaped(this.probe.canvas);
+    this.finding = false;
+    // The view again, with each visualisation black instead of white: the
+    // difference is how much of it shows through what is drawn over it.
+    const found = this.fxFound.map((el) => {
+      const [x, y] = this.origin(el);
+      const part: [number, number, number, number] = [Math.max(0, x), Math.max(0, y), 0, 0];
+      part[2] = Math.min(w, x + el.w) - part[0];
+      part[3] = Math.min(h, y + el.h) - part[1];
+      return { el, x, y, part, white: part[2] > 0 && part[3] > 0 ? g.getImageData(...part).data : null };
+    });
+    this.fx = [];
+    if (found.length) {
+      this.fxSolid = "#000";
+      this.drawShaped(this.probe.canvas);
+      // ponytail: overlapping visualisations would read each other as cover; no skin seen has two.
+      for (const { el, x, y, part, white } of found) {
+        if (!white) continue;
+        const { mask, cover } = overlay(white, g.getImageData(...part).data);
+        const image = (name: string, data: Uint8ClampedArray<ArrayBuffer>) => {
+          const c = el.canvas(name, part[2], part[3]);
+          c.putImageData(new ImageData(data, part[2], part[3]), 0, 0);
+          return c.canvas;
+        };
+        this.fx.push({ el, x, y, part, mask: image("mask", mask), cover: image("cover", cover) });
+      }
+    }
+    if (this.canvas.width !== w || this.canvas.height !== h) [this.canvas.width, this.canvas.height] = [w, h];
+    const out = this.canvas.getContext("2d")!;
+    out.clearRect(0, 0, w, h);
+    out.drawImage(this.probe.canvas, 0, 0);
+    this.paintFx();
+    this.effectsChanged();
+  }
+
+  /** Frames only while a visualisation is on screen: none while it is hidden. */
+  private effectsChanged() {
     if (this.started && this.effectsShown !== this.effectsOn) {
       this.effectsOn = this.effectsShown;
       this.send({ type: "effects", on: this.effectsOn });
     }
   }
 
-  /** An analyser frame from the host: repaint on the next display frame,
-   * if a visualisation shows it. */
+  /** An analyser frame from the host: repaint the visualisations on the
+   * next display frame, if one shows it. */
   setFrame(f: Frame) {
     this.frame = f;
-    if (this.effectsOn) this.animate();
+    if (this.effectsOn) this.animate("fx");
+  }
+
+  /** Redraws each visualisation in its part of the canvas, under what covers it. */
+  private paintFx() {
+    const g = this.canvas.getContext("2d")!;
+    for (const { el, x, y, part, mask, cover } of this.fx) {
+      const fx = el.canvas("fx", part[2], part[3]);
+      el.drawFx(fx, x - part[0], y - part[1]);
+      fx.globalCompositeOperation = "destination-in";
+      fx.drawImage(mask, 0, 0);
+      fx.globalCompositeOperation = "lighter";
+      fx.drawImage(cover, 0, 0);
+      fx.globalCompositeOperation = "source-over";
+      g.clearRect(...part);
+      g.drawImage(fx.canvas, part[0], part[1]);
+    }
+  }
+
+  /** Where an element's top-left is on the canvas. */
+  private origin(el: El): [number, number] {
+    let [x, y] = [0, 0];
+    for (let e: El | null = el; e && e !== this.view; e = e.parent) [x, y] = [x + e.x, y + e.y];
+    return [x, y];
+  }
+
+  /** Whether an element overlaps a visualisation's part of the canvas. */
+  overFx(el: El): boolean {
+    const [x, y] = this.origin(el);
+    return this.fx.some(({ part: [px, py, pw, ph] }) => x < px + pw && px < x + el.w && y < py + ph && py < y + el.h);
+  }
+
+  /** Paints the view onto `c`, inside the window shape. */
+  private drawShaped(c: HTMLCanvasElement): CanvasRenderingContext2D {
+    const g = this.draw(c, this.view.w, this.view.h);
+    g.globalCompositeOperation = "destination-in";
+    g.drawImage(this.shapeMask!, 0, 0);
+    g.globalCompositeOperation = "source-over";
+    return g;
   }
 
   private draw(c: HTMLCanvasElement, w: number, h: number): CanvasRenderingContext2D {
@@ -1253,13 +1368,36 @@ export class Skin {
     }
   }
 
-  /** Something on screen moves: repaint on the next frame. */
-  animate() {
+  /** Repaint everything in `ms`, or sooner if already due: a scrolling
+   * text's next step, rather than every display frame (ATA-116). */
+  later(ms: number, overFx: boolean) {
+    this.stepOverFx ||= overFx;
+    const at = performance.now() + ms;
+    if (at >= this.stepAt) return;
+    clearTimeout(this.stepTimer);
+    this.stepAt = at;
+    this.stepTimer = setTimeout(() => {
+      this.stepAt = Infinity;
+      this.animate(this.stepOverFx ? "all" : "scroll");
+      this.stepOverFx = false;
+    }, ms);
+  }
+
+  /** Something on screen moves: repaint on the next frame. "fx": only the
+   * visualisations; "scroll": everything, but what covers the visualisations
+   * is as it was; "all": everything. */
+  animate(what: "fx" | "scroll" | "all" = "all") {
+    const order = ["fx", "scroll", "all"];
+    if (order.indexOf(what) > order.indexOf(this.pending)) this.pending = what;
     if (this.animating) return;
     this.animating = true;
     requestAnimationFrame(() => {
       this.animating = false;
-      this.paint();
+      const what = this.pending;
+      this.pending = "fx";
+      if (what === "all") this.paint();
+      else if (what === "scroll") this.paint(false);
+      else this.paintFx();
     });
   }
 
