@@ -354,7 +354,8 @@ As in the Winamp app (its `docs/decisions.md`, ATA-72), with this app's names.
   (an edge known by its reverse name or by an address `streams.radiomast.io`
   redirects to: v0.1.0's run met one named after a hosting provider);
   the skin it downloaded, whose md5 must be a working one in
-  `compatible.json` (or, if archive.org delivered none, the house skin); two shots of the window 15 s apart; then a silent
+  `compatible.json` (or, if archive.org delivered none, the house skin,
+  which the run flags with a warning); two shots of the window 15 s apart; then a silent
   uninstall that must leave no install folder, no Settings > Apps entry
   and no shortcuts. It then installs the release before and waits for it to
   update itself to the new one. The evidence is the run's `install-check`

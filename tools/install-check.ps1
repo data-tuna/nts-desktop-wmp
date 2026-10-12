@@ -90,7 +90,11 @@ function Check-Playing([string]$name) {
     $skins = Get-ChildItem "$env:LOCALAPPDATA\com.datatuna.ntswmp\skins" -Filter *.wmz -ErrorAction SilentlyContinue
     # archive.org being slow or down is not the release's fault: the app
     # wears its house skin then, by design.
-    if (-not $skins) { "skin: Bootleg House, the fallback (no skin came from archive.org)" | Tee-Object -Append "$Out/$name.txt" }
+    if (-not $skins) {
+      "skin: Bootleg House, the fallback (no skin came from archive.org)" | Tee-Object -Append "$Out/$name.txt"
+      # On the run's summary, so a broken skin download cannot pass for a full pass.
+      Write-Host "::warning::no skin came from archive.org; the app wore Bootleg House"
+    }
     foreach ($f in $skins) {
       $md5 = (Get-FileHash $f.FullName -Algorithm MD5).Hash.ToLower()
       $known = $list | Where-Object md5 -eq $md5
