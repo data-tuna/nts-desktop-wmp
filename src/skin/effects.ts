@@ -2,9 +2,10 @@
 // an Ambience-style glow, after the look of WMP's built-in ones. They draw
 // the frames the trusted page sends while one is on screen (the `vis`
 // message, docs/decisions.md ATA-114). The NTS show card is static: it
-// draws the `show` message, and needs no frames (ATA-166). The trusted page reduces its
-// analyser data with `bands` and `samples`; no DOM here, so `node --test`
-// can run them.
+// draws the `show` message, and needs no frames (ATA-166). The trusted page
+// reduces its analyser data with `bands` and `samples`; no DOM here, so
+// `node --test` can run them.
+import { clearRows } from "./pixels.ts";
 
 /** One analyser frame: spectrum bars and waveform samples, 0..255. */
 export type Frame = { bars: number[]; wave: number[] };
@@ -49,7 +50,13 @@ export function samples(wave: Uint8Array, count: number): number[] {
 }
 
 /** What an effects element keeps between frames, and the card it last drew. */
-export type Memory = { peaks: number[]; trail: HTMLCanvasElement | null; card: { of: Card | null; canvas: HTMLCanvasElement } | null };
+export type Memory = {
+  peaks: number[];
+  trail: HTMLCanvasElement | null;
+  /** The `overlay` mask of the last full paint, `w` × `h`, at (`dx`, `dy`) in the element. */
+  cover: { mask: Uint8ClampedArray; w: number; h: number; dx: number; dy: number } | null;
+  card: { of: Card | null; canvas: HTMLCanvasElement } | null;
+};
 
 /** Draws effect `index` into (x, y, w, h). `frame` is null when nothing
  * plays: the screen stays dark, as WMP's does. `fg` is the skin's
@@ -150,9 +157,12 @@ function ambience(g: CanvasRenderingContext2D, frame: Frame | null, [x, y, w, h]
 }
 
 /** The show's picture, cropped to fill the area, with its title and up to
- * four genres centred over it. With no picture, the title on a plain card; before
- * the first `show` message, just the background. Drawn once per card and
- * size, then copied. */
+ * four genres over it, on a dark band where the skin leaves the area widest
+ * clear. With no picture, the title on a plain card; before the first `show`
+ * message, just the background. Drawn once per card and size, then copied.
+ * ponytail: a cover that changes later (a skin sliding a panel over the
+ * area) does not move the text until the next card; recheck it per paint if
+ * a skin needs that. */
 function showCard(g: CanvasRenderingContext2D, card: Card | null, [x, y, w, h]: [number, number, number, number], bg: string, fg: string | null, mem: Memory) {
   if (mem.card?.of !== card || mem.card.canvas.width !== w || mem.card.canvas.height !== h) {
     const c = mem.card?.canvas ?? document.createElement("canvas");
@@ -161,12 +171,12 @@ function showCard(g: CanvasRenderingContext2D, card: Card | null, [x, y, w, h]: 
     const t = c.getContext("2d")!;
     t.fillStyle = bg;
     t.fillRect(0, 0, w, h);
-    if (card) drawCard(t, card, w, h, fg ?? "#fff");
+    if (card) drawCard(t, card, w, h, fg ?? "#fff", mem.cover && clearSpans(mem.cover, h));
   }
   g.drawImage(mem.card.canvas, x, y);
 }
 
-function drawCard(t: CanvasRenderingContext2D, card: Card, w: number, h: number, fg: string) {
+function drawCard(t: CanvasRenderingContext2D, card: Card, w: number, h: number, fg: string, clear: [number, number][] | null) {
   const image = card.image as (CanvasImageSource & { width: number; height: number }) | null;
   if (image) {
     const s = Math.max(w / image.width, h / image.height);
@@ -176,28 +186,45 @@ function drawCard(t: CanvasRenderingContext2D, card: Card, w: number, h: number,
   const px = Math.max(9, Math.min(14, Math.round(Math.min(w, h) / 9)));
   const pad = Math.max(3, Math.round(px / 2));
   const tagPx = px - 2;
-  // At most 160 px wide: anemone's area is its whole window, and its pods cover the sides.
-  const width = Math.min(w - 2 * pad, 160);
-  t.font = `bold ${px}px sans-serif`;
-  const lines = wrap(t, card.title, width, h >= 6 * px ? 2 : 1);
-  t.font = `${tagPx}px sans-serif`;
-  const tags = h >= 4 * px ? flow(t, card.genres.slice(0, 4), width, 2) : [];
-  const rows = tags.length ? tags[tags.length - 1].row + 1 : 0;
-  const block = lines.length * Math.round(px * 1.2) + rows * (tagPx + 7);
-  // In the middle, where round areas (the house skin) and anemone's, which
-  // its pods cover at the corners, show it; over a picture, on a dark band.
-  let top = Math.round((h - block) / 2);
+  const lay = (width: number, withTags: boolean) => {
+    t.font = `bold ${px}px sans-serif`;
+    const lines = wrap(t, card.title, width, h >= 6 * px ? 2 : 1);
+    const wide = Math.max(0, ...lines.map((line) => t.measureText(line).width));
+    t.font = `${tagPx}px sans-serif`;
+    const tags = withTags && h >= 4 * px ? flow(t, card.genres.slice(0, 4), width, 2) : [];
+    const rows = tags.length ? tags[tags.length - 1].row + 1 : 0;
+    return { lines, tags, wide: Math.max(wide, ...tags.map((tag) => tag.x + tag.w)), block: lines.length * Math.round(px * 1.2) + rows * (tagPx + 7) };
+  };
+  // The widest text that fits a span the skin leaves clear: the house
+  // skin's area is round, and anemone's pods cover two corners. Without the
+  // genres if they would leave the title too narrow.
+  const rows = clear ?? Array.from({ length: h }, (): [number, number] => [0, w]);
+  const fit = (withTags: boolean) => {
+    for (let width = w - 2 * pad; width >= 4 * px; width -= 4) {
+      const layout = lay(width, withTags);
+      const spot = place(rows, layout.block + 2 * pad);
+      if (layout.wide <= spot.x1 - spot.x0 - 2 * pad) return { width, layout, spot };
+    }
+    return null;
+  };
+  let best = fit(true);
+  if (!best || best.width < 6 * px) best = fit(false) ?? best;
+  const layout = best?.layout ?? lay(w - 2 * pad, false);
+  const spot = best?.spot ?? place(rows, layout.block + 2 * pad);
+  const { lines, tags, block } = layout;
+  const cx = (spot.x0 + spot.x1) / 2;
   if (image) {
     t.fillStyle = "rgba(0,0,0,0.6)";
-    t.fillRect(0, top - pad, w, block + 2 * pad);
+    t.fillRect(spot.x0, spot.top, spot.x1 - spot.x0, block + 2 * pad);
   }
+  let top = spot.top + pad;
   const ink = image ? "#fff" : fg;
   t.fillStyle = ink;
   t.textBaseline = "top";
   t.textAlign = "center";
   t.font = `bold ${px}px sans-serif`;
   for (const line of lines) {
-    t.fillText(line, w / 2, top);
+    t.fillText(line, cx, top);
     top += Math.round(px * 1.2);
   }
   t.font = `${tagPx}px sans-serif`;
@@ -205,11 +232,35 @@ function drawCard(t: CanvasRenderingContext2D, card: Card, w: number, h: number,
   t.lineWidth = 1;
   for (const tag of tags) {
     const row = tags.filter((other) => other.row === tag.row);
-    const left = Math.round((w - row[row.length - 1].x - row[row.length - 1].w) / 2) + tag.x;
+    const left = Math.round(cx - (row[row.length - 1].x + row[row.length - 1].w) / 2) + tag.x;
     const ty = top + 2 + tag.row * (tagPx + 7);
     t.strokeRect(left + 0.5, ty + 0.5, tag.w - 1, tagPx + 4);
     t.fillText(tag.text, left + tag.w / 2, ty + 3);
   }
+}
+
+/** Each of the element's `h` rows' widest uncovered run, [start, end), in its own coordinates. */
+function clearSpans({ mask, w, h, dx, dy }: NonNullable<Memory["cover"]>, rows: number): [number, number][] {
+  const shown = clearRows(mask, w, h);
+  return Array.from({ length: rows }, (_, r) => {
+    const [a, b] = shown[r - dy] ?? [0, 0];
+    return [a + dx, b + dx];
+  });
+}
+
+/** Where a block `rows` tall shows widest, given each row's clear span
+ * [start, end): its top and the span all its rows leave clear. Of equal
+ * spans, the one nearest the middle. */
+export function place(clear: [number, number][], rows: number): { top: number; x0: number; x1: number } {
+  const middle = (clear.length - rows) / 2;
+  let best = { top: Math.max(0, Math.round(middle)), x0: 0, x1: 0 };
+  for (let top = 0; top + rows <= clear.length; top++) {
+    let [x0, x1] = clear[top];
+    for (let r = top + 1; r < top + rows && x1 > x0; r++) [x0, x1] = [Math.max(x0, clear[r][0]), Math.min(x1, clear[r][1])];
+    const [span, bestSpan] = [Math.max(0, x1 - x0), best.x1 - best.x0];
+    if (span > bestSpan || (span === bestSpan && span > 0 && Math.abs(top - middle) < Math.abs(best.top - middle))) best = { top, x0, x1 };
+  }
+  return best;
 }
 
 /** `text` in at most `max` lines of `width` px, the last cut with an ellipsis. */

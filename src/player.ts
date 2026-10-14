@@ -3,7 +3,7 @@
 // Pause and stop cancel a pending retry. See AGENTS.md, Invariants.
 
 /** A playlist row. A pick plays through `Widget`, everything else through the <audio> element. */
-export type Item = { title: string; url: string; pick?: boolean; artwork?: string };
+export type Item = { title: string; url: string; pick?: boolean; name?: string; artwork?: string };
 
 /** What plays a pick (main.ts: SoundCloud's widget). It reports a finish or an error to the caller itself. */
 export type Widget = {

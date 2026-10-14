@@ -86,7 +86,7 @@ class El {
   private canvases = new Map<string, HTMLCanvasElement>();
   api: object | null = null;
   /** An effects element's peaks and trails. */
-  readonly memory: Memory = { peaks: [], trail: null, card: null };
+  readonly memory: Memory = { peaks: [], trail: null, cover: null, card: null };
   move: ReturnType<typeof setTimeout> | null = null;
 
   readonly node: Node;
@@ -1269,6 +1269,8 @@ export class Skin {
           return c.canvas;
         };
         this.fx.push({ el, x, y, part, mask: image("mask", mask), cover: image("cover", cover) });
+        // What lies over it, for the show card's layout.
+        el.memory.cover = { mask, w: part[2], h: part[3], dx: part[0] - x, dy: part[1] - y };
       }
     }
     if (this.canvas.width !== w || this.canvas.height !== h) [this.canvas.width, this.canvas.height] = [w, h];

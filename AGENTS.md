@@ -46,9 +46,9 @@ Written in English.
                           engine.ts lays out and paints the view, runs the
                           skin's scripts and handles the pointer, runtime.ts
                           is the WMP object model the scripts see, effects.ts
-                          draws the visualisations and the show card, pixels.ts holds the pixel
-                          helpers its tests share. main.ts is the entry;
-                          index.html the page.
+                          draws the visualisations and the show card,
+                          pixels.ts holds the pixel helpers its tests share.
+                          main.ts is the entry; index.html the page.
     skins/house/          The house skin, the one skin that ships: house.wms,
                           the layered SVGs in art/ it is drawn from, build.mjs
                           that renders them to bitmaps and zips house.wmz,
@@ -310,7 +310,8 @@ no app at all:
 
 A stand-in host in that page answers the skin with state as the trusted page
 does, but plays nothing; `/?play` starts it playing, as the app does on
-launch. In either place, `__wmpScope` in the skin webview is what skin code
+launch. It sends no `show` message, so the show card, the default effect,
+is an empty area there: `next()` on the effects element moves on to Bars. In either place, `__wmpScope` in the skin webview is what skin code
 sees: `__wmpScope.player.status`, `__wmpScope.<element id>.visible`.
 
 `install-check.ps1` installs the app, plays it, and uninstalls it, as the

@@ -166,9 +166,11 @@ function sendCard() {
 async function updateCard(i: number) {
   const item = items[i];
   const show = i < CHANNELS.length ? onAir[i] : undefined;
-  const title = show?.show ?? item.title;
-  const genres = show?.genres.slice(0, 4) ?? [];
-  const artwork = show ? show.artwork : (picks.get(item.url)?.artwork ?? item.artwork);
+  const pick = picks.get(item.url);
+  // A mixtape's name without its subtitle; a pick's without its location and tags.
+  const title = show?.show ?? pick?.name ?? item.name ?? item.title;
+  const genres = (show?.genres ?? pick?.tags ?? []).slice(0, 4);
+  const artwork = show ? show.artwork : (pick?.artwork ?? item.artwork);
   const key = JSON.stringify([title, genres, artwork]);
   if (key === card) return;
   card = key;

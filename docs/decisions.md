@@ -505,17 +505,19 @@ than once), against 280 MB (540 MB) for the Winamp app.
 Ata asked for the show's picture and genres, as nts.live shows them, in the
 skin's visualiser area. A fourth effect, **NTS show** (`effectType` "NTS
 show", preset 0), draws the show's picture cropped to fill the area, and
-over it, centred on a dark band, the show's title (two lines at most) and up
-to four genres as outlined tags. It joins Bars, Scope and Ambience in
+over it, on a dark band, the show's title (two lines at most) and up to
+four genres as outlined tags. It joins Bars, Scope and Ambience in
 `next()` and `previous()`.
 
 - **Data.** The live API's `now.embeds.details.genres[].value` and the
   `media.picture_small` (200×200) that `live.ts` already read for the
   overlay. On 2026-10-14 NTS 2's show had no genres: the card then has none.
-  A mixtape uses its own `media.picture_small` (now read by `mixtapes.ts`); a
-  pick uses the NTS episode picture the picks API gives, the one the overlay
-  already shows. SoundCloud's widget has the track's artwork too, but the
-  NTS picture is already at hand.
+  A mixtape uses its own `media.picture_small` and its title without the
+  subtitle (both now read by `mixtapes.ts`). A pick uses the NTS episode
+  picture the picks API gives, the one the overlay already shows, its name
+  as the title and its genres and moods as tags (`picks.ts` now keeps them
+  apart). SoundCloud's widget has the track's artwork too, but the NTS
+  picture is already at hand.
 - **Isolation.** The skin's CSP is unchanged. The trusted page fetches the
   picture (`media*.ntslive.co.uk` sends `Access-Control-Allow-Origin: *`)
   and sends it to the skin as a `data:` URL in a `show` message through
@@ -530,16 +532,24 @@ to four genres as outlined tags. It joins Bars, Scope and Ambience in
 - **CPU.** The card is drawn once per card and area size, then copied. The
   skin tells the trusted page that a card needs no analyser frames
   (`effects` `on: false`), so none are sent. Release build, anemone, NTS 1
-  playing, muted, 30 s each: card 7.0 and 7.1 % of one core, visualisation
-  hidden 7.2 %, Bars 29.4 %.
+  playing, muted, 30 s each: card 5.9 and 5.5 % of one core, visualisation
+  hidden 5.5 %; in an earlier run Bars took 29.4 %.
 - **Saved.** `mediacenter.effectType` and `effectPreset` are now kept in
   the skin webview's `localStorage`, so the effect is the same on the next
   launch and in other skins. Skins that bind their `effects` element to
   `mediacenter` (anemone, bluegrid, cerulean) read it from there; an element
   with no `currentEffectType` (the house skin's) shows `mediacenter`'s, and
   `next()` saves to it. Before any choice, it is the card.
-- **Layout.** Text is centred and at most 160 px wide: the house skin's area
-  is round, and anemone's is its whole window, with pods over two corners.
+- **Layout.** The text goes where the skin leaves it clear. A full paint
+  already works out how much of the area shows at each pixel (`overlay`,
+  ATA-116); when the card is drawn, `clearRows` takes each row's widest
+  fully shown run, and `place` finds the band whose rows share the widest
+  span, nearest the middle. The card tries the widest text first and
+  narrows it until it fits such a span; if the genres would leave the title
+  narrower than about 6 characters' width, it drops them. The house skin's
+  round area and anemone's (its whole window, pods over two corners) keep
+  the title and lose the genres; bluegrid keeps both. The layout is redone
+  for a new card or size, not when the cover changes.
 
 ### Skins from archive.org: the list, the launch, the picker (ATA-112, 2026-10-11)
 
