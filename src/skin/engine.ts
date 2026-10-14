@@ -581,6 +581,11 @@ class El {
     const row = this.rowHeight();
     const { items, channel } = this.skin.state;
     const rows = Math.max(1, Math.floor(h / row));
+    const fg = this.color("foregroundcolor") ?? 0xffffff;
+    let playingFg = this.color("itemplayingcolor");
+    let playingBg = this.color("itemplayingbackgroundcolor");
+    // Most skins name neither colour; their playing row gets the list's own colours swapped.
+    if (playingFg === null && playingBg === null) [playingFg, playingBg] = [bg ?? 0, fg];
     if (channel !== this.scrolledTo) {
       this.scrolledTo = channel;
       if (channel < this.scroll || channel >= this.scroll + rows) {
@@ -592,12 +597,11 @@ class El {
       const i = n - this.scroll;
       if (i < 0 || i > rows) return;
       const playing = n === channel;
-      const rowBg = playing ? this.color("itemplayingbackgroundcolor") : null;
-      if (rowBg !== null) {
-        g.fillStyle = css(rowBg);
+      if (playing && playingBg !== null) {
+        g.fillStyle = css(playingBg);
         g.fillRect(x, y + i * row, w, row);
       }
-      g.fillStyle = css((playing ? this.color("itemplayingcolor") : null) ?? this.color("foregroundcolor") ?? 0xffffff);
+      g.fillStyle = css((playing ? playingFg : null) ?? fg);
       g.fillText(title, x + 6, y + i * row + row / 2);
     });
   }

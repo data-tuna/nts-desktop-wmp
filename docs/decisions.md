@@ -6,6 +6,23 @@ the evidence.
 
 ## Stack
 
+### Which channel is playing (ATA-164, 2026-10-14)
+
+- **Title:** `NTS 1: <show> - <location>` (was `NTS 1 - …`). Skins like
+  circle print the show before the title, dashes between, so the channel
+  got lost in the middle of a run of names. Mixtapes and picks
+  keep their own titles. The tray tooltip and Windows' media overlay use the
+  same text.
+- **Playlist:** the current row is drawn in the skin's `itemPlayingColor`
+  and `itemPlayingBackgroundColor`. 24 of the 30 working skins with a
+  playlist in their first view name neither, so their current row gets the
+  list's own colours swapped: the foreground colour as its background, the
+  background colour as its text.
+- **Tray:** NTS 1 and NTS 2 are check items, the current channel checked;
+  neither while a mixtape or pick plays, since the tray lists neither.
+  Windows flips a check item's mark on every click, so a click sets both
+  marks again at once.
+
 ### Windows behaviour: tray, single instance, window memory, media keys, credit (ATA-115, 2026-10-11)
 
 - **Tray icon:** Play, Stop, NTS 1, NTS 2, the pick's credit while one
@@ -66,8 +83,9 @@ the evidence.
   Next and previous walk the whole list and wrap; a playlist row sends the
   new `select` message rather than a run of `next`s, which would reload a
   stream at every step. The app still opens on NTS 1.
-- **Titles.** A channel's title is `NTS 1 - <show> - <location>`, the
-  channel first as in the Winamp app (Ata, 2026-10-09). That is
+- **Titles.** A channel's title is `NTS 1: <show> - <location>`, the
+  channel first as in the Winamp app (Ata, 2026-10-09; the colon is
+  ATA-164's). That is
   `player.currentMedia.name` and `getItemInfo("Title")`;
   `getItemInfo("Author")` is the show and `getItemInfo("Location")` its
   place. `live.ts` now keeps `show` and `location` apart for this, which the

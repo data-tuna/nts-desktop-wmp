@@ -9,7 +9,7 @@ use serde::Deserialize;
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 use tauri::http::{HeaderValue, Method, Request, Response, StatusCode};
-use tauri::menu::{Menu, MenuEvent, MenuItem, PredefinedMenuItem};
+use tauri::menu::{CheckMenuItem, Menu, MenuEvent, MenuItem, PredefinedMenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::webview::NewWindowResponse;
 use tauri::{
@@ -454,11 +454,21 @@ struct Credit {
     url: String,
 }
 
-/// The tray menu, and its credit entry, which is in the menu only while a
-/// pick plays.
+/// The tray menu, its two channels, checked while current, and its credit
+/// entry, which is in the menu only while a pick plays.
 struct Tray {
     menu: Menu<Wry>,
+    channels: [CheckMenuItem<Wry>; 2],
     credit: MenuItem<Wry>,
+}
+
+impl Tray {
+    /// Checks the current channel, or neither while a mixtape or pick plays.
+    fn check(&self, channel: Option<usize>) {
+        for (i, item) in self.channels.iter().enumerate() {
+            let _ = item.set_checked(channel == Some(i));
+        }
+    }
 }
 
 static CREDIT: Mutex<Option<Credit>> = Mutex::new(None);
@@ -496,14 +506,20 @@ fn fit_tooltip(text: &str) -> String {
 }
 
 /// The trusted page, whenever what plays changes: its title for the tray's
-/// tooltip, and a pick's credit, or none. While a pick plays the app draws
+/// tooltip, the channel to check in the tray, and a pick's credit, or none. While a pick plays the app draws
 /// the credit itself, above the skin, in a webview of its own: a skin's code
 /// cannot hide it, and a skin with no title text still shows it.
 #[tauri::command]
-async fn now_playing(app: AppHandle, title: String, credit: Option<Credit>) -> Result<(), String> {
+async fn now_playing(
+    app: AppHandle,
+    title: String,
+    channel: Option<usize>,
+    credit: Option<Credit>,
+) -> Result<(), String> {
     if let Some(tray) = app.tray_by_id("main") {
         let _ = tray.set_tooltip(Some(fit_tooltip(&title)));
     }
+    app.state::<Tray>().check(channel);
     if credit.as_ref().is_some_and(|c| !soundcloud_page(&c.url)) {
         return Err("not a SoundCloud page".into());
     }
@@ -600,15 +616,19 @@ fn open_credit() {
 /// plays, and quit. A left click brings the player forward.
 fn build_tray(app: &AppHandle) -> tauri::Result<()> {
     let item = |id: &str, text: &str| MenuItem::with_id(app, id, text, true, None::<&str>);
+    let channel = |id: &str, text: &str| {
+        CheckMenuItem::with_id(app, id, text, true, id == "nts1", None::<&str>)
+    };
     let sep = || PredefinedMenuItem::separator(app);
+    let channels = [channel("nts1", "NTS 1")?, channel("nts2", "NTS 2")?];
     let menu = Menu::with_items(
         app,
         &[
             &item("play", "Play")?,
             &item("stop", "Stop")?,
             &sep()?,
-            &item("nts1", "NTS 1")?,
-            &item("nts2", "NTS 2")?,
+            &channels[0],
+            &channels[1],
             // The credit goes here, at 5, while a pick plays.
             &sep()?,
             &item("quit", "Quit")?,
@@ -617,6 +637,7 @@ fn build_tray(app: &AppHandle) -> tauri::Result<()> {
     let credit = item("credit", "SoundCloud")?;
     app.manage(Tray {
         menu: menu.clone(),
+        channels,
         credit,
     });
     let mut tray = TrayIconBuilder::with_id("main")
@@ -645,6 +666,12 @@ fn on_tray_menu(app: &AppHandle, event: MenuEvent) {
     match event.id().as_ref() {
         "quit" => app.exit(0),
         "credit" => open_credit(),
+        // Windows flips a check item's mark on every click; main.ts plays the
+        // clicked channel, so that one is checked, even if it already was.
+        id @ ("nts1" | "nts2") => {
+            app.state::<Tray>().check(Some((id == "nts2") as usize));
+            let _ = app.emit_to(EventTarget::webview("main"), "tray", id);
+        }
         // main.ts plays, stops and switches.
         id => {
             let _ = app.emit_to(EventTarget::webview("main"), "tray", id);
