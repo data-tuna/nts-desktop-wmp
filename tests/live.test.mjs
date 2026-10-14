@@ -1,6 +1,6 @@
 // Run with `npm test`. Node strips the TypeScript types itself (22.18+).
 // Copied from nts-desktop-winamp at 6379c0e (PR #9) with its fixture; keep the two in step.
-// The `show`, `location` and `genres` checks are this copy's own.
+// The `show`, `location`, `genres` and `showAlias` checks are this copy's own.
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
@@ -17,6 +17,8 @@ test("titles, locations, artwork, end times and next shows", () => {
   assert.equal(nts1.location, "London");
   assert.deepEqual(nts1.genres, ["Soul", "House"]);
   assert.deepEqual(parseLive(fixture)[1].genres, []);
+  assert.equal(nts1.showAlias, "breakfast");
+  assert.equal(nts2.showAlias, undefined);
   assert.equal(nts1.endsAt, Date.parse("2026-10-09T10:00:00Z"));
   assert.match(nts1.artwork, /^https:\/\/media3\.ntslive\.co\.uk\/resize\/200x200\//);
   assert.deepEqual(nts1.next, { title: "SOUP TO NUTS w/ ARCHITECT", startsAt: Date.parse("2026-10-09T10:00:00Z") });
@@ -25,7 +27,7 @@ test("titles, locations, artwork, end times and next shows", () => {
 
 test("a show with no location or artwork keeps its title", () => {
   const body = { results: [{ channel_name: "2", now: { broadcast_title: "In Focus", embeds: { details: null } } }] };
-  assert.deepEqual(parseLive(body), [undefined, { title: "In Focus", show: "In Focus", location: undefined, artwork: undefined, genres: [], endsAt: undefined, next: undefined }]);
+  assert.deepEqual(parseLive(body), [undefined, { title: "In Focus", show: "In Focus", location: undefined, artwork: undefined, genres: [], showAlias: undefined, endsAt: undefined, next: undefined }]);
 });
 
 test("anything not shaped like the API gives no shows", () => {

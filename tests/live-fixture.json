@@ -9,6 +9,7 @@
         "embeds": {
           "details": {
             "location_long": "London",
+            "show_alias": "breakfast",
             "genres": [{ "id": "genres-soulrhythm-soul", "value": "Soul" }, { "id": "genres-housetechno-house", "value": "House" }],
             "media": {
               "picture_small": "https://media3.ntslive.co.uk/resize/200x200/2d3b5b71-b025-4afa-b734-ec54306d0fbc_1767744000.jpeg"

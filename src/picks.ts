@@ -3,7 +3,8 @@
 // with a link back, wherever a pick plays.
 // Copied from nts-desktop-winamp's src/picks.ts at bdc0f10, parsing only:
 // the Webamp playback stays behind. Fix a bug in both copies. This copy also
-// keeps the name and tags apart, for the show card (ATA-166).
+// keeps the name and tags apart, for the show card (ATA-166), and the
+// episode's aliases, for the tray's link to its page (ATA-172).
 
 // The .ts extension lets `node --test` load this file directly.
 import { text } from "./live.ts";
@@ -20,6 +21,9 @@ export type Pick = {
   name: string;
   tags: string[];
   artwork?: string;
+  /** The episode's page is `/shows/<showAlias>/episodes/<episodeAlias>` on nts.live. */
+  showAlias?: string;
+  episodeAlias?: string;
 };
 
 export function parsePicks(body: unknown): Pick[] {
@@ -44,6 +48,8 @@ export function parsePicks(body: unknown): Pick[] {
         name,
         tags,
         artwork: typeof picture === "string" && picture.startsWith("https://") ? picture : undefined,
+        showAlias: text(episode?.show_alias),
+        episodeAlias: text(episode?.episode_alias),
       },
     ];
   });

@@ -211,17 +211,24 @@ if ("mediaSession" in navigator) {
   for (const [action, type] of actions) navigator.mediaSession.setActionHandler(action, () => onSkin({ type } as FromSkin));
 }
 
-// The tray's tooltip and check mark, and while a pick plays its credit, which the app draws
-// over the skin and lists in the tray (lib.rs, now_playing).
+// The tray's tooltip and check mark, its link to the show's page on nts.live, and while a pick
+// plays its credit, which the app draws over the skin and lists in the tray (lib.rs, now_playing).
 let tray = "";
 function updateTray(title: string, i: number, playState: string) {
   const pick = picks.get(items[i].url);
   const credit = pick && playState !== "stopped" ? { name: pick.uploader ?? "", url: pick.url } : null;
   // The tray checks the channel that is current; a mixtape or pick checks neither.
   const channel = i < CHANNELS.length ? i : null;
-  if (tray === JSON.stringify([title, credit, channel])) return;
-  tray = JSON.stringify([title, credit, channel]);
-  void invoke("now_playing", { title, credit, channel }).catch((e: unknown) => console.warn("now_playing", e));
+  // A channel links to its show, a pick to its episode, a mixtape to nothing (ATA-172).
+  const show = i < CHANNELS.length ? onAir[i] : undefined;
+  const page = show?.showAlias
+    ? { show: show.showAlias }
+    : pick?.showAlias && pick.episodeAlias
+      ? { show: pick.showAlias, episode: pick.episodeAlias }
+      : null;
+  if (tray === JSON.stringify([title, credit, channel, page])) return;
+  tray = JSON.stringify([title, credit, channel, page]);
+  void invoke("now_playing", { title, credit, channel, page }).catch((e: unknown) => console.warn("now_playing", e));
 }
 
 // 4 updates a second covers the clock and title. The visualisation gets its
