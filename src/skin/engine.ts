@@ -1533,8 +1533,10 @@ export class Skin {
     if (done) {
       const seeks = this.seeks;
       this.fire(e, "ondragend");
+      this.fire(e, "onmouseup");
       // A seek goes out once, when the drag ends, unless the skin's onDragEnd
-      // sent it (Classic). Television's misspells currentPosition and sends none.
+      // (Classic) or onMouseUp (QuantumRedshift) sent it. Television's misspells
+      // currentPosition and sends none.
       if (e.role === "seek" && this.state.duration > 0 && this.seeks === seeks) {
         const seconds = e.fraction() * this.state.duration;
         // Set locally too, so the thumb stays where it was dropped.
