@@ -40,6 +40,8 @@ export function createWidget(on: Events): Widget & { setVolume(volume: number): 
   // Pauses we sent that the widget has not answered yet: their "pause" events are not the widget's own.
   let echoes = 0;
   let time = 0;
+  // The pick's length in seconds; 0 until the widget tells us.
+  let duration = 0;
   let volume = 100;
   let startTimer: ReturnType<typeof setTimeout> | undefined;
 
@@ -80,6 +82,7 @@ export function createWidget(on: Events): Widget & { setVolume(volume: number): 
         for (const name of ["playProgress", "play", "pause", "finish", "error"]) send("addEventListener", name);
         send("setVolume", volume);
         send("getCurrentSound");
+        send("getDuration");
         if (wanted) send("play");
         break;
       case "getCurrentSound": {
@@ -87,12 +90,17 @@ export function createWidget(on: Events): Widget & { setVolume(volume: number): 
         if (typeof user === "string" && user.trim()) on.uploader(url, user.trim());
         break;
       }
+      case "getDuration":
+        duration = Number(value) / 1000 || 0;
+        break;
       case "playProgress":
         time = Number(value?.currentPosition) / 1000 || 0;
         break;
       case "play":
         started();
         playing = true;
+        // Some sounds report 0 until they start.
+        if (!duration) send("getDuration");
         if (!wanted) {
           wanted = true;
           on.resumed();
@@ -130,7 +138,7 @@ export function createWidget(on: Events): Widget & { setVolume(volume: number): 
       url = next;
       ready = playing = false;
       echoes = 0;
-      time = 0;
+      time = duration = 0;
       frame.src = `${WIDGET}?url=${encodeURIComponent(url)}&auto_play=false&visual=false`;
     },
     pause() {
@@ -144,13 +152,18 @@ export function createWidget(on: Events): Widget & { setVolume(volume: number): 
       send("seekTo", 0);
       time = 0;
     },
+    seek(seconds: number) {
+      if (!ready || !duration) return;
+      time = Math.min(duration, Math.max(0, seconds));
+      send("seekTo", Math.round(time * 1000));
+    },
     unload() {
       started();
       if (!url) return;
       url = "";
       ready = playing = wanted = false;
       echoes = 0;
-      time = 0;
+      time = duration = 0;
       // Removing the src attribute would leave the widget's page running, and playing.
       frame.src = "about:blank";
     },
@@ -159,6 +172,12 @@ export function createWidget(on: Events): Widget & { setVolume(volume: number): 
     },
     get time() {
       return time;
+    },
+    get url() {
+      return url;
+    },
+    get duration() {
+      return duration;
     },
     /** 0..1, mute included. */
     setVolume(v: number) {

@@ -9,7 +9,7 @@ import { CHANNELS } from "../player.ts";
 import { constants, type Node } from "./wms.ts";
 import { css, keyed, mappedElement, overlay, parseColor, rgbAt, runs, type Pixels } from "./pixels.ts";
 import { drawEffect, EFFECTS, effectIndex, type Frame, type Memory } from "./effects.ts";
-import { CONSTANTS, OS_MEDIA_CHANGING, OS_MEDIA_OPEN, objects, playState, resImage, resScript, resString, wmpObject, type Host } from "./runtime.ts";
+import { clock, CONSTANTS, OS_MEDIA_CHANGING, OS_MEDIA_OPEN, objects, playState, resImage, resScript, resString, wmpObject, type Host } from "./runtime.ts";
 
 /** A text showing the current item's name, title or author. */
 const TITLE = /currentmedia\.(name\b|getiteminfo\(\s*["'](title|author)["'])/i;
@@ -59,7 +59,6 @@ function kindOf(tag: string): Kind {
   return "none";
 }
 
-const fmt = (t: number) => `${String(Math.floor(t / 60)).padStart(2, "0")}:${String(Math.floor(t % 60)).padStart(2, "0")}`;
 const HANDLER = /^on|_onchange$|^(playstatechange|openstatechange|statuschange|mediachange|modechange|disconnect)$/;
 const BINDING = /^\s*(jscript|wmpprop|wmpenabled|wmpdisabled):\s*([\s\S]*?)[\s;]*$/i;
 
@@ -244,7 +243,7 @@ class El {
   text(): string {
     if (this.role === "currentposition") return this.skin.elapsed();
     if (this.role === "status") return this.skin.status();
-    if (this.role === "duration") return "";
+    if (this.role === "duration") return this.skin.state.duration > 0 ? clock(this.skin.state.duration) : "";
     return this.skin.str(this, "value");
   }
 
@@ -252,10 +251,16 @@ class El {
   range(): [number, number, number] {
     const role = this.role;
     const min = this.skin.num(this, "min") ?? (role === "balance" ? -100 : 0);
-    const max = this.skin.num(this, "max") ?? 100;
+    const { volume, balance, time, duration } = this.skin.state;
+    // A seek slider runs from 0 to the pick's length, in seconds, as WMP's does.
+    const max = this.skin.num(this, "max") ?? (role === "seek" && duration > 0 ? duration : 100);
     let value = this.dragValue ?? this.skin.num(this, "value");
-    const { volume, balance } = this.skin.state;
-    if (value === null) value = role === "volume" ? min + volume * (max - min) : role === "balance" ? min + ((balance + 1) / 2) * (max - min) : min;
+    if (value === null)
+      value =
+        role === "volume" ? min + volume * (max - min)
+        : role === "balance" ? min + ((balance + 1) / 2) * (max - min)
+        : role === "seek" && duration > 0 ? min + (time / duration) * (max - min)
+        : min;
     return [min, max, Math.min(max, Math.max(min, value))];
   }
 
@@ -776,6 +781,8 @@ export class Skin {
 
   private images: Map<string, Img>;
   private send: Send;
+  /** Seeks the skin's scripts have sent, so a drag's end seeks only once. */
+  private seeks = 0;
   /** The skin's .js files, by lower-cased name. */
   private scripts: Map<string, string>;
 
@@ -793,7 +800,10 @@ export class Skin {
       status: () => this.status(),
       elapsed: () => this.elapsed(),
       controlEnabled: (name) => this.controlEnabled(name),
-      send: (msg) => this.send(msg),
+      send: (msg) => {
+        if (msg.type === "seek") this.seeks++;
+        this.send(msg);
+      },
       userAction: () => this.userAction,
       set: (patch) => {
         this.state = { ...this.state, ...patch };
@@ -1078,21 +1088,24 @@ export class Skin {
     return p === "stopped" ? "Ready" : p[0].toUpperCase() + p.slice(1);
   }
 
-  /** The elapsed time: blank while stopped, as in WMP, and while paused,
-   * because pausing drops the stream (player.ts) and its clock reads 0. */
+  /** The elapsed time: blank while stopped, as in WMP, and while a stream
+   * is paused, because pausing drops it (player.ts) and its clock reads 0.
+   * A paused pick keeps its place, so shows it. */
   elapsed(): string {
-    return this.playing ? fmt(this.state.time) : "";
+    const p = this.state.playState;
+    return this.playing || (p === "paused" && this.state.duration > 0) ? clock(this.state.time) : "";
   }
 
   /** Whether a named transport control is enabled, or null for other names.
-   * Previous and next switch channels; a live stream has no seeking. */
+   * Previous and next switch channels; only a pick, which has a length, can seek. */
   controlEnabled(role: string): boolean | null {
     if (role === "play") return !this.playing;
     if (role === "pause" || role === "stop") return this.playing;
     // Tag names (prevbutton, ffwdelement, seekslider) and the
     // player.controls names that wmpenabled: uses.
     if (["prev", "previous", "next"].includes(role)) return true;
-    if (["ffwd", "fastforward", "rew", "fastreverse", "seek"].includes(role)) return false;
+    if (role === "seek" || role === "currentposition") return this.state.duration > 0;
+    if (["ffwd", "fastforward", "rew", "fastreverse"].includes(role)) return false;
     return null;
   }
 
@@ -1518,8 +1531,17 @@ export class Skin {
       this.fire(e, "value_onchange");
     }
     if (done) {
+      const seeks = this.seeks;
       this.fire(e, "ondragend");
-      // Back to the player's value. Seeking is disabled: live.
+      // A seek goes out once, when the drag ends, unless the skin's onDragEnd
+      // sent it (Classic). Television's misspells currentPosition and sends none.
+      if (e.role === "seek" && this.state.duration > 0 && this.seeks === seeks) {
+        const seconds = e.fraction() * this.state.duration;
+        // Set locally too, so the thumb stays where it was dropped.
+        this.state.time = seconds;
+        this.send({ type: "seek", seconds });
+      }
+      // Back to the player's value.
       e.dragValue = null;
     }
     this.paint();

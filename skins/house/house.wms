@@ -19,12 +19,13 @@
           value="wmpprop:player.currentMedia.name"
           fontFace="Tahoma" fontSize="11" fontStyle="bold" foregroundColor="#2A1803"
           scrolling="true" scrollingDelay="40" scrollingAmount="1"/>
-    <text id="status" left="180" top="78" width="104" height="16"
+    <text id="status" left="180" top="78" width="74" height="16"
           value="wmpprop:player.status"
           fontFace="Tahoma" fontSize="8" foregroundColor="#6E430E"/>
-    <text id="time" left="284" top="74" width="102" height="22"
-          value="wmpprop:player.controls.currentPositionString"
-          fontFace="Tahoma" fontSize="13" fontStyle="bold" foregroundColor="#2A1803" justification="right"/>
+    <!-- A pick has a length: "1:02:34 / 1:58:00", smaller to fit. -->
+    <text id="time" left="254" top="74" width="132" height="22"
+          value="jscript:player.controls.currentPositionString + (player.currentMedia.duration ? ' / ' + player.currentMedia.durationString : '');"
+          fontFace="Tahoma" fontSize="jscript:player.currentMedia.duration ? 10 : 13;" fontStyle="bold" foregroundColor="#2A1803" justification="right"/>
 
     <!-- The controls. Play and pause share a place: whichever the player can do shows. -->
     <buttonGroup id="transport" left="172" top="110" transparencyColor="#FF00FF"
