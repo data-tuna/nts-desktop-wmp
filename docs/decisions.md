@@ -523,9 +523,9 @@ as it was). How frames reach the skin webview is unchanged: still
 
 - **20 frames a second, not 30.** The trusted page sends a frame when 45 ms
   have passed since the last: every third display frame at 60 Hz, every
-  sixth at 120 Hz (50 ms); 18–19 a second at 75 or 90 Hz. Measured in the skin webview, release build, anemone: frames
-  arrive every 50.0 ms (p95 51.1 ms, worst 51.7 ms), as evenly as 33.3 ms
-  (p95 34.3 ms) did before.
+  sixth at 120 Hz (50 ms); 18–19 a second at 75 or 90 Hz. Measured in the
+  skin webview, release build, anemone: frames arrive every 50.0 ms (p95
+  51.1 ms, worst 51.7 ms), as evenly as 33.3 ms (p95 34.3 ms) did before.
 - **The look per second is kept.** Bars' peak caps fall `h / 33` a frame
   instead of `h / 50`, and Ambience's trails fade by 0.175 a frame instead
   of 0.12, so both move as fast per second as they did at 30 frames.
@@ -574,10 +574,10 @@ with falling peak caps), **Scope** (the waveform) and **Ambience** (soft
 coloured lights that drift and swell with the music). Nothing is copied from
 WMP or from the GPL WMP 8 clone. `src/skin/effects.ts` has them.
 
-- **Data.** The trusted page reads a second analyser, tapped from the
-  stream before the volume, so the visualisation moves at any volume and
-  when muted, as WMP's does. It has 8192 points (6 Hz bins), so the lowest
-  bars, 8 Hz apart, each read their own bin. 20 times a second (ATA-122) it sends
+- **Data.** The trusted page reads a second analyser, tapped from the stream
+  before the volume, so the visualisation moves at any volume and when
+  muted, as WMP's does. It has 8192 points (6 Hz bins), so the lowest bars,
+  8 Hz apart, each read their own bin. 20 times a second (ATA-122) it sends
   `{ "type": "vis", "bars": [32 × 0..255], "wave": [96 × 0..255] }` through
   `skin_send`, but only while the skin has said a visualisation is on screen
   (`effects` message) and the stream is playing. Each frame repaints the
