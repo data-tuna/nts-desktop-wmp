@@ -6,6 +6,40 @@ the evidence.
 
 ## Stack
 
+### A seek bar for picks (ATA-165, 2026-10-14)
+
+- **A pick has a length.** The widget's `getDuration` gives it, asked when
+  the pick is ready and again when it starts if it read 0; `playProgress`
+  gives the position, as before. The state message's `duration` is the
+  pick's length in seconds, and still 0 for channels and mixtapes.
+  `currentMedia.duration` and `durationString` read it, and a seek slider
+  runs from 0 to it.
+- **Clocks over an hour read `H:MM:SS`**, as WMP's do: `1:58:00`, not
+  `118:00`. Under an hour they stay `MM:SS`.
+- **Seeking.** During a pick, a `seekSlider`, or any slider bound to
+  `player.controls.currentPosition`, is enabled. It sends `seek` once, when
+  the drag ends. A skin that handles `onDragEnd` itself seeks through its
+  script instead (Classic sets `player.controls.currentposition=value`), so
+  one drag sends one seek. A script setting `currentPosition` seeks too.
+  The trusted page passes it to the widget's `seekTo`, clamped to the
+  pick. Rust drops a `seek` outside 0 to 86,400 s.
+- **Channels and mixtapes stay unseekable.** Their `duration` is 0, so the
+  slider is disabled and a `seek` does nothing. Fast forward and rewind
+  stay disabled for everything.
+- **A paused pick shows its time.** A paused stream still shows none,
+  since pausing drops it.
+- **The house skin** has no seek slider. Its clock reads
+  `1:02:34 / 1:58:00` during a pick, at 10 pt instead of 13 pt so it fits.
+
+Checked on a release build on a hidden desktop (`--mute-audio`), through
+DevTools: on the house skin a pick showed `00:08 / 2:00:09`, and setting
+`currentPosition` to 3600 from the skin webview put the widget at 3605 s
+five seconds later, still playing. On bluegrid (`seekSlider`) and Classic
+(a slider with `onDragEnd`) a mouse drag along the bar moved a pick to
+1736 s and 3778 s; the position read back from the widget kept counting
+from there. Back on NTS 1 the slider was disabled and `duration` 0.
+`tools/escape.mjs` gave the same results as ATA-107.
+
 ### Which channel is playing (ATA-164, 2026-10-14)
 
 - **Title:** `NTS 1: <show> - <location>` (was `NTS 1 - …`). Skins like
@@ -107,7 +141,8 @@ the evidence.
   widget reports an error for, stops the player; a stuck pick is not
   reloaded, since that would start a two-hour mix over; a finished pick
   moves on to the next item. Pause keeps a pick's place. Picks report no
-  duration, so skins treat them as live (no seeking) for now.
+  duration, so skins treat them as live (no seeking) for now. (Reversed by
+  ATA-165: picks have a length and seek.)
 - **The state message** gains `url` (the current item's stream or page:
   `player.URL`, `currentMedia.sourceURL`), `author`, `location`, `link` (a
   pick's page, else `""`) and `items` (the playlist's titles).
@@ -234,7 +269,7 @@ unknown fields included, and refuses requests from any webview but `skin`
 | `{ "type": "mute", "value": true \| false }` | the trusted page |
 | `{ "type": "volume", "value": 0..1 }`, `{ "type": "balance", "value": -1..1 }` | the trusted page, clamped |
 | `{ "type": "eq", "band": 0..9, "gain": -15..15 }` | the trusted page, clamped |
-| `{ "type": "seek", "seconds": n }` | accepted, ignored: live streams cannot seek |
+| `{ "type": "seek", "seconds": 0..86400 }` | the trusted page: seeks a pick, clamped to its length; ignored for live streams (ATA-165) |
 | `{ "type": "drag" }` | Rust: moves the window with the pointer, only while our window is in front and under the pointer with the button down |
 | `{ "type": "shape", "width", "height", "rects": [[x, y, w, h], …] }` | Rust: sizes the window and sets its region. Ignored unless the view is 1–4096 px a side and every run is non-empty and inside it, with at most ceil(width / 2) runs per row |
 | `{ "type": "close" }`, `{ "type": "minimize" }` | Rust: closes or minimizes the window (ATA-110) |
@@ -252,7 +287,7 @@ a second (ATA-109):
 
 `playState` is `playing`, `buffering`, `reconnecting`, `paused` or
 `stopped`. `duration` is 0 for a live stream, as in WMP: a skin shows its
-seek bar disabled. `volume`, `mute`, `balance` and `eq` (ten gains in dB)
+seek bar disabled. For a pick it is its length in seconds (ATA-165). `volume`, `mute`, `balance` and `eq` (ten gains in dB)
 are the saved settings, so a skin's controls start where the listener left
 them.
 

@@ -39,7 +39,7 @@ test("play starts NTS 1; next and previous wrap around", () => {
   const audio = fakeAudio();
   const player = createPlayer(audio);
   player.play();
-  assert.deepEqual(player.state(), { playState: "playing", channel: 0, title: "NTS 1", time: 0 });
+  assert.deepEqual(player.state(), { playState: "playing", channel: 0, title: "NTS 1", time: 0, duration: 0 });
   player.step(1);
   player.step(1);
   player.step(-1);
@@ -154,8 +154,8 @@ test("play while playing keeps the stream; a refused autoplay stops instead of l
 
 /** A SoundCloud widget stand-in that records what it was told. */
 function fakeWidget() {
-  const w = { calls: [], playing: false, time: 0 };
-  for (const name of ["play", "pause", "stop", "unload"]) w[name] = (url) => w.calls.push(url ? `${name} ${url}` : name);
+  const w = { calls: [], playing: false, time: 0, duration: 0 };
+  for (const name of ["play", "pause", "stop", "unload", "seek"]) w[name] = (url) => w.calls.push(url ? `${name} ${url}` : name);
   return w;
 }
 
@@ -169,13 +169,19 @@ test("mixtapes and picks join the playlist; a pick plays through the widget, a s
   assert.equal(player.state().playState, "buffering");
   widget.playing = true;
   widget.time = 12;
-  assert.deepEqual(player.state(), { playState: "playing", channel: 3, title: "A pick", time: 12 });
+  widget.duration = 7080;
+  assert.deepEqual(player.state(), { playState: "playing", channel: 3, title: "A pick", time: 12, duration: 7080 });
+  player.seek(600);
   assert.equal(audio.src, "", "the stream stops while a pick plays");
   player.pause();
   player.play();
   player.step(1);
   assert.deepEqual(audio.loads, [NTS1, NTS1]);
-  assert.deepEqual(widget.calls, ["unload", "play https://soundcloud.com/a/b", "pause", "play https://soundcloud.com/a/b", "unload"]);
+  assert.deepEqual(widget.calls, ["unload", "play https://soundcloud.com/a/b", "seek 600", "pause", "play https://soundcloud.com/a/b", "unload"]);
+  // A stream has no length and nowhere to seek to.
+  player.seek(10);
+  assert.equal(widget.calls.at(-1), "unload");
+  assert.equal(player.state().duration, 0);
   player.step(-2);
   assert.deepEqual(audio.loads.at(-1), "https://streams.radiomast.io/poolside");
 });

@@ -105,10 +105,8 @@ function onSkin(m: FromSkin) {
     startVis();
   }
   else if (m.type === "select") player.select(m.index);
-  else if (m.type === "seek") {
-    // ponytail: seek is accepted but a live stream has nowhere to seek to.
-    // Mixtapes are live too; revisit if a seekable source ever arrives.
-  } else {
+  else if (m.type === "seek") player.seek(m.seconds);
+  else {
     if (m.type === "volume") settings.volume = clamp(m.value, 0, 1, settings.volume);
     else if (m.type === "balance") settings.balance = clamp(m.value, -1, 1, settings.balance);
     else if (m.type === "mute") settings.mute = m.value;
@@ -187,9 +185,7 @@ setInterval(() => {
   const { artwork: _, ...shown } = info(now.channel);
   updateOverlay(now.channel);
   updateTray(shown.title, now.channel, now.playState);
-  // duration 0: live streams have no length and cannot seek (WMP's convention).
-  // ponytail: picks have a length, and SoundCloud's widget can seek; they are shown as live too until someone asks to seek a pick.
-  const state = { type: "state", ...now, ...shown, items: items.map((_, i) => info(i).title), duration: 0, ...settings, level: level() };
+  const state = { type: "state", ...now, ...shown, items: items.map((_, i) => info(i).title), ...settings, level: level() };
   void invoke("skin_send", { msg: state }).catch(() => {});
   startVis();
 }, 250);

@@ -117,3 +117,22 @@ test("a play the widget makes itself is reported; a quick pause and play is ours
   mock.timers.tick(20_000);
   assert.deepEqual(events, ["paused", "resumed"]);
 });
+
+test("a pick reports its length and seeks within it", () => {
+  const { widget } = setup();
+  frame.posted = [];
+  widget.seek(10);
+  widget.play("https://soundcloud.com/a/h");
+  from("ready");
+  assert.ok(frame.posted.includes("getDuration"));
+  // Nothing to seek in before the length is known.
+  assert.ok(!frame.posted.includes("seekTo"));
+  from("getDuration", 7_080_000);
+  assert.equal(widget.duration, 7080);
+  widget.seek(600);
+  assert.deepEqual([frame.posted.at(-1), widget.time], ["seekTo", 600]);
+  widget.seek(9999);
+  assert.equal(widget.time, 7080, "clamped to the length");
+  widget.unload();
+  assert.deepEqual([widget.duration, widget.time], [0, 0]);
+});

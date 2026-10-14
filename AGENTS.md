@@ -418,8 +418,8 @@ session with its title and show (`NTS 1: <show> - <location>`), and plays,
 pauses and stops it, through the same API the overlay uses (ATA-115). The
 flyout has not been seen on screen.
 
-**Fast forward, rewind and seek sliders are drawn disabled:** a live stream
-has no length.
+**Fast forward and rewind are drawn disabled,** and so are seek sliders
+except during a pick: a live stream has no length.
 
 **A skin's `onClose` runs only when it closes the window itself** (its close
 button or `view.close()`), not when Windows closes the app, so preferences a

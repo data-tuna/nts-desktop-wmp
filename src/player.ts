@@ -14,8 +14,12 @@ export type Widget = {
   stop(): void;
   /** Lets go of the loaded pick. */
   unload(): void;
+  /** Jumps to `seconds` into the loaded pick. */
+  seek(seconds: number): void;
   readonly playing: boolean;
   readonly time: number;
+  /** The loaded pick's length in seconds, 0 until known. */
+  readonly duration: number;
 };
 
 export const CHANNELS: Item[] = [
@@ -183,6 +187,10 @@ export function createPlayer(audio: Media, items: Item[] = [...CHANNELS], widget
     /** Next (1) or previous (-1) item, wrapping around. */
     step: (by: number) => select(channel + by),
     select,
+    /** Only a pick can seek; a live stream has nowhere to go. */
+    seek(seconds: number) {
+      if (pick()) widget?.seek(seconds);
+    },
     state() {
       const playState: PlayState =
         mode !== "playing"
@@ -192,7 +200,9 @@ export function createPlayer(audio: Media, items: Item[] = [...CHANNELS], widget
             : (pick() ? !widget?.playing : audio.paused || audio.readyState < 3)
               ? "buffering"
               : "playing";
-      return { playState, channel, title: items[channel].title, time: pick() ? (widget?.time ?? 0) : audio.currentTime };
+      // duration 0: live streams have no length and cannot seek (WMP's convention).
+      if (pick()) return { playState, channel, title: items[channel].title, time: widget?.time ?? 0, duration: widget?.duration ?? 0 };
+      return { playState, channel, title: items[channel].title, time: audio.currentTime, duration: 0 };
     },
   };
 }

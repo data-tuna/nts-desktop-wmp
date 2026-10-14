@@ -65,6 +65,7 @@ enum FromSkin {
     Mute {
         value: bool,
     },
+    /// Seconds into a pick (ATA-165). Live streams ignore it.
     Seek {
         seconds: f64,
     },
@@ -287,6 +288,11 @@ fn valid_shape(width: u32, height: u32, rects: &[[u32; 4]]) -> bool {
         && rects.iter().all(inside)
 }
 
+/// At most a day into a pick: no pick is longer, and nothing is before 0.
+fn valid_seek(seconds: f64) -> bool {
+    (0.0..=86_400.0).contains(&seconds)
+}
+
 /// Only http(s) URLs of a sane length, re-serialised by the URL parser, and
 /// at most one every 3 s, so a skin cannot flood the desktop with tabs.
 fn launchable(url: &str, now: Instant, last: &Mutex<Option<Instant>>) -> Option<Url> {
@@ -362,6 +368,7 @@ fn handle(app: &AppHandle, msg: FromSkin) {
             let app = app.clone();
             std::thread::spawn(move || open_picker(&app));
         }
+        FromSkin::Seek { seconds } if !valid_seek(seconds) => {}
         other => {
             let _ = app.emit_to(EventTarget::webview("main"), "skin", other);
         }
@@ -966,6 +973,16 @@ mod tests {
     }
 
     #[test]
+    fn seek_stays_within_a_day() {
+        assert!(valid_seek(0.0));
+        assert!(valid_seek(7080.0));
+        assert!(!valid_seek(-1.0));
+        assert!(!valid_seek(86_401.0));
+        assert!(!valid_seek(f64::NAN));
+        assert!(!valid_seek(f64::INFINITY));
+    }
+
+    #[test]
     fn launch_only_http_and_not_too_often() {
         let last = Mutex::new(None);
         let t = Instant::now();
@@ -1079,6 +1096,13 @@ mod tests {
             Some(FromSkin::Effects { on: true })
         );
         assert_eq!(parse(r#"{"type":"effects","on":"yes"}"#), None);
+        assert_eq!(
+            parse(r#"{"type":"seek","seconds":600.5}"#),
+            Some(FromSkin::Seek { seconds: 600.5 })
+        );
+        assert_eq!(parse(r#"{"type":"seek","seconds":"600"}"#), None);
+        assert_eq!(parse(r#"{"type":"seek","seconds":1,"evil":1}"#), None);
+        assert_eq!(parse(r#"{"type":"seek","seconds":NaN}"#), None);
         // The trusted page still gets the bare form.
         let play = serde_json::to_string(&FromSkin::Play {}).unwrap();
         assert_eq!(play, r#"{"type":"play"}"#);
