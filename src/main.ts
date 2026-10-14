@@ -199,7 +199,7 @@ setInterval(() => {
 // Analyser frames for the skin's visualisation, 20 a second, only while one
 // is on screen, no other window covers the player and the stream plays. Each
 // frame's trip (IPC, a script in the skin webview, a composite) is most of
-// the cost: 30 a second cost about 25 % of a core (ATA-122). The loop asks for
+// what a visualisation costs (ATA-122). The loop asks for
 // display frames only then: idle, it cost about 4 % of a core (ATA-116). The
 // state tick above starts it again. Rust hides the webviews while the window
 // is minimised, so requestAnimationFrame, and the frames, stop then.
