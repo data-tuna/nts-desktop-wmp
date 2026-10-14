@@ -1543,6 +1543,9 @@ export class Skin {
         this.state.time = seconds;
         this.send({ type: "seek", seconds });
       }
+      // A slider that follows nothing keeps the dropped value, as in WMP
+      // (TwinBlade's seek bar); value_onchange already ran during the drag.
+      if (e.dragValue !== null && !BINDING.test(e.attr("value") ?? "") && !["volume", "balance", "seek"].includes(e.role)) e.props.set("value", e.dragValue);
       // Back to the player's value.
       e.dragValue = null;
     }

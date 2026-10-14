@@ -11,8 +11,12 @@ the evidence.
 - **Sliders fire `onMouseUp`** when a drag ends, after `onDragEnd`
   (`onMouseDown` already fired on every element). Kenwood_MP7, portals,
   QuantumRedshift, TwinBlade and MotherLand seek only there
-  (`player.controls.currentPosition=progressMain.value`), on sliders that
+  (`player.controls.currentPosition=<slider id>.value`), on sliders that
   are not bound to `currentPosition`.
+- **A slider bound to nothing keeps the value it was dropped at,** as in
+  WMP, so those seek bars' thumbs stay put. Sliders bound to the player
+  (a `wmpprop:` or `jscript:` value, or a volume, balance or seek slider)
+  go back to the player's value.
 - **Still one drag, one seek.** The engine seeks only for a seek slider, and
   only if neither `onDragEnd` nor `onMouseUp` sent one: anime's
   `onMouseUp` seeks, so the engine does not.
@@ -692,12 +696,11 @@ what the 7 ATA-103 skins call; no code from Webamp Modern.
   `onTimer` with `timerInterval`, `onClick`, `onDblClick`, `onMouseDown`,
   `onMouseOver`/`onMouseOut`, `value_onchange`, `onDragEnd` and (ATA-170)
   `onMouseUp` on sliders, `onEndMove` after `moveTo`, `onClose` when the
-  skin closes the window, and
-  `<property>_onchange` whenever a script sets that property. A sticky
-  button's `down` flips before its `onClick` reads it; one whose `down` is
-  bound (`wmpprop:player.settings.mute`) goes back to the binding after. A
-  named transport button still does its own job and then runs its
-  `onClick`; a mute button with an `onClick` mutes through it.
+  skin closes the window, and `<property>_onchange` whenever a script sets
+  that property. A sticky button's `down` flips before its `onClick` reads
+  it; one whose `down` is bound (`wmpprop:player.settings.mute`) goes back
+  to the binding after. A named transport button still does its own job and
+  then runs its `onClick`; a mute button with an `onClick` mutes through it.
 - **Bindings and expressions.** `wmpprop:` reads the object model or another
   element (`wmpprop:bgTransports.left`); `wmpenabled:`/`wmpdisabled:` follow
   the transport. Both, and `jscript:`, are worked out again after every
