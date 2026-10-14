@@ -402,3 +402,15 @@ test("a seek slider whose skin handles onDragEnd seeks once, through the skin's 
   listeners.mouseup(at);
   assert.deepEqual(sent.filter((m) => m.type === "seek"), [{ type: "seek", seconds: 250 }]);
 });
+
+test("a seek slider whose onDragEnd sends no seek (Television's misspelt currentpostion) still seeks once", () => {
+  const { sent, set } = load(`<theme><view width="100" height="20">
+       <slider id="seek" left="0" top="0" width="100" height="10" min="0" max="wmpprop:player.currentMedia.duration"
+               value="wmpprop:player.controls.currentPosition" onDragEnd="player.controls.currentpostion=value;"/>
+     </view></theme>`);
+  set({ playState: "playing", time: 0, duration: 1000 });
+  const at = { button: 0, clientX: 50, clientY: 5 };
+  listeners.mousedown(at);
+  listeners.mouseup(at);
+  assert.deepEqual(sent.filter((m) => m.type === "seek"), [{ type: "seek", seconds: 500 }]);
+});

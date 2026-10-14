@@ -173,6 +173,9 @@ export function createWidget(on: Events): Widget & { setVolume(volume: number): 
     get time() {
       return time;
     },
+    get url() {
+      return url;
+    },
     get duration() {
       return duration;
     },

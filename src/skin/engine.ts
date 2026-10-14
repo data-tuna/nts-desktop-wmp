@@ -781,6 +781,8 @@ export class Skin {
 
   private images: Map<string, Img>;
   private send: Send;
+  /** Seeks the skin's scripts have sent, so a drag's end seeks only once. */
+  private seeks = 0;
   /** The skin's .js files, by lower-cased name. */
   private scripts: Map<string, string>;
 
@@ -798,7 +800,10 @@ export class Skin {
       status: () => this.status(),
       elapsed: () => this.elapsed(),
       controlEnabled: (name) => this.controlEnabled(name),
-      send: (msg) => this.send(msg),
+      send: (msg) => {
+        if (msg.type === "seek") this.seeks++;
+        this.send(msg);
+      },
       userAction: () => this.userAction,
       set: (patch) => {
         this.state = { ...this.state, ...patch };
@@ -1526,15 +1531,16 @@ export class Skin {
       this.fire(e, "value_onchange");
     }
     if (done) {
-      // A seek goes out once, when the drag ends. A skin that handles the
-      // drag's end seeks itself (Classic: `player.controls.currentposition=value`).
-      if (e.role === "seek" && this.state.duration > 0 && !e.has("ondragend")) {
+      const seeks = this.seeks;
+      this.fire(e, "ondragend");
+      // A seek goes out once, when the drag ends, unless the skin's onDragEnd
+      // sent it (Classic). Television's misspells currentPosition and sends none.
+      if (e.role === "seek" && this.state.duration > 0 && this.seeks === seeks) {
         const seconds = e.fraction() * this.state.duration;
         // Set locally too, so the thumb stays where it was dropped.
         this.state.time = seconds;
         this.send({ type: "seek", seconds });
       }
-      this.fire(e, "ondragend");
       // Back to the player's value.
       e.dragValue = null;
     }

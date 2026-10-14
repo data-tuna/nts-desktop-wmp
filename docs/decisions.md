@@ -18,14 +18,18 @@ the evidence.
   `118:00`. Under an hour they stay `MM:SS`.
 - **Seeking.** During a pick, a `seekSlider`, or any slider bound to
   `player.controls.currentPosition`, is enabled. It sends `seek` once, when
-  the drag ends. A skin that handles `onDragEnd` itself seeks through its
-  script instead (Classic sets `player.controls.currentposition=value`), so
-  one drag sends one seek. A script setting `currentPosition` seeks too.
+  the drag ends, after the skin's `onDragEnd`, and only if that handler
+  sent none: Classic's sets `player.controls.currentposition=value` and
+  seeks itself; Television's and anime's misspell it (`currentpostion`)
+  and send nothing, so the engine seeks. One drag, one seek. A script setting `currentPosition` seeks too.
   The trusted page passes it to the widget's `seekTo`, clamped to the
   pick. Rust drops a `seek` outside 0 to 86,400 s.
 - **Channels and mixtapes stay unseekable.** Their `duration` is 0, so the
   slider is disabled and a `seek` does nothing. Fast forward and rewind
   stay disabled for everything.
+- **Only the loaded pick has a clock.** Next or Previous while paused
+  moves to another item but keeps the last pick loaded, so it can resume.
+  Until the new pick loads, it reports time and length 0 and does not seek.
 - **A paused pick shows its time.** A paused stream still shows none,
   since pausing drops it.
 - **The house skin** has no seek slider. Its clock reads
@@ -287,9 +291,9 @@ a second (ATA-109):
 
 `playState` is `playing`, `buffering`, `reconnecting`, `paused` or
 `stopped`. `duration` is 0 for a live stream, as in WMP: a skin shows its
-seek bar disabled. For a pick it is its length in seconds (ATA-165). `volume`, `mute`, `balance` and `eq` (ten gains in dB)
-are the saved settings, so a skin's controls start where the listener left
-them.
+seek bar disabled. For a pick it is its length in seconds (ATA-165).
+`volume`, `mute`, `balance` and `eq` (ten gains in dB) are the saved
+settings, so a skin's controls start where the listener left them.
 
 From ATA-114, also about 30 times a second while the skin shows a
 visualisation and the stream plays:
@@ -814,7 +818,8 @@ against the 7 ATA-103 skins; no code from Webamp Modern.
   (ATA-109): Play is enabled unless a stream is on (playing, buffering or
   reconnecting), Pause and Stop only while one is; Previous and Next always
   (they switch channels); fast forward, rewind and seek sliders never, since
-  a live stream has no length. Each sends its own message, and Mute sends
+  a live stream has no length. (Reversed by ATA-165 for seek sliders during
+  a pick.) Each sends its own message, and Mute sends
   the opposite of the host's mute. Sliders bound to the volume or balance,
   named or not, start at the host's saved values and send `volume` and
   `balance`, scaled from the slider's own range; EQ sliders show the saved
@@ -822,6 +827,7 @@ against the 7 ATA-103 skins; no code from Webamp Modern.
   (9SeriesDefault's) is a mute button, and draws pressed only while the
   host is muted. The elapsed time is blank while stopped, as in WMP, and
   while paused, because pausing drops the stream and its clock reads 0.
+  (ATA-165: a paused pick keeps its place, so shows its time.)
 
 ### Source: archive.org, one per launch, a compatibility list (proposed by Lama, confirmed by Ata, 2026-10-10)
 

@@ -154,8 +154,11 @@ test("play while playing keeps the stream; a refused autoplay stops instead of l
 
 /** A SoundCloud widget stand-in that records what it was told. */
 function fakeWidget() {
-  const w = { calls: [], playing: false, time: 0, duration: 0 };
+  const w = { calls: [], playing: false, time: 0, duration: 0, url: "" };
   for (const name of ["play", "pause", "stop", "unload", "seek"]) w[name] = (url) => w.calls.push(url ? `${name} ${url}` : name);
+  const { play, unload } = w;
+  w.play = (url) => ((w.url = url), play(url));
+  w.unload = () => ((w.url = ""), unload());
   return w;
 }
 
@@ -211,4 +214,25 @@ test("selecting the item already playing leaves it alone", () => {
 test("a channel's title leads with the channel", () => {
   assert.equal(channelTitle("NTS 1", "Pool Side Slow Focus - London"), "NTS 1: Pool Side Slow Focus - London");
   assert.equal(channelTitle("NTS 2", "A show"), "NTS 2: A show");
+});
+
+test("a paused pick's clock and seeking stay with it when the playlist moves to another pick", () => {
+  const audio = fakeAudio();
+  const widget = fakeWidget();
+  const [a, b] = ["https://soundcloud.com/a/a", "https://soundcloud.com/a/b"];
+  const player = createPlayer(audio, [...CHANNELS, { title: "Pick A", url: a, pick: true }, { title: "Pick B", url: b, pick: true }], widget);
+  player.select(2);
+  player.play();
+  Object.assign(widget, { playing: true, time: 2712, duration: 7080 });
+  player.pause();
+  // Next while paused: B is current, A stays loaded.
+  player.step(1);
+  assert.deepEqual([player.state().title, player.state().time, player.state().duration], ["Pick B", 0, 0]);
+  player.seek(100);
+  assert.ok(!widget.calls.includes("seek 100"), "never seeks the other pick");
+  // Back to A: its place again, and it resumes rather than reloads.
+  player.step(-1);
+  assert.deepEqual([player.state().time, player.state().duration], [2712, 7080]);
+  player.play();
+  assert.deepEqual(widget.calls.filter((c) => c.startsWith("play")), [`play ${a}`, `play ${a}`]);
 });

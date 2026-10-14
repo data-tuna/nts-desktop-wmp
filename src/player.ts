@@ -18,6 +18,8 @@ export type Widget = {
   seek(seconds: number): void;
   readonly playing: boolean;
   readonly time: number;
+  /** The loaded pick's page, "" if none. */
+  readonly url: string;
   /** The loaded pick's length in seconds, 0 until known. */
   readonly duration: number;
 };
@@ -75,6 +77,9 @@ type Media = Pick<
 export function createPlayer(audio: Media, items: Item[] = [...CHANNELS], widget?: Widget) {
   let channel = 0;
   const pick = () => items[channel].pick === true;
+  // Next or previous while paused moves the channel but keeps the last pick
+  // loaded, so its clock and seeking belong to that pick only.
+  const loaded = () => pick() && widget?.url === items[channel].url;
   // What the listener asked for; the element may disagree while it reconnects.
   let mode: "playing" | "paused" | "stopped" = "stopped";
   let retryMs = RETRY_MIN_MS;
@@ -189,7 +194,7 @@ export function createPlayer(audio: Media, items: Item[] = [...CHANNELS], widget
     select,
     /** Only a pick can seek; a live stream has nowhere to go. */
     seek(seconds: number) {
-      if (pick()) widget?.seek(seconds);
+      if (loaded()) widget?.seek(seconds);
     },
     state() {
       const playState: PlayState =
@@ -201,8 +206,8 @@ export function createPlayer(audio: Media, items: Item[] = [...CHANNELS], widget
               ? "buffering"
               : "playing";
       // duration 0: live streams have no length and cannot seek (WMP's convention).
-      if (pick()) return { playState, channel, title: items[channel].title, time: widget?.time ?? 0, duration: widget?.duration ?? 0 };
-      return { playState, channel, title: items[channel].title, time: audio.currentTime, duration: 0 };
+      if (loaded()) return { playState, channel, title: items[channel].title, time: widget?.time ?? 0, duration: widget?.duration ?? 0 };
+      return { playState, channel, title: items[channel].title, time: pick() ? 0 : audio.currentTime, duration: 0 };
     },
   };
 }
