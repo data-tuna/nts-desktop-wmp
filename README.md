@@ -48,6 +48,11 @@ Uninstall from Settings > Apps. Downloaded skins stay in
   repository or the installer. The one skin that ships, Bootleg House
   (`skins/house/`), was drawn for this project.
 - [Tauri](https://tauri.app/) is the desktop shell.
+- The Milkdrop visualisation is [Butterchurn](https://github.com/jberg/butterchurn)
+  by Jordan Berg (MIT), with the 29 presets of its
+  [minimal pack](https://github.com/jberg/butterchurn-presets). Each preset
+  is the work of the MilkDrop authors its name credits: Geiss, Flexi,
+  Martin, Rovastar, Unchained, Zylot and others.
 - Streams come from NTS via `streams.radiomast.io`.
 
 ## Development

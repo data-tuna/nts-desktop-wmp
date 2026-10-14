@@ -1,6 +1,6 @@
 // Serves the skin page for a browser, as the skin protocol does but without
 // its CSP or its message checks: the page, engine.js (run `npm run
-// build:skin` first), one .wmz, and a /msg sink that prints what the skin
+// build:skin` first), milkdrop.js, one .wmz, and a /msg sink that prints what the skin
 // sends. A stand-in host in the page answers the skin with state, as the
 // trusted page does, but plays nothing. For looking at the engine without
 // the app. tools/compat.mjs drives it too.
@@ -62,6 +62,7 @@ export function preview(port, wmz, onMsg, onHouse = () => {}) {
       if (path === "/skin.wmz") return res.writeHead(200).end(readFileSync(wmz()));
       if (path === "/house.wmz") return onHouse(), res.writeHead(200).end(readFileSync(new URL("skins/house/house.wmz", root)));
       if (path === "/engine.js") return res.writeHead(200, { "Content-Type": "text/javascript" }).end(readFileSync(new URL("dist-skin/engine.js", root)));
+      if (path === "/milkdrop.js") return res.writeHead(200, { "Content-Type": "text/javascript" }).end(["butterchurn/lib/butterchurn.min.js", "butterchurn-presets/lib/butterchurnPresetsMinimal.min.js"].map((f) => readFileSync(new URL(`node_modules/${f}`, root), "utf8")).join("\n"));
       if (path !== "/") return res.writeHead(404).end();
       const page = readFileSync(new URL("src/skin/index.html", root), "utf8").replace('<script src="/engine.js">', `${fakeHost}<script src="/engine.js">`);
       res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" }).end(page);

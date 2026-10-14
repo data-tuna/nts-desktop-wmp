@@ -47,6 +47,7 @@ Written in English.
                           skin's scripts and handles the pointer, runtime.ts
                           is the WMP object model the scripts see, effects.ts
                           draws the visualisations and the show card,
+                          milkdrop.ts runs Butterchurn for Milkdrop,
                           pixels.ts holds the pixel helpers its tests share.
                           main.ts is the entry; index.html the page.
     skins/house/          The house skin, the one skin that ships: house.wms,
@@ -405,7 +406,8 @@ scrolling title repaints the whole skin. Each frame redraws only the
 visualisation, so most of that is the frames' trip: an IPC call from the
 trusted page, a script evaluated in the skin webview, a composite of both
 webviews. Frames go 20 a second, and none while the player is minimised or
-other windows cover all of it.
+other windows cover all of it. Milkdrop costs about the same as Bars to 9
+points more (ATA-167).
 
 **Only a skin's first view is drawn.** `theme.openView` and
 `theme.currentViewID` are logged and ignored, so circle's video, playlist
@@ -421,8 +423,9 @@ markup and likely the same fault.
 wheel; it has no columns or scroll bar. Their methods
 (`setColumnResizeMode`, `appendItem`) are logged and do nothing.
 
-**Three visualisations and the show card, no Milkdrop** (ATA-114,
-ATA-166): bars, scope, ambience and the NTS show card, our own. The chosen
+**Three visualisations, Milkdrop and the show card** (ATA-114, ATA-166,
+ATA-167): bars, scope, ambience and the NTS show card are our own;
+Milkdrop is Butterchurn with 29 presets, one `next()` each. The chosen
 effect is saved in the skin webview's `localStorage`; the first launch
 shows the card. A pick's card uses the NTS episode picture, not
 SoundCloud's artwork.

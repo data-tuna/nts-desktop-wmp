@@ -274,7 +274,8 @@ function visFrame(now: number) {
   // The scope shows the newest 2048 samples (43 ms at 48 kHz): all 8192
   // would alias at 96 points, and a shorter buffer gets the oldest ones.
   visAnalyser.getByteTimeDomainData(wave);
-  const msg = { type: "vis", bars: bands(spectrum, ctx.sampleRate, 32), wave: samples(wave.subarray(-2048), 96) };
+  // Milkdrop gets the newest 1024 as they are: Butterchurn reads its levels from them (ATA-167).
+  const msg = { type: "vis", bars: bands(spectrum, ctx.sampleRate, 32), wave: samples(wave.subarray(-2048), 96), pcm: Array.from(wave.subarray(-1024)) };
   void invoke("skin_send", { msg }).catch(() => {});
 }
 

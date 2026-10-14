@@ -142,6 +142,11 @@ fn respond(app: &AppHandle, from: &str, req: Request<Vec<u8>>) -> Response<Vec<u
             .header("Content-Type", "text/javascript; charset=utf-8")
             .body(engine_js())
             .unwrap(),
+        // Butterchurn and its presets, asked for the first time Milkdrop shows (ATA-167).
+        (&Method::GET, "/milkdrop.js") => Response::builder()
+            .header("Content-Type", "text/javascript; charset=utf-8")
+            .body([MILKDROP_NOTICE.as_bytes(), BUTTERCHURN, b"\n", PRESETS].concat())
+            .unwrap(),
         (&Method::GET, "/skin.wmz") => skin_file(),
         // The skin page asks for it when a skin will not load.
         (&Method::GET, "/house.wmz") => {
@@ -158,6 +163,28 @@ fn respond(app: &AppHandle, from: &str, req: Request<Vec<u8>>) -> Response<Vec<u
         _ => status(StatusCode::NOT_FOUND),
     }
 }
+
+/// Milkdrop for the skin's visualisations (ATA-167), straight from npm. Each
+/// preset's name credits its authors.
+const BUTTERCHURN: &[u8] = include_bytes!("../../node_modules/butterchurn/lib/butterchurn.min.js");
+const PRESETS: &[u8] =
+    include_bytes!("../../node_modules/butterchurn-presets/lib/butterchurnPresetsMinimal.min.js");
+const MILKDROP_NOTICE: &str =
+    "/*! Butterchurn 2.6.7 and butterchurn-presets 2.4.7 (minimal pack).\n\
+MIT License. Copyright (c) 2013-2018 Jordan Berg. The presets are by the\n\
+MilkDrop authors their names credit.\n\n\
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and \
+associated documentation files (the \"Software\"), to deal in the Software without restriction, \
+including without limitation the rights to use, copy, modify, merge, publish, distribute, \
+sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is \
+furnished to do so, subject to the following conditions:\n\n\
+The above copyright notice and this permission notice shall be included in all copies or \
+substantial portions of the Software.\n\n\
+THE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING \
+BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND \
+NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, \
+DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT \
+OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */\n";
 
 /// The house skin, built from skins/house/ by `npm run build:house`. It ships
 /// in the binary, so the app has a skin with no network at all.
