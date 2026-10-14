@@ -704,13 +704,22 @@ mod win32 {
     use std::sync::atomic::{AtomicBool, Ordering};
     use std::sync::Mutex;
     use std::time::Duration;
-    use tauri::PhysicalPosition;
+    use tauri::{Emitter, EventTarget, PhysicalPosition};
     type Hrgn = *mut c_void;
     #[link(name = "gdi32")]
     extern "system" {
         fn CreateRectRgn(x1: i32, y1: i32, x2: i32, y2: i32) -> Hrgn;
         fn CombineRgn(dst: Hrgn, a: Hrgn, b: Hrgn, mode: i32) -> i32;
         fn DeleteObject(obj: *mut c_void) -> i32;
+    }
+    #[link(name = "dwmapi")]
+    extern "system" {
+        fn DwmGetWindowAttribute(
+            hwnd: *mut c_void,
+            attr: u32,
+            value: *mut c_void,
+            size: u32,
+        ) -> i32;
     }
     #[link(name = "user32")]
     extern "system" {
@@ -719,6 +728,17 @@ mod win32 {
         fn GetAsyncKeyState(key: i32) -> i16;
         fn GetSystemMetrics(index: i32) -> i32;
         fn GetForegroundWindow() -> *mut c_void;
+        fn GetWindow(hwnd: *mut c_void, cmd: u32) -> *mut c_void;
+        fn IsWindowVisible(hwnd: *mut c_void) -> i32;
+        fn IsIconic(hwnd: *mut c_void) -> i32;
+        fn GetWindowLongW(hwnd: *mut c_void, index: i32) -> i32;
+        fn GetLayeredWindowAttributes(
+            hwnd: *mut c_void,
+            key: *mut u32,
+            alpha: *mut u8,
+            flags: *mut u32,
+        ) -> i32;
+        fn GetWindowRgnBox(hwnd: *mut c_void, rect: *mut [i32; 4]) -> i32;
     }
     #[link(name = "shell32")]
     extern "system" {
@@ -799,6 +819,93 @@ mod win32 {
                 std::thread::sleep(Duration::from_millis(8));
             }
             DRAGGING.store(false, Ordering::SeqCst);
+        });
+    }
+
+    const GW_HWNDPREV: u32 = 3;
+    const GWL_EXSTYLE: i32 = -20;
+    const WS_EX_LAYERED: i32 = 0x80000;
+    const WS_EX_TRANSPARENT: i32 = 0x20;
+    const LWA_COLORKEY: u32 = 1;
+    const LWA_ALPHA: u32 = 2;
+    const DWMWA_EXTENDED_FRAME_BOUNDS: u32 = 9;
+    const DWMWA_CLOAKED: u32 = 14;
+    const RGN_DIFF: i32 = 4;
+    const NULLREGION: i32 = 1;
+
+    /// The window's visible rectangle on screen, as a region, without the
+    /// invisible resize borders `GetWindowRect` counts. None if DWM cannot say.
+    unsafe fn visible_rgn(hwnd: *mut c_void) -> Option<Hrgn> {
+        let mut r = [0i32; 4];
+        let ok =
+            DwmGetWindowAttribute(hwnd, DWMWA_EXTENDED_FRAME_BOUNDS, r.as_mut_ptr().cast(), 16);
+        (ok == 0).then(|| CreateRectRgn(r[0], r[1], r[2], r[3]))
+    }
+
+    /// Whether a window hides what is behind it. When in doubt it does not:
+    /// translucent, colour-keyed, click-through, shaped and cloaked windows
+    /// (another virtual desktop, the shell's invisible ones) let ours show.
+    unsafe fn opaque(hwnd: *mut c_void) -> bool {
+        if IsWindowVisible(hwnd) == 0 || IsIconic(hwnd) != 0 {
+            return false;
+        }
+        let mut cloaked = 0u32;
+        let cloak_ok =
+            DwmGetWindowAttribute(hwnd, DWMWA_CLOAKED, (&mut cloaked as *mut u32).cast(), 4);
+        let ex = GetWindowLongW(hwnd, GWL_EXSTYLE);
+        let (mut key, mut alpha, mut flags) = (0, 0, 0);
+        let layered_ok = ex & WS_EX_LAYERED == 0
+            || (GetLayeredWindowAttributes(hwnd, &mut key, &mut alpha, &mut flags) != 0
+                && flags & LWA_COLORKEY == 0
+                && (flags & LWA_ALPHA == 0 || alpha == 255));
+        cloak_ok == 0
+            && cloaked == 0
+            && ex & WS_EX_TRANSPARENT == 0
+            && layered_ok
+            && GetWindowRgnBox(hwnd, &mut [0; 4]) == 0
+    }
+
+    /// Whether the windows above ours, together, hide all of it.
+    fn covered(hwnd: *mut c_void) -> bool {
+        unsafe {
+            let Some(rest) = visible_rgn(hwnd) else {
+                return false;
+            };
+            let mut remaining = 0;
+            let mut above = GetWindow(hwnd, GW_HWNDPREV);
+            while !above.is_null() && remaining != NULLREGION {
+                if opaque(above) {
+                    if let Some(over) = visible_rgn(above) {
+                        remaining = CombineRgn(rest, rest, over, RGN_DIFF);
+                        DeleteObject(over);
+                    }
+                }
+                above = GetWindow(above, GW_HWNDPREV);
+            }
+            DeleteObject(rest);
+            remaining == NULLREGION
+        }
+    }
+
+    /// Tells the trusted page whenever the player becomes covered or shown
+    /// again, so it sends no visualisation frames nobody can see. Windows
+    /// sends no message for that, so this looks four times a second.
+    pub fn watch_cover(window: tauri::Window) {
+        let Ok(hwnd) = window.hwnd() else {
+            return;
+        };
+        // A raw pointer is not Send; the handle stays valid as long as the app.
+        let hwnd = hwnd.0 as isize;
+        std::thread::spawn(move || {
+            let mut was = false;
+            loop {
+                std::thread::sleep(Duration::from_millis(250));
+                let now = covered(hwnd as *mut c_void);
+                if now != was {
+                    was = now;
+                    let _ = window.emit_to(EventTarget::webview("main"), "covered", now);
+                }
+            }
         });
     }
 
@@ -906,6 +1013,8 @@ pub fn run() {
             build_tray(app.handle())?;
             let window = app.get_window("main").expect("main window");
             window.restore_state(StateFlags::POSITION)?;
+            #[cfg(windows)]
+            win32::watch_cover(window.clone());
             pull_on_screen(&window)?;
             let size = window
                 .inner_size()?

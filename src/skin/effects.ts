@@ -100,8 +100,8 @@ function bars(g: CanvasRenderingContext2D, frame: Frame | null, [x, y, w, h]: [n
     const bx = Math.round(x + i * step);
     const bw = Math.max(1, Math.round(x + (i + 1) * step) - bx - gap);
     g.fillRect(bx, y + h - bh, bw, bh);
-    // Peak caps fall back slowly.
-    mem.peaks[i] = Math.max(bh, (mem.peaks[i] ?? 0) - h / 50);
+    // Peak caps fall back slowly: the full height in 1.7 s at 20 frames a second.
+    mem.peaks[i] = Math.max(bh, (mem.peaks[i] ?? 0) - h / 33);
     if (mem.peaks[i] >= 1) g.fillRect(bx, Math.round(y + h - mem.peaks[i]) - 1, bw, 1);
   });
 }
@@ -131,7 +131,8 @@ function ambience(g: CanvasRenderingContext2D, frame: Frame | null, [x, y, w, h]
   }
   const t = c.getContext("2d")!;
   t.globalCompositeOperation = "source-over";
-  t.globalAlpha = frame ? 0.12 : 1;
+  // At 20 frames a second, the same fade per second as 0.12 was at 30.
+  t.globalAlpha = frame ? 0.175 : 1;
   t.fillStyle = bg;
   t.fillRect(0, 0, w, h);
   t.globalAlpha = 1;

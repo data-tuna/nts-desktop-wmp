@@ -396,13 +396,16 @@ until this one gets its own.
 **PR CI does not build the Rust side.** It runs typecheck, lint, the frontend
 build, the tests and `cargo fmt --check`.
 
-**A visualisation costs about 20–30 points of a core** (ATA-116); the
-show card about 2 (ATA-166), likely the full paints' pass that finds what
-covers any visible visualisation. With one showing, the app uses about
-25–35 % of a core (5–7 % without). Each frame
-redraws only the visualisation, so most of that is the frames' trip: an IPC
-call from the trusted page, a script evaluated in the skin webview, a
-composite of both webviews.
+**A visualisation costs about 10–25 points of a core** (ATA-116, ATA-122);
+the show card about 2 (ATA-166), likely the full paints' pass that finds
+what covers any visible visualisation. With one showing, the app uses about
+15–33 % of a core, depending on the skin (5–7 % without; the Winamp app
+about 18 % with its spectrum). The top of that range is Bootleg House, whose
+scrolling title repaints the whole skin. Each frame redraws only the
+visualisation, so most of that is the frames' trip: an IPC call from the
+trusted page, a script evaluated in the skin webview, a composite of both
+webviews. Frames go 20 a second, and none while the player is minimised or
+other windows cover all of it.
 
 **Only a skin's first view is drawn.** `theme.openView` and
 `theme.currentViewID` are logged and ignored, so circle's video, playlist

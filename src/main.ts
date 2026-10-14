@@ -83,6 +83,8 @@ const settings = (() => {
 
 /** Whether the skin shows a visualisation, which wants analyser frames. */
 let effectsOn = false;
+/** Whether other windows hide all of the player (Rust tells us, on Windows). */
+let covered = false;
 
 function apply() {
   gain.gain.value = settings.mute ? 0 : settings.volume;
@@ -119,6 +121,7 @@ function onSkin(m: FromSkin) {
 
 apply();
 await listen<FromSkin>("skin", (e) => onSkin(e.payload));
+await listen<boolean>("covered", (e) => (covered = e.payload));
 // The tray menu (lib.rs): play, stop and the two channels.
 await listen<string>("tray", ({ payload: id }) => {
   if (id === "play" || id === "stop") onSkin({ type: id });
@@ -234,11 +237,12 @@ setInterval(() => {
   startVis();
 }, 250);
 
-// Analyser frames for the skin's visualisation, about 30 a second, only
-// while one is on screen and the stream plays. The loop asks for display
-// frames only then: idle, it cost about 4 % of a core (ATA-116). The state
-// tick above starts it again. Rust hides the webviews while the window is
-// minimised, so requestAnimationFrame, and the frames, stop then.
+// Analyser frames for the skin's visualisation, 20 a second (ATA-122), only
+// while one is on screen, no other window covers the player and the stream
+// plays. The loop asks for display frames only then: idle, it cost about 4 %
+// of a core (ATA-116). The state tick above starts it again. Rust hides the
+// webviews while the window is minimised, so requestAnimationFrame, and the
+// frames, stop then.
 const spectrum = new Uint8Array(visAnalyser.frequencyBinCount);
 const wave = new Uint8Array(visAnalyser.fftSize);
 let lastFrame = 0;
@@ -252,7 +256,7 @@ function startVis() {
 function visFrame(now: number) {
   visLooping = false;
   const { playState, channel } = player.state();
-  if (!effectsOn || playState !== "playing") return;
+  if (!effectsOn || covered || playState !== "playing") return;
   // A pick plays outside our Web Audio graph: one flat frame clears the last
   // stream frame, then nothing until a stream plays. Silence, not the
   // analyser's data, which still holds the stream's last moments.
@@ -262,7 +266,8 @@ function visFrame(now: number) {
     return;
   }
   startVis();
-  if (now - lastFrame < 30) return;
+  // 45, not 50: at 60 Hz the third display frame comes 50 ms on, give or take.
+  if (now - lastFrame < 45) return;
   flatSent = false;
   lastFrame = now;
   visAnalyser.getByteFrequencyData(spectrum);
