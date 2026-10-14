@@ -6,6 +6,31 @@ the evidence.
 
 ## Stack
 
+### Sliders that seek from onMouseUp (ATA-170, 2026-10-14)
+
+- **Sliders fire `onMouseUp`** when a drag ends, after `onDragEnd`
+  (`onMouseDown` already fired on every element). Kenwood_MP7, portals,
+  QuantumRedshift, TwinBlade and MotherLand seek only there
+  (`player.controls.currentPosition=<slider id>.value`), on sliders that
+  are not bound to `currentPosition`.
+- **A slider bound to nothing keeps the value it was dropped at,** as in
+  WMP, so those seek bars' thumbs stay put. Sliders bound to the player
+  (a `wmpprop:` or `jscript:` value, or a volume, balance or seek slider)
+  go back to the player's value.
+- **Still one drag, one seek.** The engine seeks only for a seek slider, and
+  only if neither `onDragEnd` nor `onMouseUp` sent one: anime's
+  `onMouseUp` seeks, so the engine does not.
+- **Streams stay unseekable.** Such a slider runs from 0 to
+  `currentMedia.duration`, which is 0 on a channel or mixtape, and setting
+  `currentPosition` there sends nothing.
+
+Checked on a release build on a hidden desktop (`--mute-audio`), through
+DevTools input events. During a pick, a drag on QuantumRedshift's seek dial
+moved the widget from 14 s to 2876 s, and one on TwinBlade's position bar
+from 7 s to 3155 s. Both kept playing, and each drag sent one `seek`. On
+NTS 1 the same drags sent none. Kenwood_MP7's bar could not be tried: its
+`mainMeta` subview is not drawn or hit, a separate engine bug.
+
 ### A seek bar for picks (ATA-165, 2026-10-14)
 
 - **A pick has a length.** The widget's `getDuration` gives it, asked when
@@ -669,13 +694,13 @@ what the 7 ATA-103 skins call; no code from Webamp Modern.
   state first.
 - **Handlers.** `onLoad` (after the scripts, before the first paint),
   `onTimer` with `timerInterval`, `onClick`, `onDblClick`, `onMouseDown`,
-  `onMouseOver`/`onMouseOut`, `value_onchange` and `onDragEnd` on sliders,
-  `onEndMove` after `moveTo`, `onClose` when the skin closes the window, and
-  `<property>_onchange` whenever a script sets that property. A sticky
-  button's `down` flips before its `onClick` reads it; one whose `down` is
-  bound (`wmpprop:player.settings.mute`) goes back to the binding after. A
-  named transport button still does its own job and then runs its
-  `onClick`; a mute button with an `onClick` mutes through it.
+  `onMouseOver`/`onMouseOut`, `value_onchange`, `onDragEnd` and (ATA-170)
+  `onMouseUp` on sliders, `onEndMove` after `moveTo`, `onClose` when the
+  skin closes the window, and `<property>_onchange` whenever a script sets
+  that property. A sticky button's `down` flips before its `onClick` reads
+  it; one whose `down` is bound (`wmpprop:player.settings.mute`) goes back
+  to the binding after. A named transport button still does its own job and
+  then runs its `onClick`; a mute button with an `onClick` mutes through it.
 - **Bindings and expressions.** `wmpprop:` reads the object model or another
   element (`wmpprop:bgTransports.left`); `wmpenabled:`/`wmpdisabled:` follow
   the transport. Both, and `jscript:`, are worked out again after every

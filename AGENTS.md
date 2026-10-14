@@ -404,6 +404,11 @@ composite of both webviews.
 `theme.currentViewID` are logged and ignored, so circle's video, playlist
 and settings views and 9SeriesDefault's compact view never open.
 
+**Kenwood_MP7 loses its display.** It is listed as "works", but its
+`mainMeta` subview (title, clock, seek bar, EQ) is never drawn or hit,
+though its script sets it visible (ATA-170). Kenwood_MPXP has the same
+markup and likely the same fault.
+
 **Video, item and drop-down playlists, and popups are not drawn.**
 `<playlist>` lists the channels, mixtapes and picks, and scrolls with the
 wheel; it has no columns or scroll bar. Their methods

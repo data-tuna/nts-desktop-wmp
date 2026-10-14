@@ -414,3 +414,34 @@ test("a seek slider whose onDragEnd sends no seek (Television's misspelt current
   listeners.mouseup(at);
   assert.deepEqual(sent.filter((m) => m.type === "seek"), [{ type: "seek", seconds: 500 }]);
 });
+
+test("a slider that seeks only from onMouseUp (Kenwood_MP7's progressMain) seeks once on a pick, and not on a stream", () => {
+  const { js, sent, set } = load(`<theme><view width="100" height="20">
+       <slider id="progressMain" left="0" top="0" width="100" height="10" bordersize="0" direction="horizontal" min="0" max="wmpprop:player.currentMedia.duration"
+               slide="false" onmouseup="player.controls.currentPosition=progressMain.value;" enabled="true"/>
+     </view></theme>`);
+  const at = { button: 0, clientX: 75, clientY: 5 };
+  set({ playState: "playing", time: 0, duration: 0 });
+  listeners.mousedown(at);
+  listeners.mouseup(at);
+  assert.deepEqual(sent.filter((m) => m.type === "seek"), [], "a live stream cannot seek");
+  set({ duration: 1000 });
+  listeners.mousedown(at);
+  listeners.mouseup(at);
+  assert.deepEqual(sent.filter((m) => m.type === "seek"), [{ type: "seek", seconds: 750 }]);
+  // It follows nothing, so the thumb stays where it was dropped.
+  set({ time: 760 });
+  assert.equal(js("progressMain.value"), 750);
+});
+
+test("a seek slider whose onMouseUp seeks (anime's) seeks once, not again from the engine", () => {
+  const { sent, set } = load(`<theme><view width="100" height="20">
+       <slider id="seek" left="0" top="0" width="100" height="10" min="0" max="wmpprop:player.currentMedia.duration"
+               onmouseup = "player.controls.currentPosition = seek.value; " value="wmpprop:player.controls.currentposition" onDragEnd="player.controls.currentpostion=value;"/>
+     </view></theme>`);
+  set({ playState: "playing", time: 0, duration: 1000 });
+  const at = { button: 0, clientX: 50, clientY: 5 };
+  listeners.mousedown(at);
+  listeners.mouseup(at);
+  assert.deepEqual(sent.filter((m) => m.type === "seek"), [{ type: "seek", seconds: 500 }]);
+});

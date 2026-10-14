@@ -1533,14 +1533,19 @@ export class Skin {
     if (done) {
       const seeks = this.seeks;
       this.fire(e, "ondragend");
+      this.fire(e, "onmouseup");
       // A seek goes out once, when the drag ends, unless the skin's onDragEnd
-      // sent it (Classic). Television's misspells currentPosition and sends none.
+      // (Classic) or onMouseUp (QuantumRedshift) sent it. Television's misspells
+      // currentPosition and sends none.
       if (e.role === "seek" && this.state.duration > 0 && this.seeks === seeks) {
         const seconds = e.fraction() * this.state.duration;
         // Set locally too, so the thumb stays where it was dropped.
         this.state.time = seconds;
         this.send({ type: "seek", seconds });
       }
+      // A slider that follows nothing keeps the dropped value, as in WMP
+      // (TwinBlade's seek bar); value_onchange already ran during the drag.
+      if (e.dragValue !== null && !BINDING.test(e.attr("value") ?? "") && !["volume", "balance", "seek"].includes(e.role)) e.props.set("value", e.dragValue);
       // Back to the player's value.
       e.dragValue = null;
     }
