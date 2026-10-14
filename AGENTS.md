@@ -311,8 +311,9 @@ no app at all:
 A stand-in host in that page answers the skin with state as the trusted page
 does, but plays nothing; `/?play` starts it playing, as the app does on
 launch. It sends no `show` message, so the show card, the default effect,
-is an empty area there: `next()` on the effects element moves on to Bars. In either place, `__wmpScope` in the skin webview is what skin code
-sees: `__wmpScope.player.status`, `__wmpScope.<element id>.visible`.
+is an empty area there: `next()` on the effects element moves on to Bars.
+In either place, `__wmpScope` in the skin webview is what skin code sees:
+`__wmpScope.player.status`, `__wmpScope.<element id>.visible`.
 
 `install-check.ps1` installs the app, plays it, and uninstalls it, as the
 release workflow does on a fresh runner: on this machine it would install a
@@ -396,8 +397,9 @@ until this one gets its own.
 build, the tests and `cargo fmt --check`.
 
 **A visualisation costs about 20–30 points of a core** (ATA-116); the
-show card costs nothing measurable (ATA-166). With one
-showing, the app uses about 25–35 % of a core (5–7 % without). Each frame
+show card about 2 (ATA-166), likely the full paints' pass that finds what
+covers any visible visualisation. With one showing, the app uses about
+25–35 % of a core (5–7 % without). Each frame
 redraws only the visualisation, so most of that is the frames' trip: an IPC
 call from the trusted page, a script evaluated in the skin webview, a
 composite of both webviews.

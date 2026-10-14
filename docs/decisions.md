@@ -533,7 +533,12 @@ four genres as outlined tags. It joins Bars, Scope and Ambience in
   skin tells the trusted page that a card needs no analyser frames
   (`effects` `on: false`), so none are sent. Release build, anemone, NTS 1
   playing, muted, 30 s each: card 5.9 and 5.5 % of one core, visualisation
-  hidden 5.5 %; in an earlier run Bars took 29.4 %.
+  hidden 5.5 %; in an earlier run Bars took 29.4 %. The reviewer's three
+  alternating pairs on one running app gave card 8.8, 9.6, 7.6 % against
+  hidden 7.4, 6.5, 5.0 %: about 2 points. Likely the cause: while any
+  visualisation shows, each full paint (once a second for the clock) draws
+  the view twice and reads back its pixels to find what covers it
+  (ATA-116); a hidden one skips that.
 - **Saved.** `mediacenter.effectType` and `effectPreset` are now kept in
   the skin webview's `localStorage`, so the effect is the same on the next
   launch and in other skins. Skins that bind their `effects` element to

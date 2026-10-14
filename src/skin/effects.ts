@@ -202,7 +202,7 @@ function drawCard(t: CanvasRenderingContext2D, card: Card, w: number, h: number,
   const fit = (withTags: boolean) => {
     for (let width = w - 2 * pad; width >= 4 * px; width -= 4) {
       const layout = lay(width, withTags);
-      const spot = place(rows, layout.block + 2 * pad);
+      const spot = place(rows, layout.block + 2 * pad, w);
       if (layout.wide <= spot.x1 - spot.x0 - 2 * pad) return { width, layout, spot };
     }
     return null;
@@ -210,7 +210,7 @@ function drawCard(t: CanvasRenderingContext2D, card: Card, w: number, h: number,
   let best = fit(true);
   if (!best || best.width < 6 * px) best = fit(false) ?? best;
   const layout = best?.layout ?? lay(w - 2 * pad, false);
-  const spot = best?.spot ?? place(rows, layout.block + 2 * pad);
+  const spot = best?.spot ?? place(rows, layout.block + 2 * pad, w);
   const { lines, tags, block } = layout;
   const cx = (spot.x0 + spot.x1) / 2;
   if (image) {
@@ -250,8 +250,9 @@ function clearSpans({ mask, w, h, dx, dy }: NonNullable<Memory["cover"]>, rows: 
 
 /** Where a block `rows` tall shows widest, given each row's clear span
  * [start, end): its top and the span all its rows leave clear. Of equal
- * spans, the one nearest the middle. */
-export function place(clear: [number, number][], rows: number): { top: number; x0: number; x1: number } {
+ * spans, the one nearest the middle. With none (the area is too short, or
+ * all covered), the middle, across the whole `width`. */
+export function place(clear: [number, number][], rows: number, width: number): { top: number; x0: number; x1: number } {
   const middle = (clear.length - rows) / 2;
   let best = { top: Math.max(0, Math.round(middle)), x0: 0, x1: 0 };
   for (let top = 0; top + rows <= clear.length; top++) {
@@ -260,7 +261,7 @@ export function place(clear: [number, number][], rows: number): { top: number; x
     const [span, bestSpan] = [Math.max(0, x1 - x0), best.x1 - best.x0];
     if (span > bestSpan || (span === bestSpan && span > 0 && Math.abs(top - middle) < Math.abs(best.top - middle))) best = { top, x0, x1 };
   }
-  return best;
+  return best.x1 > best.x0 ? best : { ...best, x1: width };
 }
 
 /** `text` in at most `max` lines of `width` px, the last cut with an ellipsis. */
