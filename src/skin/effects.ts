@@ -1,14 +1,17 @@
 // The visualisations an `<effects>` element draws: our own bars, scope and
 // an Ambience-style glow, after the look of WMP's built-in ones. They draw
 // the frames the trusted page sends while one is on screen (the `vis`
-// message, docs/decisions.md ATA-114). The NTS show card is static: it
+// message, docs/decisions.md ATA-114). Milkdrop is Butterchurn's
+// (milkdrop.ts, ATA-167). The NTS show card is static: it
 // draws the `show` message, and needs no frames (ATA-166). The trusted page
 // reduces its analyser data with `bands` and `samples`; no DOM here, so
 // `node --test` can run them.
 import { clearRows } from "./pixels.ts";
+import { milkdrop, PRESETS, type Milk } from "./milkdrop.ts";
 
-/** One analyser frame: spectrum bars and waveform samples, 0..255. */
-export type Frame = { bars: number[]; wave: number[] };
+/** One analyser frame: spectrum bars and waveform samples, 0..255, and the
+ * newest 1024 samples for Milkdrop (none in a pick's flat frame). */
+export type Frame = { bars: number[]; wave: number[]; pcm?: number[] };
 
 /** The show on air, from the `show` message, its picture decoded. */
 export type Card = { title: string; genres: string[]; image: CanvasImageSource | null };
@@ -19,6 +22,8 @@ export const EFFECTS = [
   { type: "Bars and Waves", preset: 0, title: "Bars" },
   { type: "Bars and Waves", preset: 1, title: "Scope" },
   { type: "Ambience", preset: 0, title: "Ambience" },
+  // WMP's next() walks an effect's presets before the next effect.
+  ...Array.from({ length: PRESETS }, (_, preset) => ({ type: "Milkdrop", preset, title: "Milkdrop" })),
   { type: "NTS show", preset: 0, title: "NTS show" },
 ];
 /** The card, the effect until the listener picks another. */
@@ -56,6 +61,7 @@ export type Memory = {
   /** The `overlay` mask of the last full paint, `w` × `h`, at (`dx`, `dy`) in the element. */
   cover: { mask: Uint8ClampedArray; w: number; h: number; dx: number; dy: number } | null;
   card: { of: Card | null; canvas: HTMLCanvasElement } | null;
+  milk: Milk | null;
 };
 
 /** Draws effect `index` into (x, y, w, h). `frame` is null when nothing
@@ -71,6 +77,7 @@ export function drawEffect(g: CanvasRenderingContext2D, index: number, frame: Fr
   const title = EFFECTS[index].title;
   if (title === "Ambience") ambience(g, frame, box, bg, mem);
   else if (index === SHOW) showCard(g, card, box, bg, fg, mem);
+  else if (title === "Milkdrop") milkdrop(g, frame, EFFECTS[index].preset, box, bg, mem);
   else {
     g.fillStyle = bg;
     g.fillRect(x, y, w, h);

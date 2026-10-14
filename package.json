@@ -25,6 +25,8 @@
     "vite": "^8.0.16"
   },
   "dependencies": {
-    "@tauri-apps/api": "^2.12.3"
+    "@tauri-apps/api": "^2.12.3",
+    "butterchurn": "2.6.7",
+    "butterchurn-presets": "2.4.7"
   }
 }

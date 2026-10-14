@@ -86,7 +86,7 @@ class El {
   private canvases = new Map<string, HTMLCanvasElement>();
   api: object | null = null;
   /** An effects element's peaks and trails. */
-  readonly memory: Memory = { peaks: [], trail: null, cover: null, card: null };
+  readonly memory: Memory = { peaks: [], trail: null, cover: null, card: null, milk: null };
   move: ReturnType<typeof setTimeout> | null = null;
 
   readonly node: Node;

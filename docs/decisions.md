@@ -324,7 +324,9 @@ From ATA-114, also 20 times a second (30 before ATA-122) while the skin
 shows a visualisation, no other window covers the player, and the stream
 plays:
 
-    { "type": "vis", "bars": [32 × 0..255], "wave": [96 × 0..255] }
+    { "type": "vis", "bars": [32 × 0..255], "wave": [96 × 0..255], "pcm": [1024 × 0..255] }
+
+`pcm` is for Milkdrop (ATA-167); a pick's flat frame has none.
 
 From ATA-166, when the item or its show changes, and in answer to each
 `effects` message (a skin sends one on its first paint):
@@ -332,7 +334,8 @@ From ATA-166, when the item or its show changes, and in answer to each
     { "type": "show", "title", "genres": [up to 4], "image": "data:image/…" | null }
 
 The skin also gets `GET /` (the engine page), `GET /engine.js` (the
-engine), `GET /skin.wmz` (the skin itself, whole) and `GET /house.wmz` (the
+engine), `GET /milkdrop.js` (Butterchurn and its presets; ATA-167),
+`GET /skin.wmz` (the skin itself, whole) and `GET /house.wmz` (the
 house skin, for when a skin will not load; ATA-112) from the protocol, and
 nothing of the app's. Until ATA-108 the stub skin read its files one by one
 from `GET /files/<name>`.
@@ -500,6 +503,74 @@ full 25 times a second for its title. RAM, playing, on the merged build:
 than once), against 280 MB (540 MB) for the Winamp app.
 
 ## Skins
+
+### Milkdrop on a small preset budget (ATA-167, 2026-10-14)
+
+Ata asked for Milkdrop in the skins' visualiser area. ATA-114 left it out
+on size; this adds it within a budget of 1.5 MB on the installer.
+
+- **What.** Butterchurn 2.6.7 (MIT, Jordan Berg) and the 29 presets of its
+  "minimal" pack (`butterchurn-presets` 2.4.7, MIT; Jordan Berg picked
+  them). Each preset's name credits its MilkDrop authors: Geiss, Flexi,
+  Martin, Rovastar, Unchained, Zylot, Krash, Illusion, Idiot, suksma, yin,
+  Eo.S., Phat, AdamFX, QBikal, fishbrain, Mig, $$$ Royal and FED. The
+  README credits them, and the served file starts with the MIT notice. No
+  preset needs an image beyond Butterchurn's built-in noise.
+- **Where it renders: in the skin webview.** The other choice was an
+  app-owned webview over the `effects` rectangle, as the pick credit is.
+  That webview would need the audio too (it lives in the trusted page
+  either way), would cover whatever a skin draws over its visualisation
+  (anemone's pods), and would have to follow the area as scripts move and
+  hide it. In the skin webview, Milkdrop is one more effect: the engine
+  draws it under the skin's cover like Bars (ATA-116), and the
+  hidden/covered/minimised rules that stop frames stop it too.
+- **Isolation.** Nothing new reaches the skin. The skin protocol serves one
+  more fixed file, `GET /milkdrop.js` (Butterchurn and the pack, straight
+  from `node_modules`, built into the binary). The CSP is unchanged: the
+  file is `'self'`, and Butterchurn compiles the presets' equations with
+  `new Function`, which `'unsafe-eval'` already allowed for `jscript:`.
+  Butterchurn runs with no `AudioContext`: each `vis` frame now also carries
+  `pcm`, the newest 1024 samples of the trusted page's analyser, and
+  Butterchurn reads its bass, mid and treble from those. A skin's script
+  shares the webview with Butterchurn as it already does with the engine,
+  so it can tamper with it, but gains nothing it could not do before.
+  `tools/escape.mjs` on the release build gives the ATA-107 rows.
+- **Lazy.** The engine adds `<script src="/milkdrop.js">` the first time
+  Milkdrop has a frame to draw; until it loads the area is the background
+  colour. Without WebGL 2 it stays that colour and logs why.
+- **The cycle.** "Milkdrop", presets 0 to 28, between Ambience and the show
+  card. As in WMP, `next()` walks an effect's presets before the next
+  effect, so `next` within Milkdrop moves to the next preset, and after the
+  last one to the card. A new preset blends in over a second. The choice
+  is saved like the others (`mediacenter.effectType` and `effectPreset`).
+- **Frames.** Butterchurn renders once per `vis` frame, 20 a second
+  (ATA-122), into a WebGL canvas of the area's size, copied to a 2D canvas
+  for repaints between frames. No frames (paused, hidden, covered,
+  minimised) means no rendering. A pick's flat frame has no `pcm`, so
+  Milkdrop shows the background colour during a pick, as Bars and Scope
+  show flat.
+
+Installer, release builds of `main` (`78538fc`) and this branch:
+1,677,765 bytes before, 1,746,021 after (+67 KB, 1.60 to 1.67 MiB). The exe
+grows 387 KB (4.53 to 4.92 MB): the two files are stored uncompressed in
+it.
+
+CPU, % of one core over the whole process tree, release builds, anemone,
+NTS 1 playing muted on a hidden desktop, 30 s samples, two per launch,
+launches interleaved; the machine was busy with other work:
+
+| | Samples | Median |
+|---|---|---|
+| `main`, Bars | 20.9, 18.5, 19.2, 24.7 | 20.1 |
+| This branch, Bars | 24.8, 22.4, 22.3, 13.5, 26.1, 22.4 | 22.4 |
+| This branch, Milkdrop preset 0 | 31.9, 29.7, 30.1, 26.6, 36.8, 33.1 | 31.0 |
+| This branch, Milkdrop preset 18 (mandelbox explorer) | 23.4, 21.1 | |
+| This branch, Milkdrop preset 5 (alien fish pond) | 21.0, 17.8 | |
+
+Milkdrop costs about 0 to 9 points of a core over Bars, under the 15 the
+issue allows, so it keeps the 20 frames a second. Bars may cost a point or
+two more than on `main`, for the 1024 samples each frame now carries; the
+spread is wider than that.
 
 ### The NTS show card (ATA-166, 2026-10-14)
 
@@ -751,7 +822,8 @@ WMP or from the GPL WMP 8 clone. `src/skin/effects.ts` has them.
   both pages stayed `visible` and `requestAnimationFrame` kept running.
   Rust now hides both webviews while the window is minimised and shows them
   on restore; the audio plays on.
-- **Milkdrop (Butterchurn): not added.** The `butterchurn` package is
+- **Milkdrop (Butterchurn): not added** (added since, on a small preset
+  budget: ATA-167). The `butterchurn` package is
   0.7 MB unpacked and `butterchurn-presets` 11.9 MB, against a 3.3 MB
   release binary; it would also need WebGL in the skin webview and the full
   spectrum at frame rate. Three effects of our own cover what the test

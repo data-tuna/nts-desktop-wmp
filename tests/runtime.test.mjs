@@ -246,8 +246,16 @@ test("effects start on the show card, step through the visualisations, save them
   js("vis.next()");
   assert.deepEqual(js("[vis.currentEffectTitle, mediacenter.effectType, mediacenter.effectPreset]"), ["Ambience", "Ambience", 0]);
   js("vis.next()");
+  assert.deepEqual(js("[vis.currentEffectTitle, mediacenter.effectType, mediacenter.effectPreset]"), ["Milkdrop", "Milkdrop", 0]);
+  js("vis.next()");
+  assert.deepEqual(js("[vis.currentEffectTitle, vis.currentPreset]"), ["Milkdrop", 1], "next() moves to Milkdrop's next preset");
+  js("vis.currentPreset = 28");
+  js("vis.next()");
   assert.equal(js("vis.currentEffectTitle"), "NTS show", "round the list");
   js("vis.previous()");
+  js("vis.previous()");
+  assert.deepEqual(js("[vis.currentEffectTitle, vis.currentPreset]"), ["Milkdrop", 27]);
+  for (let i = 0; i < 28; i++) js("vis.previous()");
   assert.equal(js("vis.currentEffectTitle"), "Ambience");
   await Promise.resolve();
   assert.deepEqual(effects(), [false, true]);

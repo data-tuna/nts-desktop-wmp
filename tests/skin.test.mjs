@@ -172,6 +172,18 @@ test("effects: bars are log-spaced spectrum peaks, the wave is evenly sampled, a
   assert.equal(effectIndex("{some-clsid}", 3), 0);
 });
 
+test("effects: Milkdrop has one entry per preset in the pack the protocol serves, before the show card", async () => {
+  const { EFFECTS, SHOW, effectIndex } = await import("../src/skin/effects.ts");
+  const { PRESETS } = await import("../src/skin/milkdrop.ts");
+  const { createRequire } = await import("node:module");
+  const pack = createRequire(import.meta.url)("butterchurn-presets/lib/butterchurnPresetsMinimal.min.js");
+  assert.equal(Object.keys(pack.getPresets()).length, PRESETS);
+  const milk = EFFECTS.flatMap((e, i) => (e.type === "Milkdrop" ? [i] : []));
+  assert.deepEqual(milk.map((i) => EFFECTS[i].preset), [...Array(PRESETS).keys()]);
+  assert.equal(milk.at(-1) + 1, SHOW, "next() from the last preset goes to the card");
+  assert.equal(effectIndex("milkdrop", 5), milk[5]);
+});
+
 test("overlay: a visualisation redrawn under its mask and cover matches the skin painted over it", () => {
   // Per pixel: what lies over the visualisation (straight RGBA, alpha 0..1),
   // or null outside the window shape.
