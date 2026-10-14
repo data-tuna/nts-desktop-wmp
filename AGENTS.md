@@ -46,9 +46,9 @@ Written in English.
                           engine.ts lays out and paints the view, runs the
                           skin's scripts and handles the pointer, runtime.ts
                           is the WMP object model the scripts see, effects.ts
-                          draws the visualisations, pixels.ts holds the pixel
-                          helpers its tests share. main.ts is the entry;
-                          index.html the page.
+                          draws the visualisations and the show card,
+                          pixels.ts holds the pixel helpers its tests share.
+                          main.ts is the entry; index.html the page.
     skins/house/          The house skin, the one skin that ships: house.wms,
                           the layered SVGs in art/ it is drawn from, build.mjs
                           that renders them to bitmaps and zips house.wmz,
@@ -310,8 +310,10 @@ no app at all:
 
 A stand-in host in that page answers the skin with state as the trusted page
 does, but plays nothing; `/?play` starts it playing, as the app does on
-launch. In either place, `__wmpScope` in the skin webview is what skin code
-sees: `__wmpScope.player.status`, `__wmpScope.<element id>.visible`.
+launch. It sends no `show` message, so the show card, the default effect,
+is an empty area there: `next()` on the effects element moves on to Bars.
+In either place, `__wmpScope` in the skin webview is what skin code sees:
+`__wmpScope.player.status`, `__wmpScope.<element id>.visible`.
 
 `install-check.ps1` installs the app, plays it, and uninstalls it, as the
 release workflow does on a fresh runner: on this machine it would install a
@@ -394,35 +396,44 @@ until this one gets its own.
 **PR CI does not build the Rust side.** It runs typecheck, lint, the frontend
 build, the tests and `cargo fmt --check`.
 
-**A visualisation costs about 10–25 points of a core** (ATA-116, ATA-122).
-With one showing, the app uses about 15–33 % of a core, depending on the
-skin (5–7 % without; the Winamp app about 18 % with its spectrum). The top of
-that range is Bootleg House, whose scrolling title repaints the whole skin. Each
-frame redraws only the visualisation, so most of that is the frames' trip:
-an IPC call from the trusted page, a script evaluated in the skin webview, a
-composite of both webviews. Frames go 20 a second, and none while the player
-is minimised or other windows cover all of it.
+**A visualisation costs about 10–25 points of a core** (ATA-116, ATA-122);
+the show card about 2 (ATA-166), likely the full paints' pass that finds
+what covers any visible visualisation. With one showing, the app uses about
+15–33 % of a core, depending on the skin (5–7 % without; the Winamp app
+about 18 % with its spectrum). The top of that range is Bootleg House, whose
+scrolling title repaints the whole skin. Each frame redraws only the
+visualisation, so most of that is the frames' trip: an IPC call from the
+trusted page, a script evaluated in the skin webview, a composite of both
+webviews. Frames go 20 a second, and none while the player is minimised or
+other windows cover all of it.
 
 **Only a skin's first view is drawn.** `theme.openView` and
 `theme.currentViewID` are logged and ignored, so circle's video, playlist
 and settings views and 9SeriesDefault's compact view never open.
+
+**Kenwood_MP7 loses its display.** It is listed as "works", but its
+`mainMeta` subview (title, clock, seek bar, EQ) is never drawn or hit,
+though its script sets it visible (ATA-170). Kenwood_MPXP has the same
+markup and likely the same fault.
 
 **Video, item and drop-down playlists, and popups are not drawn.**
 `<playlist>` lists the channels, mixtapes and picks, and scrolls with the
 wheel; it has no columns or scroll bar. Their methods
 (`setColumnResizeMode`, `appendItem`) are logged and do nothing.
 
-**Three visualisations, no Milkdrop** (ATA-114): bars, scope and ambience,
-our own. The chosen effect is not saved across launches (`mediacenter`
-starts empty each time).
+**Three visualisations and the show card, no Milkdrop** (ATA-114,
+ATA-166): bars, scope, ambience and the NTS show card, our own. The chosen
+effect is saved in the skin webview's `localStorage`; the first launch
+shows the card. A pick's card uses the NTS episode picture, not
+SoundCloud's artwork.
 
 **Nobody has looked at the media overlay itself.** Windows lists the app's
-session with its title and show (`NTS 1 - <show> - <location>`), and plays,
+session with its title and show (`NTS 1: <show> - <location>`), and plays,
 pauses and stops it, through the same API the overlay uses (ATA-115). The
 flyout has not been seen on screen.
 
-**Fast forward, rewind and seek sliders are drawn disabled:** a live stream
-has no length.
+**Fast forward and rewind are drawn disabled,** and so are seek sliders
+except during a pick: a live stream has no length.
 
 **A skin's `onClose` runs only when it closes the window itself** (its close
 button or `view.close()`), not when Windows closes the app, so preferences a

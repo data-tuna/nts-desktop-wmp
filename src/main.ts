@@ -6,7 +6,7 @@ import { listen } from "@tauri-apps/api/event";
 import { fetchLive, mergeOnAir, nextPollDelay, type OnAir } from "./live";
 import { MIXTAPES_API, parseMixtapes } from "./mixtapes";
 import { PICKS_API, parsePicks, type Pick } from "./picks";
-import { CHANNELS, createPlayer, type Item } from "./player";
+import { CHANNELS, channelTitle, createPlayer, type Item } from "./player";
 import { createWidget } from "./widget";
 import { bands, samples } from "./skin/effects";
 
@@ -105,12 +105,12 @@ function onSkin(m: FromSkin) {
   else if (m.type === "effects") {
     effectsOn = m.on;
     startVis();
+    // A skin sends this on its first paint: a new skin needs the card too.
+    sendCard();
   }
   else if (m.type === "select") player.select(m.index);
-  else if (m.type === "seek") {
-    // ponytail: seek is accepted but a live stream has nowhere to seek to.
-    // Mixtapes are live too; revisit if a seekable source ever arrives.
-  } else {
+  else if (m.type === "seek") player.seek(m.seconds);
+  else {
     if (m.type === "volume") settings.volume = clamp(m.value, 0, 1, settings.volume);
     else if (m.type === "balance") settings.balance = clamp(m.value, -1, 1, settings.balance);
     else if (m.type === "mute") settings.mute = m.value;
@@ -147,8 +147,7 @@ function info(i: number) {
   const item = items[i];
   const url = item.url;
   const show = i < CHANNELS.length ? onAir[i] : undefined;
-  // The channel always leads, as in the Winamp app (Ata, 2026-10-09): "NTS 1 - <show> - <location>".
-  if (show) return { title: `${item.title} - ${show.title}`, url, author: show.show, location: show.location ?? "", link: "", artwork: show.artwork };
+  if (show) return { title: channelTitle(item.title, show.title), url, author: show.show, location: show.location ?? "", link: "", artwork: show.artwork };
   const pick = picks.get(item.url);
   if (pick) {
     const credit = pick.uploader ? `${pick.uploader} on SoundCloud` : "SoundCloud";
@@ -157,6 +156,47 @@ function info(i: number) {
   }
   return { title: item.title, url, author: "", location: "", link: "", artwork: undefined };
 }
+
+// The show card, the "NTS show" visualisation (ATA-166): the show's title,
+// up to 4 genres and its picture. The skin has no network, so this page
+// fetches the picture and hands it over as a data: URL, once per change.
+// Without the API or the picture, the card is the item's title alone.
+let card = "";
+let cardMsg: { type: "show"; title: string; genres: string[]; image: string | null } | null = null;
+function sendCard() {
+  if (cardMsg) void invoke("skin_send", { msg: cardMsg }).catch(() => {});
+}
+async function updateCard(i: number) {
+  const item = items[i];
+  const show = i < CHANNELS.length ? onAir[i] : undefined;
+  const pick = picks.get(item.url);
+  // A mixtape's name without its subtitle; a pick's without its location and tags.
+  const title = show?.show ?? pick?.name ?? item.name ?? item.title;
+  const genres = (show?.genres ?? pick?.tags ?? []).slice(0, 4);
+  const artwork = show ? show.artwork : (pick?.artwork ?? item.artwork);
+  const key = JSON.stringify([title, genres, artwork]);
+  if (key === card) return;
+  card = key;
+  let image: string | null = null;
+  try {
+    const response = artwork ? await fetch(artwork, { signal: AbortSignal.timeout(10_000) }) : null;
+    const blob = response?.ok ? await response.blob() : null;
+    if (blob?.type.startsWith("image/")) image = await dataUrl(blob);
+  } catch (error: unknown) {
+    console.warn("show picture failed", error);
+  }
+  // Another item or show came along while this one loaded.
+  if (key !== card) return;
+  cardMsg = { type: "show", title, genres, image };
+  sendCard();
+}
+const dataUrl = (blob: Blob) =>
+  new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(blob);
+  });
 
 // Windows' media overlay, through WebView2's Media Session.
 let overlay = "";
@@ -171,15 +211,17 @@ if ("mediaSession" in navigator) {
   for (const [action, type] of actions) navigator.mediaSession.setActionHandler(action, () => onSkin({ type } as FromSkin));
 }
 
-// The tray's tooltip, and while a pick plays its credit, which the app draws
+// The tray's tooltip and check mark, and while a pick plays its credit, which the app draws
 // over the skin and lists in the tray (lib.rs, now_playing).
 let tray = "";
 function updateTray(title: string, i: number, playState: string) {
   const pick = picks.get(items[i].url);
   const credit = pick && playState !== "stopped" ? { name: pick.uploader ?? "", url: pick.url } : null;
-  if (tray === JSON.stringify([title, credit])) return;
-  tray = JSON.stringify([title, credit]);
-  void invoke("now_playing", { title, credit }).catch((e: unknown) => console.warn("now_playing", e));
+  // The tray checks the channel that is current; a mixtape or pick checks neither.
+  const channel = i < CHANNELS.length ? i : null;
+  if (tray === JSON.stringify([title, credit, channel])) return;
+  tray = JSON.stringify([title, credit, channel]);
+  void invoke("now_playing", { title, credit, channel }).catch((e: unknown) => console.warn("now_playing", e));
 }
 
 // 4 updates a second covers the clock and title. The visualisation gets its
@@ -188,10 +230,9 @@ setInterval(() => {
   const now = player.state();
   const { artwork: _, ...shown } = info(now.channel);
   updateOverlay(now.channel);
+  void updateCard(now.channel);
   updateTray(shown.title, now.channel, now.playState);
-  // duration 0: live streams have no length and cannot seek (WMP's convention).
-  // ponytail: picks have a length, and SoundCloud's widget can seek; they are shown as live too until someone asks to seek a pick.
-  const state = { type: "state", ...now, ...shown, items: items.map((_, i) => info(i).title), duration: 0, ...settings, level: level() };
+  const state = { type: "state", ...now, ...shown, items: items.map((_, i) => info(i).title), ...settings, level: level() };
   void invoke("skin_send", { msg: state }).catch(() => {});
   startVis();
 }, 250);

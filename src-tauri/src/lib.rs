@@ -9,7 +9,7 @@ use serde::Deserialize;
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 use tauri::http::{HeaderValue, Method, Request, Response, StatusCode};
-use tauri::menu::{Menu, MenuEvent, MenuItem, PredefinedMenuItem};
+use tauri::menu::{CheckMenuItem, Menu, MenuEvent, MenuItem, PredefinedMenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::webview::NewWindowResponse;
 use tauri::{
@@ -65,6 +65,7 @@ enum FromSkin {
     Mute {
         value: bool,
     },
+    /// Seconds into a pick (ATA-165). Live streams ignore it.
     Seek {
         seconds: f64,
     },
@@ -287,6 +288,11 @@ fn valid_shape(width: u32, height: u32, rects: &[[u32; 4]]) -> bool {
         && rects.iter().all(inside)
 }
 
+/// At most a day into a pick: no pick is longer, and nothing is before 0.
+fn valid_seek(seconds: f64) -> bool {
+    (0.0..=86_400.0).contains(&seconds)
+}
+
 /// Only http(s) URLs of a sane length, re-serialised by the URL parser, and
 /// at most one every 3 s, so a skin cannot flood the desktop with tabs.
 fn launchable(url: &str, now: Instant, last: &Mutex<Option<Instant>>) -> Option<Url> {
@@ -362,6 +368,7 @@ fn handle(app: &AppHandle, msg: FromSkin) {
             let app = app.clone();
             std::thread::spawn(move || open_picker(&app));
         }
+        FromSkin::Seek { seconds } if !valid_seek(seconds) => {}
         other => {
             let _ = app.emit_to(EventTarget::webview("main"), "skin", other);
         }
@@ -454,11 +461,21 @@ struct Credit {
     url: String,
 }
 
-/// The tray menu, and its credit entry, which is in the menu only while a
-/// pick plays.
+/// The tray menu, its two channels, checked while current, and its credit
+/// entry, which is in the menu only while a pick plays.
 struct Tray {
     menu: Menu<Wry>,
+    channels: [CheckMenuItem<Wry>; 2],
     credit: MenuItem<Wry>,
+}
+
+impl Tray {
+    /// Checks the current channel, or neither while a mixtape or pick plays.
+    fn check(&self, channel: Option<usize>) {
+        for (i, item) in self.channels.iter().enumerate() {
+            let _ = item.set_checked(channel == Some(i));
+        }
+    }
 }
 
 static CREDIT: Mutex<Option<Credit>> = Mutex::new(None);
@@ -496,14 +513,21 @@ fn fit_tooltip(text: &str) -> String {
 }
 
 /// The trusted page, whenever what plays changes: its title for the tray's
-/// tooltip, and a pick's credit, or none. While a pick plays the app draws
-/// the credit itself, above the skin, in a webview of its own: a skin's code
-/// cannot hide it, and a skin with no title text still shows it.
+/// tooltip, the channel to check in the tray, and a pick's credit, or none.
+/// While a pick plays the app draws the credit itself, above the skin, in a
+/// webview of its own: a skin's code cannot hide it, and a skin with no title
+/// text still shows it.
 #[tauri::command]
-async fn now_playing(app: AppHandle, title: String, credit: Option<Credit>) -> Result<(), String> {
+async fn now_playing(
+    app: AppHandle,
+    title: String,
+    channel: Option<usize>,
+    credit: Option<Credit>,
+) -> Result<(), String> {
     if let Some(tray) = app.tray_by_id("main") {
         let _ = tray.set_tooltip(Some(fit_tooltip(&title)));
     }
+    app.state::<Tray>().check(channel);
     if credit.as_ref().is_some_and(|c| !soundcloud_page(&c.url)) {
         return Err("not a SoundCloud page".into());
     }
@@ -600,15 +624,19 @@ fn open_credit() {
 /// plays, and quit. A left click brings the player forward.
 fn build_tray(app: &AppHandle) -> tauri::Result<()> {
     let item = |id: &str, text: &str| MenuItem::with_id(app, id, text, true, None::<&str>);
+    let channel = |id: &str, text: &str| {
+        CheckMenuItem::with_id(app, id, text, true, id == "nts1", None::<&str>)
+    };
     let sep = || PredefinedMenuItem::separator(app);
+    let channels = [channel("nts1", "NTS 1")?, channel("nts2", "NTS 2")?];
     let menu = Menu::with_items(
         app,
         &[
             &item("play", "Play")?,
             &item("stop", "Stop")?,
             &sep()?,
-            &item("nts1", "NTS 1")?,
-            &item("nts2", "NTS 2")?,
+            &channels[0],
+            &channels[1],
             // The credit goes here, at 5, while a pick plays.
             &sep()?,
             &item("quit", "Quit")?,
@@ -617,6 +645,7 @@ fn build_tray(app: &AppHandle) -> tauri::Result<()> {
     let credit = item("credit", "SoundCloud")?;
     app.manage(Tray {
         menu: menu.clone(),
+        channels,
         credit,
     });
     let mut tray = TrayIconBuilder::with_id("main")
@@ -645,6 +674,12 @@ fn on_tray_menu(app: &AppHandle, event: MenuEvent) {
     match event.id().as_ref() {
         "quit" => app.exit(0),
         "credit" => open_credit(),
+        // Windows flips a check item's mark on every click; main.ts plays the
+        // clicked channel, so that one is checked, even if it already was.
+        id @ ("nts1" | "nts2") => {
+            app.state::<Tray>().check(Some((id == "nts2") as usize));
+            let _ = app.emit_to(EventTarget::webview("main"), "tray", id);
+        }
         // main.ts plays, stops and switches.
         id => {
             let _ = app.emit_to(EventTarget::webview("main"), "tray", id);
@@ -1047,6 +1082,16 @@ mod tests {
     }
 
     #[test]
+    fn seek_stays_within_a_day() {
+        assert!(valid_seek(0.0));
+        assert!(valid_seek(7080.0));
+        assert!(!valid_seek(-1.0));
+        assert!(!valid_seek(86_401.0));
+        assert!(!valid_seek(f64::NAN));
+        assert!(!valid_seek(f64::INFINITY));
+    }
+
+    #[test]
     fn launch_only_http_and_not_too_often() {
         let last = Mutex::new(None);
         let t = Instant::now();
@@ -1160,6 +1205,13 @@ mod tests {
             Some(FromSkin::Effects { on: true })
         );
         assert_eq!(parse(r#"{"type":"effects","on":"yes"}"#), None);
+        assert_eq!(
+            parse(r#"{"type":"seek","seconds":600.5}"#),
+            Some(FromSkin::Seek { seconds: 600.5 })
+        );
+        assert_eq!(parse(r#"{"type":"seek","seconds":"600"}"#), None);
+        assert_eq!(parse(r#"{"type":"seek","seconds":1,"evil":1}"#), None);
+        assert_eq!(parse(r#"{"type":"seek","seconds":NaN}"#), None);
         // The trusted page still gets the bare form.
         let play = serde_json::to_string(&FromSkin::Play {}).unwrap();
         assert_eq!(play, r#"{"type":"play"}"#);

@@ -3,7 +3,7 @@
 // Pause and stop cancel a pending retry. See AGENTS.md, Invariants.
 
 /** A playlist row. A pick plays through `Widget`, everything else through the <audio> element. */
-export type Item = { title: string; url: string; pick?: boolean };
+export type Item = { title: string; url: string; pick?: boolean; name?: string; artwork?: string };
 
 /** What plays a pick (main.ts: SoundCloud's widget). It reports a finish or an error to the caller itself. */
 export type Widget = {
@@ -14,14 +14,24 @@ export type Widget = {
   stop(): void;
   /** Lets go of the loaded pick. */
   unload(): void;
+  /** Jumps to `seconds` into the loaded pick. */
+  seek(seconds: number): void;
   readonly playing: boolean;
   readonly time: number;
+  /** The loaded pick's page, "" if none. */
+  readonly url: string;
+  /** The loaded pick's length in seconds, 0 until known. */
+  readonly duration: number;
 };
 
 export const CHANNELS: Item[] = [
   { title: "NTS 1", url: "https://streams.radiomast.io/nts1" },
   { title: "NTS 2", url: "https://streams.radiomast.io/nts2" },
 ];
+
+/** A channel's title while the live API names its show: "NTS 1: <show> - <location>".
+ * The channel leads, so every skin's title says which one plays (ATA-164). */
+export const channelTitle = (channel: string, show: string) => `${channel}: ${show}`;
 
 /** 6 s of silence as an 8 kHz WAV: what the element holds while paused or
  * stopped. WebView2 leaves media shorter than about 5 s out of the session. */
@@ -67,6 +77,9 @@ type Media = Pick<
 export function createPlayer(audio: Media, items: Item[] = [...CHANNELS], widget?: Widget) {
   let channel = 0;
   const pick = () => items[channel].pick === true;
+  // Next or previous while paused moves the channel but keeps the last pick
+  // loaded, so its clock and seeking belong to that pick only.
+  const loaded = () => pick() && widget?.url === items[channel].url;
   // What the listener asked for; the element may disagree while it reconnects.
   let mode: "playing" | "paused" | "stopped" = "stopped";
   let retryMs = RETRY_MIN_MS;
@@ -179,6 +192,10 @@ export function createPlayer(audio: Media, items: Item[] = [...CHANNELS], widget
     /** Next (1) or previous (-1) item, wrapping around. */
     step: (by: number) => select(channel + by),
     select,
+    /** Only a pick can seek; a live stream has nowhere to go. */
+    seek(seconds: number) {
+      if (loaded()) widget?.seek(seconds);
+    },
     state() {
       const playState: PlayState =
         mode !== "playing"
@@ -188,7 +205,9 @@ export function createPlayer(audio: Media, items: Item[] = [...CHANNELS], widget
             : (pick() ? !widget?.playing : audio.paused || audio.readyState < 3)
               ? "buffering"
               : "playing";
-      return { playState, channel, title: items[channel].title, time: pick() ? (widget?.time ?? 0) : audio.currentTime };
+      // duration 0: live streams have no length and cannot seek (WMP's convention).
+      if (loaded()) return { playState, channel, title: items[channel].title, time: widget?.time ?? 0, duration: widget?.duration ?? 0 };
+      return { playState, channel, title: items[channel].title, time: pick() ? 0 : audio.currentTime, duration: 0 };
     },
   };
 }

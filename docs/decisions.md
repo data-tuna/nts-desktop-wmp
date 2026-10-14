@@ -6,6 +6,86 @@ the evidence.
 
 ## Stack
 
+### Sliders that seek from onMouseUp (ATA-170, 2026-10-14)
+
+- **Sliders fire `onMouseUp`** when a drag ends, after `onDragEnd`
+  (`onMouseDown` already fired on every element). Kenwood_MP7, portals,
+  QuantumRedshift, TwinBlade and MotherLand seek only there
+  (`player.controls.currentPosition=<slider id>.value`), on sliders that
+  are not bound to `currentPosition`.
+- **A slider bound to nothing keeps the value it was dropped at,** as in
+  WMP, so those seek bars' thumbs stay put. Sliders bound to the player
+  (a `wmpprop:` or `jscript:` value, or a volume, balance or seek slider)
+  go back to the player's value.
+- **Still one drag, one seek.** The engine seeks only for a seek slider, and
+  only if neither `onDragEnd` nor `onMouseUp` sent one: anime's
+  `onMouseUp` seeks, so the engine does not.
+- **Streams stay unseekable.** Such a slider runs from 0 to
+  `currentMedia.duration`, which is 0 on a channel or mixtape, and setting
+  `currentPosition` there sends nothing.
+
+Checked on a release build on a hidden desktop (`--mute-audio`), through
+DevTools input events. During a pick, a drag on QuantumRedshift's seek dial
+moved the widget from 14 s to 2876 s, and one on TwinBlade's position bar
+from 7 s to 3155 s. Both kept playing, and each drag sent one `seek`. On
+NTS 1 the same drags sent none. Kenwood_MP7's bar could not be tried: its
+`mainMeta` subview is not drawn or hit, a separate engine bug.
+
+### A seek bar for picks (ATA-165, 2026-10-14)
+
+- **A pick has a length.** The widget's `getDuration` gives it, asked when
+  the pick is ready and again when it starts if it read 0; `playProgress`
+  gives the position, as before. The state message's `duration` is the
+  pick's length in seconds, and still 0 for channels and mixtapes.
+  `currentMedia.duration` and `durationString` read it, and a seek slider
+  runs from 0 to it.
+- **Clocks over an hour read `H:MM:SS`**, as WMP's do: `1:58:00`, not
+  `118:00`. Under an hour they stay `MM:SS`.
+- **Seeking.** During a pick, a `seekSlider`, or any slider bound to
+  `player.controls.currentPosition`, is enabled. It sends `seek` once, when
+  the drag ends, after the skin's `onDragEnd`, and only if that handler sent
+  none: Classic's sets `player.controls.currentposition=value` and seeks
+  itself; Television's and anime's misspell it (`currentpostion`) and send
+  nothing, so the engine seeks. One drag, one seek. A script setting
+  `currentPosition` seeks too. The trusted page passes it to the widget's
+  `seekTo`, clamped to the pick. Rust drops a `seek` outside 0 to 86,400 s.
+- **Channels and mixtapes stay unseekable.** Their `duration` is 0, so the
+  slider is disabled and a `seek` does nothing. Fast forward and rewind
+  stay disabled for everything.
+- **Only the loaded pick has a clock.** Next or Previous while paused
+  moves to another item but keeps the last pick loaded, so it can resume.
+  Until the new pick loads, it reports time and length 0 and does not seek.
+- **A paused pick shows its time.** A paused stream still shows none,
+  since pausing drops it.
+- **The house skin** has no seek slider. Its clock reads
+  `1:02:34 / 1:58:00` during a pick, at 10 pt instead of 13 pt so it fits.
+
+Checked on a release build on a hidden desktop (`--mute-audio`), through
+DevTools: on the house skin a pick showed `00:08 / 2:00:09`, and setting
+`currentPosition` to 3600 from the skin webview put the widget at 3605 s
+five seconds later, still playing. On bluegrid (`seekSlider`) and Classic
+(a slider with `onDragEnd`) a mouse drag along the bar moved a pick to
+1736 s and 3778 s; the position read back from the widget kept counting
+from there. Back on NTS 1 the slider was disabled and `duration` 0.
+`tools/escape.mjs` gave the same results as ATA-107.
+
+### Which channel is playing (ATA-164, 2026-10-14)
+
+- **Title:** `NTS 1: <show> - <location>` (was `NTS 1 - …`). Skins like
+  circle print the show before the title, dashes between, so the channel
+  got lost in the middle of a run of names. Mixtapes and picks
+  keep their own titles. The tray tooltip and Windows' media overlay use the
+  same text.
+- **Playlist:** the current row is drawn in the skin's `itemPlayingColor`
+  and `itemPlayingBackgroundColor`. 24 of the 30 working skins with a
+  playlist in their first view name neither, so their current row gets the
+  list's own colours swapped: the foreground colour as its background, the
+  background colour as its text.
+- **Tray:** NTS 1 and NTS 2 are check items, the current channel checked;
+  neither while a mixtape or pick plays, since the tray lists neither.
+  Windows flips a check item's mark on every click, so a click sets both
+  marks again at once.
+
 ### Windows behaviour: tray, single instance, window memory, media keys, credit (ATA-115, 2026-10-11)
 
 - **Tray icon:** Play, Stop, NTS 1, NTS 2, the pick's credit while one
@@ -66,8 +146,9 @@ the evidence.
   Next and previous walk the whole list and wrap; a playlist row sends the
   new `select` message rather than a run of `next`s, which would reload a
   stream at every step. The app still opens on NTS 1.
-- **Titles.** A channel's title is `NTS 1 - <show> - <location>`, the
-  channel first as in the Winamp app (Ata, 2026-10-09). That is
+- **Titles.** A channel's title is `NTS 1: <show> - <location>`, the
+  channel first as in the Winamp app (Ata, 2026-10-09; the colon is
+  ATA-164's). That is
   `player.currentMedia.name` and `getItemInfo("Title")`;
   `getItemInfo("Author")` is the show and `getItemInfo("Location")` its
   place. `live.ts` now keeps `show` and `location` apart for this, which the
@@ -89,7 +170,8 @@ the evidence.
   widget reports an error for, stops the player; a stuck pick is not
   reloaded, since that would start a two-hour mix over; a finished pick
   moves on to the next item. Pause keeps a pick's place. Picks report no
-  duration, so skins treat them as live (no seeking) for now.
+  duration, so skins treat them as live (no seeking) for now. (Reversed by
+  ATA-165: picks have a length and seek.)
 - **The state message** gains `url` (the current item's stream or page:
   `player.URL`, `currentMedia.sourceURL`), `author`, `location`, `link` (a
   pick's page, else `""`) and `items` (the playlist's titles).
@@ -216,7 +298,7 @@ unknown fields included, and refuses requests from any webview but `skin`
 | `{ "type": "mute", "value": true \| false }` | the trusted page |
 | `{ "type": "volume", "value": 0..1 }`, `{ "type": "balance", "value": -1..1 }` | the trusted page, clamped |
 | `{ "type": "eq", "band": 0..9, "gain": -15..15 }` | the trusted page, clamped |
-| `{ "type": "seek", "seconds": n }` | accepted, ignored: live streams cannot seek |
+| `{ "type": "seek", "seconds": 0..86400 }` | the trusted page: seeks a pick, clamped to its length; ignored for live streams (ATA-165) |
 | `{ "type": "drag" }` | Rust: moves the window with the pointer, only while our window is in front and under the pointer with the button down |
 | `{ "type": "shape", "width", "height", "rects": [[x, y, w, h], …] }` | Rust: sizes the window and sets its region. Ignored unless the view is 1–4096 px a side and every run is non-empty and inside it, with at most ceil(width / 2) runs per row |
 | `{ "type": "close" }`, `{ "type": "minimize" }` | Rust: closes or minimizes the window (ATA-110) |
@@ -234,15 +316,20 @@ a second (ATA-109):
 
 `playState` is `playing`, `buffering`, `reconnecting`, `paused` or
 `stopped`. `duration` is 0 for a live stream, as in WMP: a skin shows its
-seek bar disabled. `volume`, `mute`, `balance` and `eq` (ten gains in dB)
-are the saved settings, so a skin's controls start where the listener left
-them.
+seek bar disabled. For a pick it is its length in seconds (ATA-165).
+`volume`, `mute`, `balance` and `eq` (ten gains in dB) are the saved
+settings, so a skin's controls start where the listener left them.
 
 From ATA-114, also 20 times a second (30 before ATA-122) while the skin
 shows a visualisation, no other window covers the player, and the stream
 plays:
 
     { "type": "vis", "bars": [32 × 0..255], "wave": [96 × 0..255] }
+
+From ATA-166, when the item or its show changes, and in answer to each
+`effects` message (a skin sends one on its first paint):
+
+    { "type": "show", "title", "genres": [up to 4], "image": "data:image/…" | null }
 
 The skin also gets `GET /` (the engine page), `GET /engine.js` (the
 engine), `GET /skin.wmz` (the skin itself, whole) and `GET /house.wmz` (the
@@ -413,6 +500,62 @@ full 25 times a second for its title. RAM, playing, on the merged build:
 than once), against 280 MB (540 MB) for the Winamp app.
 
 ## Skins
+
+### The NTS show card (ATA-166, 2026-10-14)
+
+Ata asked for the show's picture and genres, as nts.live shows them, in the
+skin's visualiser area. A fourth effect, **NTS show** (`effectType` "NTS
+show", preset 0), draws the show's picture cropped to fill the area, and
+over it, on a dark band, the show's title (two lines at most) and up to
+four genres as outlined tags. It joins Bars, Scope and Ambience in
+`next()` and `previous()`.
+
+- **Data.** The live API's `now.embeds.details.genres[].value` and the
+  `media.picture_small` (200×200) that `live.ts` already read for the
+  overlay. On 2026-10-14 NTS 2's show had no genres: the card then has none.
+  A mixtape uses its own `media.picture_small` and its title without the
+  subtitle (both now read by `mixtapes.ts`). A pick uses the NTS episode
+  picture the picks API gives, the one the overlay already shows, its name
+  as the title and its genres and moods as tags (`picks.ts` now keeps them
+  apart). SoundCloud's widget has the track's artwork too, but the NTS
+  picture is already at hand.
+- **Isolation.** The skin's CSP is unchanged. The trusted page fetches the
+  picture (`media*.ntslive.co.uk` sends `Access-Control-Allow-Origin: *`)
+  and sends it to the skin as a `data:` URL in a `show` message through
+  `skin_send`; the skin CSP already allows `data:` images. Rust is not
+  involved. It is sent when the item or the show changes, and again when a
+  skin starts: the engine now always sends one `effects` message on its
+  first paint, and the trusted page answers that with the card. A picture
+  that fails to load or decode leaves the card without one.
+- **Fallbacks.** Without the API, the card shows the item's title ("NTS 1")
+  on the element's background colour, in its foreground colour (white if
+  none). Playback never waits for any of it.
+- **CPU.** The card is drawn once per card and area size, then copied. The
+  skin tells the trusted page that a card needs no analyser frames
+  (`effects` `on: false`), so none are sent. Release build, anemone, NTS 1
+  playing, muted, 30 s each: card 5.9 and 5.5 % of one core, visualisation
+  hidden 5.5 %; in an earlier run Bars took 29.4 %. The reviewer's three
+  alternating pairs on one running app gave card 8.8, 9.6, 7.6 % against
+  hidden 7.4, 6.5, 5.0 %: about 2 points. Likely the cause: while any
+  visualisation shows, each full paint (once a second for the clock) draws
+  the view twice and reads back its pixels to find what covers it
+  (ATA-116); a hidden one skips that.
+- **Saved.** `mediacenter.effectType` and `effectPreset` are now kept in
+  the skin webview's `localStorage`, so the effect is the same on the next
+  launch and in other skins. Skins that bind their `effects` element to
+  `mediacenter` (anemone, bluegrid, cerulean) read it from there; an element
+  with no `currentEffectType` (the house skin's) shows `mediacenter`'s, and
+  `next()` saves to it. Before any choice, it is the card.
+- **Layout.** The text goes where the skin leaves it clear. A full paint
+  already works out how much of the area shows at each pixel (`overlay`,
+  ATA-116); when the card is drawn, `clearRows` takes each row's widest
+  fully shown run, and `place` finds the band whose rows share the widest
+  span, nearest the middle. The card tries the widest text first and
+  narrows it until it fits such a span; if the genres would leave the title
+  narrower than about 6 characters' width, it drops them. The house skin's
+  round area and anemone's (its whole window, pods over two corners) keep
+  the title and lose the genres; bluegrid keeps both. The layout is redone
+  for a new card or size, not when the cover changes.
 
 ### Skins from archive.org: the list, the launch, the picker (ATA-112, 2026-10-11)
 
@@ -588,7 +731,7 @@ WMP or from the GPL WMP 8 clone. `src/skin/effects.ts` has them.
   shows Bars. `next()` and `previous()` step round the list and run the
   properties' `_onchange` handlers, which is how anemone, bluegrid and
   cerulean save the choice to `mediacenter`. `mediacenter` is not saved
-  across launches.
+  across launches (it is since ATA-166).
 - **Colours.** `backgroundColor` (black if none) behind, and
   `foregroundColor` for bars and scope if the skin gives one (the house
   skin's amber); otherwise WMP-like green to red.
@@ -664,13 +807,13 @@ what the 7 ATA-103 skins call; no code from Webamp Modern.
   state first.
 - **Handlers.** `onLoad` (after the scripts, before the first paint),
   `onTimer` with `timerInterval`, `onClick`, `onDblClick`, `onMouseDown`,
-  `onMouseOver`/`onMouseOut`, `value_onchange` and `onDragEnd` on sliders,
-  `onEndMove` after `moveTo`, `onClose` when the skin closes the window, and
-  `<property>_onchange` whenever a script sets that property. A sticky
-  button's `down` flips before its `onClick` reads it; one whose `down` is
-  bound (`wmpprop:player.settings.mute`) goes back to the binding after. A
-  named transport button still does its own job and then runs its
-  `onClick`; a mute button with an `onClick` mutes through it.
+  `onMouseOver`/`onMouseOut`, `value_onchange`, `onDragEnd` and (ATA-170)
+  `onMouseUp` on sliders, `onEndMove` after `moveTo`, `onClose` when the
+  skin closes the window, and `<property>_onchange` whenever a script sets
+  that property. A sticky button's `down` flips before its `onClick` reads
+  it; one whose `down` is bound (`wmpprop:player.settings.mute`) goes back
+  to the binding after. A named transport button still does its own job and
+  then runs its `onClick`; a mute button with an `onClick` mutes through it.
 - **Bindings and expressions.** `wmpprop:` reads the object model or another
   element (`wmpprop:bgTransports.left`); `wmpenabled:`/`wmpdisabled:` follow
   the transport. Both, and `jscript:`, are worked out again after every
@@ -813,14 +956,16 @@ against the 7 ATA-103 skins; no code from Webamp Modern.
   (ATA-109): Play is enabled unless a stream is on (playing, buffering or
   reconnecting), Pause and Stop only while one is; Previous and Next always
   (they switch channels); fast forward, rewind and seek sliders never, since
-  a live stream has no length. Each sends its own message, and Mute sends
-  the opposite of the host's mute. Sliders bound to the volume or balance,
-  named or not, start at the host's saved values and send `volume` and
-  `balance`, scaled from the slider's own range; EQ sliders show the saved
-  gains. A button whose `down` is bound to `player.settings.mute`
-  (9SeriesDefault's) is a mute button, and draws pressed only while the
-  host is muted. The elapsed time is blank while stopped, as in WMP, and
-  while paused, because pausing drops the stream and its clock reads 0.
+  a live stream has no length. (Reversed by ATA-165 for seek sliders during
+  a pick.) Each sends its own message, and Mute sends the opposite of the
+  host's mute. Sliders bound to the volume or balance, named or not, start
+  at the host's saved values and send `volume` and `balance`, scaled from
+  the slider's own range; EQ sliders show the saved gains. A button whose
+  `down` is bound to `player.settings.mute` (9SeriesDefault's) is a mute
+  button, and draws pressed only while the host is muted. The elapsed time
+  is blank while stopped, as in WMP, and while paused, because pausing drops
+  the stream and its clock reads 0. (ATA-165: a paused pick keeps its place,
+  so shows its time.)
 
 ### Source: archive.org, one per launch, a compatibility list (proposed by Lama, confirmed by Ata, 2026-10-10)
 

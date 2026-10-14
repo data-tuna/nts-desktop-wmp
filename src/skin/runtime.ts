@@ -7,6 +7,7 @@
 // honour (DVD, the library, video) return safe defaults; anything else a
 // skin reaches for is logged once and reads as undefined.
 import type { State } from "./engine.ts";
+import { EFFECTS, SHOW } from "./effects.ts";
 
 const PLAY_STATES = ["Undefined", "Stopped", "Paused", "Playing", "ScanForward", "ScanReverse", "Buffering", "Waiting", "MediaEnded", "Transitioning", "Ready", "Reconnecting"];
 const OPEN_STATES = ["Undefined", "PlaylistChanging", "PlaylistLocating", "PlaylistConnecting", "PlaylistLoading", "PlaylistOpening", "PlaylistOpenNoMedia", "PlaylistChanged", "MediaChanging", "MediaLocating", "MediaConnecting", "MediaLoading", "MediaOpening", "MediaOpen", "BeginCodecAcquisition", "EndCodecAcquisition", "BeginLicenseAcquisition", "EndLicenseAcquisition", "BeginIndividualization", "EndIndividualization", "MediaWaiting", "OpeningUnknownURL"];
@@ -42,6 +43,13 @@ export type Host = {
   prefix: string;
 };
 
+/** A clock as WMP shows it: "02:05", and "1:58:00" from an hour on. */
+export function clock(t: number): string {
+  const s = Math.max(0, Math.floor(t));
+  const two = (n: number) => String(n).padStart(2, "0");
+  return s >= 3600 ? `${Math.floor(s / 3600)}:${two(Math.floor(s / 60) % 60)}:${two(s % 60)}` : `${two(Math.floor(s / 60))}:${two(s % 60)}`;
+}
+
 const clamp = (v: unknown, lo: number, hi: number) => Math.min(hi, Math.max(lo, Number(v) || 0));
 
 /** COM objects are case-insensitive (`player.PlayState`, `player.playstate`),
@@ -75,8 +83,8 @@ export function objects(host: Host) {
   const media: Record<string, any> = wmpObject("player.currentMedia", {
     get name() { return s().title; },
     getiteminfo: (attr: unknown) => itemInfo(s(), String(attr)),
-    duration: 0,
-    durationstring: "",
+    get duration() { return s().duration; },
+    get durationstring() { return s().duration > 0 ? clock(s().duration) : ""; },
     imagesourcewidth: 0,
     imagesourceheight: 0,
     get sourceurl() { return s().url; },
@@ -102,11 +110,16 @@ export function objects(host: Host) {
     stop: () => host.send({ type: "stop" }),
     next: () => host.send({ type: "next" }),
     previous: () => host.send({ type: "previous" }),
-    // A live stream has no length, so it cannot seek or scan.
+    // A live stream has no length, so it cannot seek or scan. A pick can seek.
     fastforward: () => log("player.controls.fastForward: a live stream cannot scan"),
     fastreverse: () => log("player.controls.fastReverse: a live stream cannot scan"),
     get currentposition() { return s().time; },
-    set currentposition(_: unknown) {},
+    set currentposition(v: unknown) {
+      if (!(s().duration > 0)) return;
+      const seconds = clamp(v, 0, s().duration);
+      host.set({ time: seconds });
+      host.send({ type: "seek", seconds });
+    },
     get currentpositionstring() { return host.elapsed(); },
     get currentitem() { return media; },
     isavailable: (name: unknown) => host.controlEnabled(String(name).toLowerCase()) ?? false,
@@ -177,9 +190,20 @@ export function objects(host: Host) {
     playsound: () => {},
     logstring: () => {},
   };
+  // The effect is saved for the next launch (ATA-166); the first launch shows the card.
   const mediacenter = {
-    effecttype: "",
-    effectpreset: 0,
+    get effecttype() {
+      return localStorage.getItem("effectType") ?? EFFECTS[SHOW].type;
+    },
+    set effecttype(v: unknown) {
+      localStorage.setItem("effectType", String(v));
+    },
+    get effectpreset() {
+      return Number(localStorage.getItem("effectPreset") ?? EFFECTS[SHOW].preset) || 0;
+    },
+    set effectpreset(v: unknown) {
+      localStorage.setItem("effectPreset", String(v));
+    },
     videostretchtofit: true,
     videozoom: 100,
     contrastmode: "",

@@ -7,8 +7,10 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 
 // Pointer listeners, so a test can click: the skin's canvas registers last.
+// `drawn` logs each fillRect and fillText with its colour.
 const listeners = {};
 const listen = (type, f) => (listeners[type] = f);
+const drawn = [];
 function canvas() {
   const c = { width: 0, height: 0, style: {}, title: "", addEventListener: listen, getBoundingClientRect: () => ({ left: 0, top: 0, width: c.width, height: c.height }) };
   const g = new Proxy(
@@ -17,6 +19,7 @@ function canvas() {
       get(t, k) {
         if (k in t) return t[k];
         if (k === "measureText") return (s) => ({ width: s.length * 6 });
+        if (k === "fillRect" || k === "fillText") return (...a) => drawn.push([k, t.fillStyle, ...a]);
         if (k === "getImageData") return (x, y, w, h) => ({ width: w, height: h, data: new Uint8ClampedArray(w * h * 4) });
         return () => ({});
       },
@@ -39,7 +42,7 @@ console.warn = () => {}; // the engine logs what skins do that it skips
 
 const { Skin } = await import("../src/skin/engine.ts");
 const { parse } = await import("../src/skin/wms.ts");
-const { resImage, resString, CONSTANTS } = await import("../src/skin/runtime.ts");
+const { clock, resImage, resString, CONSTANTS } = await import("../src/skin/runtime.ts");
 
 const STATE = { playState: "stopped", channel: 0, title: "NTS 1", url: "", author: "", location: "", link: "", items: ["NTS 1", "NTS 2"], time: 0, duration: 0, volume: 0.5, mute: false, balance: 0, eq: Array(10).fill(0), level: 0 };
 
@@ -180,7 +183,7 @@ test("the player objects send the protocol's messages and update bindings at onc
   js("player.settings.mute = true");
   js("eq.gainLevel2 = -20");
   js("player.controls.play(), player.controls.next()");
-  const msgs = sent.filter((m) => m.type !== "shape");
+  const msgs = sent.filter((m) => m.type !== "shape" && m.type !== "effects");
   assert.deepEqual(msgs, [
     { type: "volume", value: 1 },
     { type: "mute", value: true },
@@ -225,26 +228,35 @@ test("wmploc stand-ins: our own strings and glyphs, nothing for the rest", () =>
   assert.equal(resImage("res://wmploc/RT_IMAGE/#9999"), null);
 });
 
-test("effects step through the visualisations, save them through their _onchange, and ask for frames only while shown", async () => {
+test("effects start on the show card, step through the visualisations, save them through their _onchange, and ask for frames only while one shows", async () => {
+  store.clear();
   const { js, sent } = load(`<theme><view width="100" height="100">
        <effects id="vis" width="50" height="40"
          currentEffectType="wmpprop:mediacenter.effectType" currentEffectType_onchange="mediacenter.effectType=currentEffectType;"
          currentPreset="wmpprop:mediacenter.effectPreset" currentPreset_onchange="mediacenter.effectPreset=currentPreset;"/>
      </view></theme>`);
-  assert.deepEqual(js("[vis.currentEffectType, vis.currentPreset, vis.currentEffectTitle]"), ["Bars and Waves", 0, "Bars"]);
+  assert.deepEqual(js("[vis.currentEffectType, vis.currentPreset, vis.currentEffectTitle]"), ["NTS show", 0, "NTS show"]);
+  const effects = () => sent.filter((m) => m.type === "effects").map((m) => m.on);
+  assert.deepEqual(effects(), [false], "the card wants no frames, but the host hears the skin start");
+  js("vis.next()");
+  assert.equal(js("vis.currentEffectTitle"), "Bars");
+  await Promise.resolve();
   js("vis.next()");
   assert.deepEqual(js("[vis.currentEffectTitle, mediacenter.effectType, mediacenter.effectPreset]"), ["Scope", "Bars and Waves", 1]);
   js("vis.next()");
   assert.deepEqual(js("[vis.currentEffectTitle, mediacenter.effectType, mediacenter.effectPreset]"), ["Ambience", "Ambience", 0]);
   js("vis.next()");
-  assert.equal(js("vis.currentEffectTitle"), "Bars", "round the list");
+  assert.equal(js("vis.currentEffectTitle"), "NTS show", "round the list");
   js("vis.previous()");
   assert.equal(js("vis.currentEffectTitle"), "Ambience");
-  const effects = () => sent.filter((m) => m.type === "effects").map((m) => m.on);
-  assert.deepEqual(effects(), [true]);
+  await Promise.resolve();
+  assert.deepEqual(effects(), [false, true]);
   js("vis.visible = false");
   await Promise.resolve();
-  assert.deepEqual(effects(), [true, false], "hidden: no more frames");
+  assert.deepEqual(effects(), [false, true, false], "hidden: no more frames");
+  // The next launch, in a skin that binds nothing: the last choice.
+  assert.equal(load(`<theme><view width="100" height="100"><effects id="vis2" width="50" height="40"/></view></theme>`).js("vis2.currentEffectTitle"), "Ambience");
+  store.clear();
 });
 
 test("a click on a subview's drawn pixels stays there; through its transparency it reaches the visualisation behind", () => {
@@ -274,7 +286,7 @@ test("a click on a subview's drawn pixels stays there; through its transparency 
 });
 
 test("now playing: the media's name and item info, the playlist, and a pick's link on a double click", () => {
-  const items = ["NTS 1 - A show - London", "NTS 2", "Poolside", "someone on SoundCloud - A pick"];
+  const items = ["NTS 1: A show - London", "NTS 2", "Poolside", "someone on SoundCloud - A pick"];
   const { skin, js, sent, set } = load(`<theme><view width="100" height="60">
        <text id="name" left="0" top="0" width="100" height="10" value="wmpprop:player.currentMedia.name"/>
        <text id="len" left="0" top="10" width="100" height="10" value="wmpprop:player.currentMedia.durationString"/>
@@ -330,4 +342,115 @@ test("a double click that starts a pick from its row does not open its page", ()
   listeners.mousedown(rowB(1));
   listeners.dblclick(rowB(2));
   assert.deepEqual(sent.slice(at).filter((m) => m.type === "launchUrl"), [{ type: "launchUrl", url: "https://soundcloud.com/b" }]);
+});
+
+test("the playlist marks the current row in the skin's playing colours, or the list's own swapped", () => {
+  const items = ["NTS 1: A show", "NTS 2", "Poolside"];
+  // The rows a paint draws: each row's text and the colour it is drawn in, and the row backgrounds.
+  const rows = (skin) => {
+    drawn.length = 0;
+    skin.paint();
+    return drawn.filter(([k, , a]) => k === "fillText" ? items.includes(a) : k === "fillRect" && a === 0).map(([k, style, a, y]) => (k === "fillText" ? [a, style] : [`row at ${y}`, style]));
+  };
+  const plain = load(`<theme><view width="100" height="60">
+       <playlist id="pl" left="0" top="0" width="100" height="48" fontSize="6" backgroundColor="#000000" foregroundColor="#FFFFFF"/>
+     </view></theme>`, {}, { ...STATE, items });
+  // 16 px rows: the background, then the current row in white with black text.
+  assert.deepEqual(rows(plain.skin), [["row at 0", "#000000"], ["row at 0", "#ffffff"], ["NTS 1: A show", "#000000"], ["NTS 2", "#ffffff"], ["Poolside", "#ffffff"]]);
+  plain.set({ channel: 2 });
+  assert.deepEqual(rows(plain.skin), [["row at 0", "#000000"], ["NTS 1: A show", "#ffffff"], ["NTS 2", "#ffffff"], ["row at 32", "#ffffff"], ["Poolside", "#000000"]]);
+  const coloured = load(`<theme><view width="100" height="60">
+       <playlist id="pl" left="0" top="0" width="100" height="48" fontSize="6" foregroundColor="#FFFFFF" itemPlayingColor="#FF0000"/>
+     </view></theme>`, {}, { ...STATE, items, channel: 1 });
+  // A skin's own playing colour wins, and with no background colour named, no row is filled.
+  assert.deepEqual(rows(coloured.skin), [["NTS 1: A show", "#ffffff"], ["NTS 2", "#ff0000"], ["Poolside", "#ffffff"]]);
+});
+
+test("clocks read as WMP's: minutes and seconds, then hours from an hour on", () => {
+  assert.deepEqual([0, 5.9, 75, 3599, 3600, 7080, 36_061].map(clock), ["00:00", "00:05", "01:15", "59:59", "1:00:00", "1:58:00", "10:01:01"]);
+});
+
+test("a pick has a length: its clock and length show, and the seek slider and currentPosition jump in it", () => {
+  const { js, sent, set } = load(`<theme><view width="100" height="40">
+       <text id="pos" left="0" top="0" width="100" height="10" value="wmpprop:player.controls.currentPositionString"/>
+       <text id="len" left="0" top="10" width="100" height="10" value="wmpprop:player.currentMedia.durationString"/>
+       <seekslider id="bar" left="0" top="20" width="100" height="10"/>
+     </view></theme>`);
+  const seeks = () => sent.filter((m) => m.type === "seek");
+  // A live stream: no length, the slider is disabled and a drag sends nothing.
+  set({ playState: "playing", time: 30 });
+  assert.deepEqual(js("[pos.value, len.value, bar.enabled, player.currentMedia.duration]"), ["00:30", "", false, 0]);
+  const half = { button: 0, clientX: 50, clientY: 25 };
+  listeners.mousedown(half);
+  listeners.mouseup(half);
+  js("player.controls.currentPosition = 10");
+  assert.deepEqual(seeks(), []);
+  // A pick of 1:58:00.
+  set({ time: 750, duration: 7080 });
+  assert.deepEqual(js("[pos.value, len.value, bar.enabled, player.currentMedia.duration]"), ["12:30", "1:58:00", true, 7080]);
+  listeners.mousedown(half);
+  listeners.mouseup(half);
+  assert.equal(seeks().length, 1, "one seek, when the drag ends");
+  assert.equal(seeks()[0].seconds, 3540);
+  js("player.controls.currentPosition = 60");
+  assert.deepEqual(seeks().at(-1), { type: "seek", seconds: 60 });
+  assert.equal(js("pos.value"), "01:00", "shown before the host answers");
+  // Paused, a pick keeps its place and its clock.
+  set({ playState: "paused" });
+  assert.equal(js("pos.value"), "01:00");
+});
+
+test("a seek slider whose skin handles onDragEnd seeks once, through the skin's script", () => {
+  const { sent, set } = load(`<theme><view width="100" height="20">
+       <slider id="pos" left="0" top="0" width="100" height="10" min="0" max="wmpprop:player.currentMedia.duration"
+               value="wmpprop:player.controls.currentPosition" onDragEnd="player.controls.currentposition=value;"/>
+     </view></theme>`);
+  set({ playState: "playing", time: 0, duration: 1000 });
+  const at = { button: 0, clientX: 25, clientY: 5 };
+  listeners.mousedown(at);
+  listeners.mouseup(at);
+  assert.deepEqual(sent.filter((m) => m.type === "seek"), [{ type: "seek", seconds: 250 }]);
+});
+
+test("a seek slider whose onDragEnd sends no seek (Television's misspelt currentpostion) still seeks once", () => {
+  const { sent, set } = load(`<theme><view width="100" height="20">
+       <slider id="seek" left="0" top="0" width="100" height="10" min="0" max="wmpprop:player.currentMedia.duration"
+               value="wmpprop:player.controls.currentPosition" onDragEnd="player.controls.currentpostion=value;"/>
+     </view></theme>`);
+  set({ playState: "playing", time: 0, duration: 1000 });
+  const at = { button: 0, clientX: 50, clientY: 5 };
+  listeners.mousedown(at);
+  listeners.mouseup(at);
+  assert.deepEqual(sent.filter((m) => m.type === "seek"), [{ type: "seek", seconds: 500 }]);
+});
+
+test("a slider that seeks only from onMouseUp (Kenwood_MP7's progressMain) seeks once on a pick, and not on a stream", () => {
+  const { js, sent, set } = load(`<theme><view width="100" height="20">
+       <slider id="progressMain" left="0" top="0" width="100" height="10" bordersize="0" direction="horizontal" min="0" max="wmpprop:player.currentMedia.duration"
+               slide="false" onmouseup="player.controls.currentPosition=progressMain.value;" enabled="true"/>
+     </view></theme>`);
+  const at = { button: 0, clientX: 75, clientY: 5 };
+  set({ playState: "playing", time: 0, duration: 0 });
+  listeners.mousedown(at);
+  listeners.mouseup(at);
+  assert.deepEqual(sent.filter((m) => m.type === "seek"), [], "a live stream cannot seek");
+  set({ duration: 1000 });
+  listeners.mousedown(at);
+  listeners.mouseup(at);
+  assert.deepEqual(sent.filter((m) => m.type === "seek"), [{ type: "seek", seconds: 750 }]);
+  // It follows nothing, so the thumb stays where it was dropped.
+  set({ time: 760 });
+  assert.equal(js("progressMain.value"), 750);
+});
+
+test("a seek slider whose onMouseUp seeks (anime's) seeks once, not again from the engine", () => {
+  const { sent, set } = load(`<theme><view width="100" height="20">
+       <slider id="seek" left="0" top="0" width="100" height="10" min="0" max="wmpprop:player.currentMedia.duration"
+               onmouseup = "player.controls.currentPosition = seek.value; " value="wmpprop:player.controls.currentposition" onDragEnd="player.controls.currentpostion=value;"/>
+     </view></theme>`);
+  set({ playState: "playing", time: 0, duration: 1000 });
+  const at = { button: 0, clientX: 50, clientY: 5 };
+  listeners.mousedown(at);
+  listeners.mouseup(at);
+  assert.deepEqual(sent.filter((m) => m.type === "seek"), [{ type: "seek", seconds: 500 }]);
 });
