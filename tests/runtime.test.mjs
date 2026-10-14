@@ -183,7 +183,7 @@ test("the player objects send the protocol's messages and update bindings at onc
   js("player.settings.mute = true");
   js("eq.gainLevel2 = -20");
   js("player.controls.play(), player.controls.next()");
-  const msgs = sent.filter((m) => m.type !== "shape");
+  const msgs = sent.filter((m) => m.type !== "shape" && m.type !== "effects");
   assert.deepEqual(msgs, [
     { type: "volume", value: 1 },
     { type: "mute", value: true },
@@ -228,26 +228,35 @@ test("wmploc stand-ins: our own strings and glyphs, nothing for the rest", () =>
   assert.equal(resImage("res://wmploc/RT_IMAGE/#9999"), null);
 });
 
-test("effects step through the visualisations, save them through their _onchange, and ask for frames only while shown", async () => {
+test("effects start on the show card, step through the visualisations, save them through their _onchange, and ask for frames only while one shows", async () => {
+  store.clear();
   const { js, sent } = load(`<theme><view width="100" height="100">
        <effects id="vis" width="50" height="40"
          currentEffectType="wmpprop:mediacenter.effectType" currentEffectType_onchange="mediacenter.effectType=currentEffectType;"
          currentPreset="wmpprop:mediacenter.effectPreset" currentPreset_onchange="mediacenter.effectPreset=currentPreset;"/>
      </view></theme>`);
-  assert.deepEqual(js("[vis.currentEffectType, vis.currentPreset, vis.currentEffectTitle]"), ["Bars and Waves", 0, "Bars"]);
+  assert.deepEqual(js("[vis.currentEffectType, vis.currentPreset, vis.currentEffectTitle]"), ["NTS show", 0, "NTS show"]);
+  const effects = () => sent.filter((m) => m.type === "effects").map((m) => m.on);
+  assert.deepEqual(effects(), [false], "the card wants no frames, but the host hears the skin start");
+  js("vis.next()");
+  assert.equal(js("vis.currentEffectTitle"), "Bars");
+  await Promise.resolve();
   js("vis.next()");
   assert.deepEqual(js("[vis.currentEffectTitle, mediacenter.effectType, mediacenter.effectPreset]"), ["Scope", "Bars and Waves", 1]);
   js("vis.next()");
   assert.deepEqual(js("[vis.currentEffectTitle, mediacenter.effectType, mediacenter.effectPreset]"), ["Ambience", "Ambience", 0]);
   js("vis.next()");
-  assert.equal(js("vis.currentEffectTitle"), "Bars", "round the list");
+  assert.equal(js("vis.currentEffectTitle"), "NTS show", "round the list");
   js("vis.previous()");
   assert.equal(js("vis.currentEffectTitle"), "Ambience");
-  const effects = () => sent.filter((m) => m.type === "effects").map((m) => m.on);
-  assert.deepEqual(effects(), [true]);
+  await Promise.resolve();
+  assert.deepEqual(effects(), [false, true]);
   js("vis.visible = false");
   await Promise.resolve();
-  assert.deepEqual(effects(), [true, false], "hidden: no more frames");
+  assert.deepEqual(effects(), [false, true, false], "hidden: no more frames");
+  // The next launch, in a skin that binds nothing: the last choice.
+  assert.equal(load(`<theme><view width="100" height="100"><effects id="vis2" width="50" height="40"/></view></theme>`).js("vis2.currentEffectTitle"), "Ambience");
+  store.clear();
 });
 
 test("a click on a subview's drawn pixels stays there; through its transparency it reaches the visualisation behind", () => {

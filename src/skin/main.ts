@@ -52,6 +52,7 @@ load("/skin.wmz").catch((e) => (console.warn(`skin: ${String(e)}; wearing the ho
     window.addEventListener("message", (e) => {
       if (e.data?.type === "state") skin.setState(e.data as State);
       else if (e.data?.type === "vis") skin.setFrame(e.data as Frame);
+      else if (e.data?.type === "show") skin.setShow(e.data);
     });
   },
   (e) => {

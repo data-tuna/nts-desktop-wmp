@@ -7,6 +7,7 @@
 // honour (DVD, the library, video) return safe defaults; anything else a
 // skin reaches for is logged once and reads as undefined.
 import type { State } from "./engine.ts";
+import { EFFECTS, SHOW } from "./effects.ts";
 
 const PLAY_STATES = ["Undefined", "Stopped", "Paused", "Playing", "ScanForward", "ScanReverse", "Buffering", "Waiting", "MediaEnded", "Transitioning", "Ready", "Reconnecting"];
 const OPEN_STATES = ["Undefined", "PlaylistChanging", "PlaylistLocating", "PlaylistConnecting", "PlaylistLoading", "PlaylistOpening", "PlaylistOpenNoMedia", "PlaylistChanged", "MediaChanging", "MediaLocating", "MediaConnecting", "MediaLoading", "MediaOpening", "MediaOpen", "BeginCodecAcquisition", "EndCodecAcquisition", "BeginLicenseAcquisition", "EndLicenseAcquisition", "BeginIndividualization", "EndIndividualization", "MediaWaiting", "OpeningUnknownURL"];
@@ -189,9 +190,20 @@ export function objects(host: Host) {
     playsound: () => {},
     logstring: () => {},
   };
+  // The effect is saved for the next launch (ATA-166); the first launch shows the card.
   const mediacenter = {
-    effecttype: "",
-    effectpreset: 0,
+    get effecttype() {
+      return localStorage.getItem("effectType") ?? EFFECTS[SHOW].type;
+    },
+    set effecttype(v: unknown) {
+      localStorage.setItem("effectType", String(v));
+    },
+    get effectpreset() {
+      return Number(localStorage.getItem("effectPreset") ?? EFFECTS[SHOW].preset) || 0;
+    },
+    set effectpreset(v: unknown) {
+      localStorage.setItem("effectPreset", String(v));
+    },
     videostretchtofit: true,
     videozoom: 100,
     contrastmode: "",

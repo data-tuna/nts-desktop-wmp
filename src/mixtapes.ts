@@ -2,6 +2,8 @@
 // like NTS 1 and NTS 2, so they play and reconnect the same way.
 // Copied from nts-desktop-winamp's src/mixtapes.ts at 6379c0e (PR #9),
 // parsing only: the Webamp playlist code stays behind. Fix a bug in both copies.
+// This copy also reads each mixtape's picture and keeps its bare title (`name`),
+// for the show card (ATA-166).
 
 // The .ts extension lets `node --test` load this file directly.
 import { text } from "./live.ts";
@@ -14,7 +16,7 @@ export const MIXTAPES_API = "https://www.nts.live/api/v2/mixtapes";
 // stream, which starts at streams.radiomast.io: drop the `/hls.m3u8`.
 const RADIOMAST_HLS = /^(https:\/\/streams\.radiomast\.io\/[\w-]+)\/hls\.m3u8$/;
 
-export type Mixtape = { url: string; title: string };
+export type Mixtape = { url: string; title: string; name: string; artwork?: string };
 
 export function parseMixtapes(body: unknown): Mixtape[] {
   const results = (body as { results?: unknown } | null)?.results;
@@ -25,6 +27,8 @@ export function parseMixtapes(body: unknown): Mixtape[] {
     const title = text(mixtape?.title);
     if (!url || !title) return [];
     const subtitle = text(mixtape?.subtitle);
-    return [{ url, title: subtitle ? `${title} - ${subtitle}` : title }];
+    const picture = (mixtape?.media as { picture_small?: unknown } | undefined)?.picture_small;
+    const artwork = typeof picture === "string" && picture.startsWith("https://") ? picture : undefined;
+    return [{ url, title: subtitle ? `${title} - ${subtitle}` : title, name: title, artwork }];
   });
 }

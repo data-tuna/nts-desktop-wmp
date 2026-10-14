@@ -1,5 +1,6 @@
 // Run with `npm test`. Node strips the TypeScript types itself (22.18+).
 // Copied from nts-desktop-winamp at 6379c0e (PR #9) with its fixture; keep the two in step.
+// The `name` and `artwork` checks are this copy's own.
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
@@ -13,10 +14,14 @@ test("title and subtitle; the radiomast MP3 stream behind the HLS url, not the g
     {
       url: "https://streams.radiomast.io/052d2e3c-389c-44cf-a91a-8f5e1854f4c6",
       title: "Poolside - Balearic, boogie, and sophisti-pop for poolsides, beaches and car stereos.",
+      name: "Poolside",
+      artwork: "https://media3.ntslive.co.uk/resize/200x200/cf5afb01-5a68-4fa0-a1c6-415b35d09ed6_1542931200.jpeg",
     },
     {
       url: "https://streams.radiomast.io/dfc76352-cda6-4a95-85dd-6f6609f83ba2",
       title: "Slow Focus - Meditative, relaxing and beatless: ambient, drone and ragas.",
+      name: "Slow Focus",
+      artwork: undefined,
     },
   ]);
 });
@@ -32,7 +37,7 @@ test("a mixtape with no radiomast stream, or no title, is skipped; bare ones kee
       { title: "A &amp; B", subtitle: 3, audio_stream_endpoint_hls_mp3: hls },
     ],
   };
-  assert.deepEqual(parseMixtapes(body), [{ url: "https://streams.radiomast.io/abc-123", title: "A & B" }]);
+  assert.deepEqual(parseMixtapes(body), [{ url: "https://streams.radiomast.io/abc-123", title: "A & B", name: "A & B", artwork: undefined }]);
 });
 
 test("anything not shaped like the API gives no mixtapes", () => {

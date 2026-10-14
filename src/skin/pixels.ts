@@ -90,3 +90,21 @@ export function overlay(white: Uint8ClampedArray, black: Uint8ClampedArray) {
   }
   return { mask, cover };
 }
+
+/** Each row's longest run of fully shown pixels in an `overlay` mask, as
+ * [start, end); [0, 0] where nothing shows. */
+export function clearRows(mask: Uint8ClampedArray, w: number, h: number): [number, number][] {
+  return Array.from({ length: h }, (_, y) => {
+    let best: [number, number] = [0, 0];
+    let start = -1;
+    for (let x = 0; x <= w; x++) {
+      const shown = x < w && mask[(y * w + x) * 4 + 3] >= 250;
+      if (shown && start < 0) start = x;
+      else if (!shown && start >= 0) {
+        if (x - start > best[1] - best[0]) best = [start, x];
+        start = -1;
+      }
+    }
+    return best;
+  });
+}
