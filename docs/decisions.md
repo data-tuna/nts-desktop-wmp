@@ -522,8 +522,8 @@ as it was). How frames reach the skin webview is unchanged: still
 `skin_send`, the ATA-107 boundary.
 
 - **20 frames a second, not 30.** The trusted page sends a frame when 45 ms
-  have passed since the last, which at 60 Hz is every third display frame
-  (50 ms). Measured in the skin webview, release build, anemone: frames
+  have passed since the last: every third display frame at 60 Hz, every
+  sixth at 120 Hz (50 ms); 18–19 a second at 75 or 90 Hz. Measured in the skin webview, release build, anemone: frames
   arrive every 50.0 ms (p95 51.1 ms, worst 51.7 ms), as evenly as 33.3 ms
   (p95 34.3 ms) did before.
 - **The look per second is kept.** Bars' peak caps fall `h / 33` a frame
@@ -536,10 +536,15 @@ as it was). How frames reach the skin webview is unchanged: still
   `covered` to the trusted page, which stops sending frames until the
   player shows again. It errs towards "not covered": translucent,
   colour-keyed, click-through, shaped, minimised and cloaked windows hide
-  nothing, so the worst mistake is frames nobody sees, never a frozen
-  visualisation. Rectangles are DWM's visible bounds, without the
-  invisible resize borders. The visualisation keeps its last frame while
-  covered and moves again within a quarter of a second of being uncovered.
+  nothing, and a window DWM cannot measure, ours included, covers nothing
+  either. Rectangles are DWM's visible bounds, without the invisible resize
+  borders; the player counts by its whole rectangle, not its shape. The
+  visualisation keeps its last frame while covered and moves again within
+  half a second of being uncovered (the poll, then the trusted page's state
+  tick). Two ways it can still freeze while something shows: an overlay
+  that draws through DirectComposition without the layered style counts as
+  opaque, and Windows 11's rounded corners leave a few pixels of the player
+  visible when a window exactly covers it.
   On a hidden desktop, anemone: 20 frames a second with nothing over it and
   with a window over half the screen (the player partly under it), 0 under
   a maximised window (6.6 % of a core, against 26.6 % uncovered in the same

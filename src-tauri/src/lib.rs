@@ -798,59 +798,57 @@ mod win32 {
     const RGN_DIFF: i32 = 4;
     const NULLREGION: i32 = 1;
 
-    /// The window's visible rectangle on screen, without the invisible
-    /// resize borders `GetWindowRect` counts.
-    fn bounds(hwnd: *mut c_void) -> [i32; 4] {
-        let mut r = [0; 4];
-        unsafe {
-            DwmGetWindowAttribute(hwnd, DWMWA_EXTENDED_FRAME_BOUNDS, r.as_mut_ptr().cast(), 16)
-        };
-        r
+    /// The window's visible rectangle on screen, as a region, without the
+    /// invisible resize borders `GetWindowRect` counts. None if DWM cannot say.
+    unsafe fn visible_rgn(hwnd: *mut c_void) -> Option<Hrgn> {
+        let mut r = [0i32; 4];
+        let ok =
+            DwmGetWindowAttribute(hwnd, DWMWA_EXTENDED_FRAME_BOUNDS, r.as_mut_ptr().cast(), 16);
+        (ok == 0).then(|| CreateRectRgn(r[0], r[1], r[2], r[3]))
     }
 
     /// Whether a window hides what is behind it. When in doubt it does not:
     /// translucent, colour-keyed, click-through, shaped and cloaked windows
     /// (another virtual desktop, the shell's invisible ones) let ours show.
-    fn opaque(hwnd: *mut c_void) -> bool {
-        unsafe {
-            let mut cloaked = 0u32;
-            DwmGetWindowAttribute(hwnd, DWMWA_CLOAKED, (&mut cloaked as *mut u32).cast(), 4);
-            let ex = GetWindowLongW(hwnd, GWL_EXSTYLE);
-            let (mut key, mut alpha, mut flags) = (0, 0, 0);
-            let layered_ok = ex & WS_EX_LAYERED == 0
-                || (GetLayeredWindowAttributes(hwnd, &mut key, &mut alpha, &mut flags) != 0
-                    && flags & LWA_COLORKEY == 0
-                    && (flags & LWA_ALPHA == 0 || alpha == 255));
-            IsWindowVisible(hwnd) != 0
-                && IsIconic(hwnd) == 0
-                && cloaked == 0
-                && ex & WS_EX_TRANSPARENT == 0
-                && layered_ok
-                && GetWindowRgnBox(hwnd, &mut [0; 4]) == 0
+    unsafe fn opaque(hwnd: *mut c_void) -> bool {
+        if IsWindowVisible(hwnd) == 0 || IsIconic(hwnd) != 0 {
+            return false;
         }
+        let mut cloaked = 0u32;
+        let cloak_ok =
+            DwmGetWindowAttribute(hwnd, DWMWA_CLOAKED, (&mut cloaked as *mut u32).cast(), 4);
+        let ex = GetWindowLongW(hwnd, GWL_EXSTYLE);
+        let (mut key, mut alpha, mut flags) = (0, 0, 0);
+        let layered_ok = ex & WS_EX_LAYERED == 0
+            || (GetLayeredWindowAttributes(hwnd, &mut key, &mut alpha, &mut flags) != 0
+                && flags & LWA_COLORKEY == 0
+                && (flags & LWA_ALPHA == 0 || alpha == 255));
+        cloak_ok == 0
+            && cloaked == 0
+            && ex & WS_EX_TRANSPARENT == 0
+            && layered_ok
+            && GetWindowRgnBox(hwnd, &mut [0; 4]) == 0
     }
 
     /// Whether the windows above ours, together, hide all of it.
-    pub fn covered(window: &tauri::Window) -> bool {
-        let Ok(hwnd) = window.hwnd() else {
-            return false;
-        };
-        let [l, t, r, b] = bounds(hwnd.0);
+    fn covered(hwnd: *mut c_void) -> bool {
         unsafe {
-            let rest = CreateRectRgn(l, t, r, b);
-            let mut left = 0;
-            let mut above = GetWindow(hwnd.0, GW_HWNDPREV);
-            while !above.is_null() && left != NULLREGION {
+            let Some(rest) = visible_rgn(hwnd) else {
+                return false;
+            };
+            let mut remaining = 0;
+            let mut above = GetWindow(hwnd, GW_HWNDPREV);
+            while !above.is_null() && remaining != NULLREGION {
                 if opaque(above) {
-                    let [l, t, r, b] = bounds(above);
-                    let over = CreateRectRgn(l, t, r, b);
-                    left = CombineRgn(rest, rest, over, RGN_DIFF);
-                    DeleteObject(over);
+                    if let Some(over) = visible_rgn(above) {
+                        remaining = CombineRgn(rest, rest, over, RGN_DIFF);
+                        DeleteObject(over);
+                    }
                 }
                 above = GetWindow(above, GW_HWNDPREV);
             }
             DeleteObject(rest);
-            left == NULLREGION
+            remaining == NULLREGION
         }
     }
 
@@ -858,11 +856,16 @@ mod win32 {
     /// again, so it sends no visualisation frames nobody can see. Windows
     /// sends no message for that, so this looks four times a second.
     pub fn watch_cover(window: tauri::Window) {
+        let Ok(hwnd) = window.hwnd() else {
+            return;
+        };
+        // A raw pointer is not Send; the handle stays valid as long as the app.
+        let hwnd = hwnd.0 as isize;
         std::thread::spawn(move || {
             let mut was = false;
             loop {
                 std::thread::sleep(Duration::from_millis(250));
-                let now = covered(&window);
+                let now = covered(hwnd as *mut c_void);
                 if now != was {
                     was = now;
                     let _ = window.emit_to(EventTarget::webview("main"), "covered", now);
