@@ -216,15 +216,33 @@ test("show card: the text goes where the skin leaves the area widest clear", asy
   for (let y = 0; y < 6; y++) for (let x = 0; x < 10; x++) mask[(y * 10 + x) * 4 + 3] = y === 5 || (y < 3 && x < 6) ? 0 : 255;
   const clear = clearRows(mask, 10, 6);
   assert.deepEqual(clear, [[6, 10], [6, 10], [6, 10], [0, 10], [0, 10], [0, 0]]);
-  assert.deepEqual(place(clear, 2, 10), { top: 3, x0: 0, x1: 10 });
-  assert.deepEqual(place(clear, 3, 10), { top: 1, x0: 6, x1: 10 }, "of equal spans, the one nearest the middle");
+  assert.deepEqual(place(clear, 2), { top: 3, x0: 0, x1: 10 });
+  assert.deepEqual(place(clear, 3), { top: 1, x0: 6, x1: 10 }, "of equal spans, the one nearest the middle");
   // A circle: the widest chord is the middle.
   const circle = Array.from({ length: 21 }, (_, y) => {
     const half = Math.floor(Math.sqrt(100 - (y - 10) ** 2));
     return [10 - half, 10 + half];
   });
-  assert.equal(place(circle, 5, 21).top, 8);
-  // No band fits: the middle, across the whole area, not centred on its left edge.
-  assert.deepEqual(place(Array(20).fill([0, 100]), 21, 100), { top: 0, x0: 0, x1: 100 }, "too short");
-  assert.deepEqual(place(Array(60).fill([0, 0]), 20, 100), { top: 20, x0: 0, x1: 100 }, "all covered");
+  assert.equal(place(circle, 5).top, 8);
+  // No band fits: a 0-wide span.
+  assert.deepEqual(place(Array(20).fill([0, 100]), 21), { top: 0, x0: 0, x1: 0 }, "too short");
+  assert.deepEqual(place(Array(60).fill([0, 0]), 20), { top: 20, x0: 0, x1: 0 }, "all covered");
+});
+
+test("show card: genres give way when the block with them would not fit; with nothing fitting, the title goes in the middle", async () => {
+  const { layCard } = await import("../src/skin/effects.ts");
+  const t = { font: "", measureText: (s) => ({ width: s.length * 6 }) };
+  const card = { title: "MOXIE W/ THEO KOTTIS", genres: ["Soul", "Detroit Techno", "House", "Deep House"], image: null };
+  // modernblue's 41 px oval: two tag rows would make the block 49 px.
+  const oval = layCard(t, card, 100, 41, Array(41).fill([0, 100]));
+  assert.deepEqual(oval.layout.tags, []);
+  assert.ok(oval.spot.top >= 0 && oval.spot.top + oval.layout.block + 2 * oval.pad <= 41, JSON.stringify(oval.spot));
+  assert.ok(oval.spot.x1 > oval.spot.x0);
+  // Taller and clear: the genres stay.
+  assert.ok(layCard(t, card, 140, 120, null).layout.tags.length > 0);
+  // Too short for even the title, or all covered: the middle, the whole width.
+  for (const clear of [Array(20).fill([0, 104]), Array(60).fill([0, 0])]) {
+    const { spot, layout } = layCard(t, card, 104, clear.length, clear);
+    assert.deepEqual([spot.x0, spot.x1, layout.tags], [0, 104, []]);
+  }
 });

@@ -182,35 +182,7 @@ function drawCard(t: CanvasRenderingContext2D, card: Card, w: number, h: number,
     const s = Math.max(w / image.width, h / image.height);
     t.drawImage(image, (w - image.width * s) / 2, (h - image.height * s) / 2, image.width * s, image.height * s);
   }
-  // 9 to 14 px type, by the area's smaller side.
-  const px = Math.max(9, Math.min(14, Math.round(Math.min(w, h) / 9)));
-  const pad = Math.max(3, Math.round(px / 2));
-  const tagPx = px - 2;
-  const lay = (width: number, withTags: boolean) => {
-    t.font = `bold ${px}px sans-serif`;
-    const lines = wrap(t, card.title, width, h >= 6 * px ? 2 : 1);
-    const wide = Math.max(0, ...lines.map((line) => t.measureText(line).width));
-    t.font = `${tagPx}px sans-serif`;
-    const tags = withTags && h >= 4 * px ? flow(t, card.genres.slice(0, 4), width, 2) : [];
-    const rows = tags.length ? tags[tags.length - 1].row + 1 : 0;
-    return { lines, tags, wide: Math.max(wide, ...tags.map((tag) => tag.x + tag.w)), block: lines.length * Math.round(px * 1.2) + rows * (tagPx + 7) };
-  };
-  // The widest text that fits a span the skin leaves clear: the house
-  // skin's area is round, and anemone's pods cover two corners. Without the
-  // genres if they would leave the title too narrow.
-  const rows = clear ?? Array.from({ length: h }, (): [number, number] => [0, w]);
-  const fit = (withTags: boolean) => {
-    for (let width = w - 2 * pad; width >= 4 * px; width -= 4) {
-      const layout = lay(width, withTags);
-      const spot = place(rows, layout.block + 2 * pad, w);
-      if (layout.wide <= spot.x1 - spot.x0 - 2 * pad) return { width, layout, spot };
-    }
-    return null;
-  };
-  let best = fit(true);
-  if (!best || best.width < 6 * px) best = fit(false) ?? best;
-  const layout = best?.layout ?? lay(w - 2 * pad, false);
-  const spot = best?.spot ?? place(rows, layout.block + 2 * pad, w);
+  const { px, pad, tagPx, layout, spot } = layCard(t, card, w, h, clear);
   const { lines, tags, block } = layout;
   const cx = (spot.x0 + spot.x1) / 2;
   if (image) {
@@ -248,11 +220,49 @@ function clearSpans({ mask, w, h, dx, dy }: NonNullable<Memory["cover"]>, rows: 
   });
 }
 
+/** The card's type sizes, its text laid out, and where it goes: the widest
+ * text that fits a band of rows the skin leaves clear (`clear`, each row's
+ * [start, end); none means all of it). */
+export function layCard(t: { font: string; measureText(s: string): { width: number } }, card: Card, w: number, h: number, clear: [number, number][] | null) {
+  // 9 to 14 px type, by the area's smaller side.
+  const px = Math.max(9, Math.min(14, Math.round(Math.min(w, h) / 9)));
+  const pad = Math.max(3, Math.round(px / 2));
+  const tagPx = px - 2;
+  const lay = (width: number, withTags: boolean) => {
+    t.font = `bold ${px}px sans-serif`;
+    const lines = wrap(t, card.title, width, h >= 6 * px ? 2 : 1);
+    const wide = Math.max(0, ...lines.map((line) => t.measureText(line).width));
+    t.font = `${tagPx}px sans-serif`;
+    const tags = withTags && h >= 4 * px ? flow(t, card.genres.slice(0, 4), width, 2) : [];
+    const rows = tags.length ? tags[tags.length - 1].row + 1 : 0;
+    return { lines, tags, wide: Math.max(wide, ...tags.map((tag) => tag.x + tag.w)), block: lines.length * Math.round(px * 1.2) + rows * (tagPx + 7) };
+  };
+  // The widest text that fits a span the skin leaves clear: the house
+  // skin's area is round, and anemone's pods cover two corners. Without the
+  // genres if they would leave the title too narrow.
+  const rows = clear ?? Array.from({ length: h }, (): [number, number] => [0, w]);
+  const fit = (withTags: boolean) => {
+    for (let width = w - 2 * pad; width >= 4 * px; width -= 4) {
+      const layout = lay(width, withTags);
+      const spot = place(rows, layout.block + 2 * pad);
+      // A 0-wide span: no band fits, the block is too tall or all is covered.
+      if (spot.x1 > spot.x0 && layout.wide <= spot.x1 - spot.x0 - 2 * pad) return { width, layout, spot };
+    }
+    return null;
+  };
+  let best = fit(true);
+  if (!best || best.width < 6 * px) best = fit(false) ?? best;
+  if (best) return { px, pad, tagPx, ...best };
+  // Nothing fits: the title alone, in the middle across the whole area.
+  const layout = lay(w - 2 * pad, false);
+  return { px, pad, tagPx, layout, spot: { top: Math.max(0, Math.round((h - layout.block) / 2 - pad)), x0: 0, x1: w } };
+}
+
 /** Where a block `rows` tall shows widest, given each row's clear span
  * [start, end): its top and the span all its rows leave clear. Of equal
- * spans, the one nearest the middle. With none (the area is too short, or
- * all covered), the middle, across the whole `width`. */
-export function place(clear: [number, number][], rows: number, width: number): { top: number; x0: number; x1: number } {
+ * spans, the one nearest the middle. With none (the block is taller than
+ * the area, or every row is covered), a 0-wide span. */
+export function place(clear: [number, number][], rows: number): { top: number; x0: number; x1: number } {
   const middle = (clear.length - rows) / 2;
   let best = { top: Math.max(0, Math.round(middle)), x0: 0, x1: 0 };
   for (let top = 0; top + rows <= clear.length; top++) {
@@ -261,7 +271,7 @@ export function place(clear: [number, number][], rows: number, width: number): {
     const [span, bestSpan] = [Math.max(0, x1 - x0), best.x1 - best.x0];
     if (span > bestSpan || (span === bestSpan && span > 0 && Math.abs(top - middle) < Math.abs(best.top - middle))) best = { top, x0, x1 };
   }
-  return best.x1 > best.x0 ? best : { ...best, x1: width };
+  return best;
 }
 
 /** `text` in at most `max` lines of `width` px, the last cut with an ellipsis. */
