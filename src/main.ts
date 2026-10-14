@@ -103,6 +103,8 @@ function onSkin(m: FromSkin) {
   else if (m.type === "effects") {
     effectsOn = m.on;
     startVis();
+    // A skin sends this on its first paint: a new skin needs the card too.
+    sendCard();
   }
   else if (m.type === "select") player.select(m.index);
   else if (m.type === "seek") player.seek(m.seconds);
@@ -152,6 +154,45 @@ function info(i: number) {
   return { title: item.title, url, author: "", location: "", link: "", artwork: undefined };
 }
 
+// The show card, the "NTS show" visualisation (ATA-166): the show's title,
+// up to 4 genres and its picture. The skin has no network, so this page
+// fetches the picture and hands it over as a data: URL, once per change.
+// Without the API or the picture, the card is the item's title alone.
+let card = "";
+let cardMsg: { type: "show"; title: string; genres: string[]; image: string | null } | null = null;
+function sendCard() {
+  if (cardMsg) void invoke("skin_send", { msg: cardMsg }).catch(() => {});
+}
+async function updateCard(i: number) {
+  const item = items[i];
+  const show = i < CHANNELS.length ? onAir[i] : undefined;
+  const title = show?.show ?? item.title;
+  const genres = show?.genres.slice(0, 4) ?? [];
+  const artwork = show ? show.artwork : (picks.get(item.url)?.artwork ?? item.artwork);
+  const key = JSON.stringify([title, genres, artwork]);
+  if (key === card) return;
+  card = key;
+  let image: string | null = null;
+  try {
+    const response = artwork ? await fetch(artwork, { signal: AbortSignal.timeout(10_000) }) : null;
+    const blob = response?.ok ? await response.blob() : null;
+    if (blob?.type.startsWith("image/")) image = await dataUrl(blob);
+  } catch (error: unknown) {
+    console.warn("show picture failed", error);
+  }
+  // Another item or show came along while this one loaded.
+  if (key !== card) return;
+  cardMsg = { type: "show", title, genres, image };
+  sendCard();
+}
+const dataUrl = (blob: Blob) =>
+  new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(blob);
+  });
+
 // Windows' media overlay, through WebView2's Media Session.
 let overlay = "";
 function updateOverlay(i: number) {
@@ -184,6 +225,7 @@ setInterval(() => {
   const now = player.state();
   const { artwork: _, ...shown } = info(now.channel);
   updateOverlay(now.channel);
+  void updateCard(now.channel);
   updateTray(shown.title, now.channel, now.playState);
   const state = { type: "state", ...now, ...shown, items: items.map((_, i) => info(i).title), ...settings, level: level() };
   void invoke("skin_send", { msg: state }).catch(() => {});

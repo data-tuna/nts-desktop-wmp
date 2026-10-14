@@ -46,7 +46,7 @@ Written in English.
                           engine.ts lays out and paints the view, runs the
                           skin's scripts and handles the pointer, runtime.ts
                           is the WMP object model the scripts see, effects.ts
-                          draws the visualisations, pixels.ts holds the pixel
+                          draws the visualisations and the show card, pixels.ts holds the pixel
                           helpers its tests share. main.ts is the entry;
                           index.html the page.
     skins/house/          The house skin, the one skin that ships: house.wms,
@@ -394,7 +394,8 @@ until this one gets its own.
 **PR CI does not build the Rust side.** It runs typecheck, lint, the frontend
 build, the tests and `cargo fmt --check`.
 
-**A visualisation costs about 20–30 points of a core** (ATA-116). With one
+**A visualisation costs about 20–30 points of a core** (ATA-116); the
+show card costs nothing measurable (ATA-166). With one
 showing, the app uses about 25–35 % of a core (5–7 % without). Each frame
 redraws only the visualisation, so most of that is the frames' trip: an IPC
 call from the trusted page, a script evaluated in the skin webview, a
@@ -414,9 +415,11 @@ markup and likely the same fault.
 wheel; it has no columns or scroll bar. Their methods
 (`setColumnResizeMode`, `appendItem`) are logged and do nothing.
 
-**Three visualisations, no Milkdrop** (ATA-114): bars, scope and ambience,
-our own. The chosen effect is not saved across launches (`mediacenter`
-starts empty each time).
+**Three visualisations and the show card, no Milkdrop** (ATA-114,
+ATA-166): bars, scope, ambience and the NTS show card, our own. The chosen
+effect is saved in the skin webview's `localStorage`; the first launch
+shows the card. A pick's card uses the NTS episode picture, not
+SoundCloud's artwork.
 
 **Nobody has looked at the media overlay itself.** Windows lists the app's
 session with its title and show (`NTS 1: <show> - <location>`), and plays,

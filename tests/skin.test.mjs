@@ -192,3 +192,18 @@ test("overlay: a visualisation redrawn under its mask and cover matches the skin
     }
   }
 });
+
+test("show card: the title wraps and ends in an ellipsis, genres that do not fit are left out", async () => {
+  const { wrap, flow } = await import("../src/skin/effects.ts");
+  const t = { measureText: (s) => ({ width: s.length * 6 }) };
+  assert.deepEqual(wrap(t, "NTS 1", 60, 2), ["NTS 1"]);
+  assert.deepEqual(wrap(t, "MOXIE W/ THEO KOTTIS", 66, 2), ["MOXIE W/", "THEO KOTTIS"]);
+  assert.deepEqual(wrap(t, "NO WEAPON IS ABSOLUTE", 60, 1), ["NO WEAPON…"]);
+  assert.deepEqual(wrap(t, "", 60, 2), []);
+  // Pills are 6 px a character plus 6, with 4 px between.
+  assert.deepEqual(flow(t, ["Soul", "Detroit Techno", "House"], 100, 1), [
+    { text: "Soul", x: 0, w: 30, row: 0 },
+    { text: "House", x: 34, w: 36, row: 0 },
+  ]);
+  assert.deepEqual(flow(t, ["Soul", "Detroit Techno", "House"], 100, 2).map((p) => [p.text, p.row]), [["Soul", 0], ["Detroit Techno", 1]]);
+});
