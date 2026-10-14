@@ -6,6 +6,26 @@ the evidence.
 
 ## Stack
 
+### NTS accounts: a link to the show, no sign-in (ATA-168, ATA-172, 2026-10-14)
+
+- **The app cannot follow or save shows itself** (ATA-168). NTS's writes go
+  through Firebase App Check, which accepts only nts.live's own clients, and
+  nts.live has no sign-in that hands a token to another app.
+- **So the tray links to the show's page** (Mika's choice). "Show on
+  nts.live" opens `https://www.nts.live/shows/<show_alias>` for a channel,
+  from the live API's `details.show_alias`, and
+  `/shows/<show_alias>/episodes/<episode_alias>` for a pick. The listener
+  follows or saves it there, signed in in their own browser. The entry is
+  gone for a mixtape, and whenever the API gave no alias. No login, token
+  or account code; no new capability.
+
+Checked on a release build on a hidden desktop, with a probe (not
+committed) that logged the tray's entries after each `now_playing`: NTS 1
+opened `/shows/touching-bass`, NTS 2 `/shows/james-k`, the pick Milkweed
+`/shows/milkweed/episodes/milkweed-7th-october-2026`, with the credit
+below it; a mixtape had no entry. With `www.nts.live` mapped to nothing,
+neither channel had one, and NTS 1 played.
+
 ### Sliders that seek from onMouseUp (ATA-170, 2026-10-14)
 
 - **Sliders fire `onMouseUp`** when a drag ends, after `onDragEnd`

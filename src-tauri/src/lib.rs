@@ -488,11 +488,39 @@ struct Credit {
     url: String,
 }
 
-/// The tray menu, its two channels, checked while current, and its credit
-/// entry, which is in the menu only while a pick plays.
+/// The current show's or pick's aliases on nts.live (ATA-172).
+#[derive(Deserialize)]
+struct Page {
+    show: String,
+    episode: Option<String>,
+}
+
+/// The show's page on nts.live, or with an episode the episode's. Aliases
+/// come from the NTS API: anything but a plain slug gives no page.
+fn show_page(page: &Page) -> Option<Url> {
+    let slug = |s: &str| {
+        !s.is_empty()
+            && s.len() <= 200
+            && s.bytes()
+                .all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_')
+    };
+    if !slug(&page.show) || !page.episode.as_deref().is_none_or(slug) {
+        return None;
+    }
+    let mut url = format!("https://www.nts.live/shows/{}", page.show);
+    if let Some(episode) = &page.episode {
+        url = format!("{url}/episodes/{episode}");
+    }
+    Url::parse(&url).ok()
+}
+
+/// The tray menu, its two channels, checked while current, its "Show on
+/// nts.live" entry, in the menu only while the current show has a page, and
+/// its credit entry, in the menu only while a pick plays.
 struct Tray {
     menu: Menu<Wry>,
     channels: [CheckMenuItem<Wry>; 2],
+    show: MenuItem<Wry>,
     credit: MenuItem<Wry>,
 }
 
@@ -506,6 +534,7 @@ impl Tray {
 }
 
 static CREDIT: Mutex<Option<Credit>> = Mutex::new(None);
+static SHOW_PAGE: Mutex<Option<Url>> = Mutex::new(None);
 
 /// The credit's height, in CSS pixels.
 const CREDIT_HEIGHT: u32 = 16;
@@ -540,7 +569,8 @@ fn fit_tooltip(text: &str) -> String {
 }
 
 /// The trusted page, whenever what plays changes: its title for the tray's
-/// tooltip, the channel to check in the tray, and a pick's credit, or none.
+/// tooltip, the channel to check in the tray, the show's or pick's aliases on
+/// nts.live, and a pick's credit, or none.
 /// While a pick plays the app draws the credit itself, above the skin, in a
 /// webview of its own: a skin's code cannot hide it, and a skin with no title
 /// text still shows it.
@@ -550,11 +580,22 @@ async fn now_playing(
     title: String,
     channel: Option<usize>,
     credit: Option<Credit>,
+    page: Option<Page>,
 ) -> Result<(), String> {
     if let Some(tray) = app.tray_by_id("main") {
         let _ = tray.set_tooltip(Some(fit_tooltip(&title)));
     }
-    app.state::<Tray>().check(channel);
+    let tray = app.state::<Tray>();
+    tray.check(channel);
+    // Without a page (a mixtape, the live API down) the entry leaves the menu.
+    let page = page.as_ref().and_then(show_page);
+    let shown = page.is_some();
+    let had_page = std::mem::replace(&mut *SHOW_PAGE.lock().unwrap(), page).is_some();
+    if shown && !had_page {
+        let _ = tray.menu.insert(&tray.show, 5);
+    } else if had_page && !shown {
+        let _ = tray.menu.remove(&tray.show);
+    }
     if credit.as_ref().is_some_and(|c| !soundcloud_page(&c.url)) {
         return Err("not a SoundCloud page".into());
     }
@@ -567,7 +608,6 @@ async fn now_playing(
         }
         std::mem::replace(&mut *current, credit.clone()).is_some()
     };
-    let tray = app.state::<Tray>();
     let window = app.get_window("main").ok_or("no main window")?;
     match &credit {
         Some(c) => {
@@ -576,7 +616,7 @@ async fn now_playing(
                 .set_text(credit_text(c).replace('&', "&&"))
                 .map_err(|e| e.to_string())?;
             if !had {
-                let _ = tray.menu.insert(&tray.credit, 5);
+                let _ = tray.menu.insert(&tray.credit, 5 + shown as usize);
             }
             // As wide as the window while it lays out; credit_size narrows it.
             let width = window
@@ -647,8 +687,9 @@ fn open_credit() {
     }
 }
 
-/// The tray icon: play, stop, the two channels, the pick's credit while one
-/// plays, and quit. A left click brings the player forward.
+/// The tray icon: play, stop, the two channels, the show's page while it has
+/// one, the pick's credit while one plays, and quit. A left click brings the
+/// player forward.
 fn build_tray(app: &AppHandle) -> tauri::Result<()> {
     let item = |id: &str, text: &str| MenuItem::with_id(app, id, text, true, None::<&str>);
     let channel = |id: &str, text: &str| {
@@ -664,15 +705,18 @@ fn build_tray(app: &AppHandle) -> tauri::Result<()> {
             &sep()?,
             &channels[0],
             &channels[1],
-            // The credit goes here, at 5, while a pick plays.
+            // "Show on nts.live" goes here, at 5, while the show has a page,
+            // then the credit while a pick plays.
             &sep()?,
             &item("quit", "Quit")?,
         ],
     )?;
+    let show = item("show", "Show on nts.live")?;
     let credit = item("credit", "SoundCloud")?;
     app.manage(Tray {
         menu: menu.clone(),
         channels,
+        show,
         credit,
     });
     let mut tray = TrayIconBuilder::with_id("main")
@@ -701,6 +745,13 @@ fn on_tray_menu(app: &AppHandle, event: MenuEvent) {
     match event.id().as_ref() {
         "quit" => app.exit(0),
         "credit" => open_credit(),
+        "show" => {
+            // Cloned so the lock is not held while the browser starts.
+            let page = SHOW_PAGE.lock().unwrap().clone();
+            if let Some(url) = page {
+                open_url(&url);
+            }
+        }
         // Windows flips a check item's mark on every click; main.ts plays the
         // clicked channel, so that one is checked, even if it already was.
         id @ ("nts1" | "nts2") => {
@@ -1176,6 +1227,39 @@ mod tests {
         assert_eq!(fit_tooltip("NTS 1 - Show"), "NTS 1 - Show");
         assert_eq!(fit_tooltip(&"a".repeat(200)).len(), 127);
         assert_eq!(fit_tooltip(&"\u{1F4FB}".repeat(64)).chars().count(), 63);
+    }
+
+    #[test]
+    fn show_pages_from_aliases() {
+        let page = |show: &str, episode: Option<&str>| {
+            show_page(&Page {
+                show: show.into(),
+                episode: episode.map(Into::into),
+            })
+            .map(String::from)
+        };
+        assert_eq!(
+            page("touching-bass", None).as_deref(),
+            Some("https://www.nts.live/shows/touching-bass")
+        );
+        assert_eq!(
+            page("milkweed", Some("milkweed-7th-october-2026")).as_deref(),
+            Some("https://www.nts.live/shows/milkweed/episodes/milkweed-7th-october-2026")
+        );
+        for bad in [
+            "",
+            "../supporters",
+            "a/b",
+            "a?b",
+            "a#b",
+            "a b",
+            "%2e%2e",
+            "é",
+        ] {
+            assert_eq!(page(bad, None), None, "{bad}");
+            assert_eq!(page("milkweed", Some(bad)), None, "{bad}");
+        }
+        assert_eq!(page(&"a".repeat(201), None), None);
     }
 
     #[test]
