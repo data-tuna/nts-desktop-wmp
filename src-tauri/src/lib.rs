@@ -506,9 +506,10 @@ fn fit_tooltip(text: &str) -> String {
 }
 
 /// The trusted page, whenever what plays changes: its title for the tray's
-/// tooltip, the channel to check in the tray, and a pick's credit, or none. While a pick plays the app draws
-/// the credit itself, above the skin, in a webview of its own: a skin's code
-/// cannot hide it, and a skin with no title text still shows it.
+/// tooltip, the channel to check in the tray, and a pick's credit, or none.
+/// While a pick plays the app draws the credit itself, above the skin, in a
+/// webview of its own: a skin's code cannot hide it, and a skin with no title
+/// text still shows it.
 #[tauri::command]
 async fn now_playing(
     app: AppHandle,
