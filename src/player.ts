@@ -23,6 +23,10 @@ export const CHANNELS: Item[] = [
   { title: "NTS 2", url: "https://streams.radiomast.io/nts2" },
 ];
 
+/** A channel's title while the live API names its show: "NTS 1: <show> - <location>".
+ * The channel leads, so every skin's title says which one plays (ATA-164). */
+export const channelTitle = (channel: string, show: string) => `${channel}: ${show}`;
+
 /** 6 s of silence as an 8 kHz WAV: what the element holds while paused or
  * stopped. WebView2 leaves media shorter than about 5 s out of the session. */
 export const silence = (() => {

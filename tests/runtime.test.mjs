@@ -7,8 +7,10 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 
 // Pointer listeners, so a test can click: the skin's canvas registers last.
+// `drawn` logs each fillRect and fillText with its colour.
 const listeners = {};
 const listen = (type, f) => (listeners[type] = f);
+const drawn = [];
 function canvas() {
   const c = { width: 0, height: 0, style: {}, title: "", addEventListener: listen, getBoundingClientRect: () => ({ left: 0, top: 0, width: c.width, height: c.height }) };
   const g = new Proxy(
@@ -17,6 +19,7 @@ function canvas() {
       get(t, k) {
         if (k in t) return t[k];
         if (k === "measureText") return (s) => ({ width: s.length * 6 });
+        if (k === "fillRect" || k === "fillText") return (...a) => drawn.push([k, t.fillStyle, ...a]);
         if (k === "getImageData") return (x, y, w, h) => ({ width: w, height: h, data: new Uint8ClampedArray(w * h * 4) });
         return () => ({});
       },
@@ -274,7 +277,7 @@ test("a click on a subview's drawn pixels stays there; through its transparency 
 });
 
 test("now playing: the media's name and item info, the playlist, and a pick's link on a double click", () => {
-  const items = ["NTS 1 - A show - London", "NTS 2", "Poolside", "someone on SoundCloud - A pick"];
+  const items = ["NTS 1: A show - London", "NTS 2", "Poolside", "someone on SoundCloud - A pick"];
   const { skin, js, sent, set } = load(`<theme><view width="100" height="60">
        <text id="name" left="0" top="0" width="100" height="10" value="wmpprop:player.currentMedia.name"/>
        <text id="len" left="0" top="10" width="100" height="10" value="wmpprop:player.currentMedia.durationString"/>
@@ -330,4 +333,26 @@ test("a double click that starts a pick from its row does not open its page", ()
   listeners.mousedown(rowB(1));
   listeners.dblclick(rowB(2));
   assert.deepEqual(sent.slice(at).filter((m) => m.type === "launchUrl"), [{ type: "launchUrl", url: "https://soundcloud.com/b" }]);
+});
+
+test("the playlist marks the current row in the skin's playing colours, or the list's own swapped", () => {
+  const items = ["NTS 1: A show", "NTS 2", "Poolside"];
+  // The rows a paint draws: each row's text and the colour it is drawn in, and the row backgrounds.
+  const rows = (skin) => {
+    drawn.length = 0;
+    skin.paint();
+    return drawn.filter(([k, , a]) => k === "fillText" ? items.includes(a) : k === "fillRect" && a === 0).map(([k, style, a, y]) => (k === "fillText" ? [a, style] : [`row at ${y}`, style]));
+  };
+  const plain = load(`<theme><view width="100" height="60">
+       <playlist id="pl" left="0" top="0" width="100" height="48" fontSize="6" backgroundColor="#000000" foregroundColor="#FFFFFF"/>
+     </view></theme>`, {}, { ...STATE, items });
+  // 16 px rows: the background, then the current row in white with black text.
+  assert.deepEqual(rows(plain.skin), [["row at 0", "#000000"], ["row at 0", "#ffffff"], ["NTS 1: A show", "#000000"], ["NTS 2", "#ffffff"], ["Poolside", "#ffffff"]]);
+  plain.set({ channel: 2 });
+  assert.deepEqual(rows(plain.skin), [["row at 0", "#000000"], ["NTS 1: A show", "#ffffff"], ["NTS 2", "#ffffff"], ["row at 32", "#ffffff"], ["Poolside", "#000000"]]);
+  const coloured = load(`<theme><view width="100" height="60">
+       <playlist id="pl" left="0" top="0" width="100" height="48" fontSize="6" foregroundColor="#FFFFFF" itemPlayingColor="#FF0000"/>
+     </view></theme>`, {}, { ...STATE, items, channel: 1 });
+  // A skin's own playing colour wins, and with no background colour named, no row is filled.
+  assert.deepEqual(rows(coloured.skin), [["NTS 1: A show", "#ffffff"], ["NTS 2", "#ff0000"], ["Poolside", "#ffffff"]]);
 });

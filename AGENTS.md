@@ -414,7 +414,7 @@ our own. The chosen effect is not saved across launches (`mediacenter`
 starts empty each time).
 
 **Nobody has looked at the media overlay itself.** Windows lists the app's
-session with its title and show (`NTS 1 - <show> - <location>`), and plays,
+session with its title and show (`NTS 1: <show> - <location>`), and plays,
 pauses and stops it, through the same API the overlay uses (ATA-115). The
 flyout has not been seen on screen.
 

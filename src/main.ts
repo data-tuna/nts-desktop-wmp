@@ -6,7 +6,7 @@ import { listen } from "@tauri-apps/api/event";
 import { fetchLive, mergeOnAir, nextPollDelay, type OnAir } from "./live";
 import { MIXTAPES_API, parseMixtapes } from "./mixtapes";
 import { PICKS_API, parsePicks, type Pick } from "./picks";
-import { CHANNELS, createPlayer, type Item } from "./player";
+import { CHANNELS, channelTitle, createPlayer, type Item } from "./player";
 import { createWidget } from "./widget";
 import { bands, samples } from "./skin/effects";
 
@@ -144,8 +144,7 @@ function info(i: number) {
   const item = items[i];
   const url = item.url;
   const show = i < CHANNELS.length ? onAir[i] : undefined;
-  // The channel always leads, as in the Winamp app (Ata, 2026-10-09): "NTS 1 - <show> - <location>".
-  if (show) return { title: `${item.title} - ${show.title}`, url, author: show.show, location: show.location ?? "", link: "", artwork: show.artwork };
+  if (show) return { title: channelTitle(item.title, show.title), url, author: show.show, location: show.location ?? "", link: "", artwork: show.artwork };
   const pick = picks.get(item.url);
   if (pick) {
     const credit = pick.uploader ? `${pick.uploader} on SoundCloud` : "SoundCloud";
@@ -168,15 +167,17 @@ if ("mediaSession" in navigator) {
   for (const [action, type] of actions) navigator.mediaSession.setActionHandler(action, () => onSkin({ type } as FromSkin));
 }
 
-// The tray's tooltip, and while a pick plays its credit, which the app draws
+// The tray's tooltip and check mark, and while a pick plays its credit, which the app draws
 // over the skin and lists in the tray (lib.rs, now_playing).
 let tray = "";
 function updateTray(title: string, i: number, playState: string) {
   const pick = picks.get(items[i].url);
   const credit = pick && playState !== "stopped" ? { name: pick.uploader ?? "", url: pick.url } : null;
-  if (tray === JSON.stringify([title, credit])) return;
-  tray = JSON.stringify([title, credit]);
-  void invoke("now_playing", { title, credit }).catch((e: unknown) => console.warn("now_playing", e));
+  // The tray checks the channel that is current; a mixtape or pick checks neither.
+  const channel = i < CHANNELS.length ? i : null;
+  if (tray === JSON.stringify([title, credit, channel])) return;
+  tray = JSON.stringify([title, credit, channel]);
+  void invoke("now_playing", { title, credit, channel }).catch((e: unknown) => console.warn("now_playing", e));
 }
 
 // 4 updates a second covers the clock and title. The visualisation gets its

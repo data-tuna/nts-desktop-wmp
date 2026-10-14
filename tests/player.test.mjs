@@ -2,7 +2,7 @@
 // a stand-in for the <audio> element and mocked timers.
 import assert from "node:assert/strict";
 import { afterEach, beforeEach, mock, test } from "node:test";
-import { CHANNELS, createPlayer, silence } from "../src/player.ts";
+import { CHANNELS, channelTitle, createPlayer, silence } from "../src/player.ts";
 
 beforeEach(() => mock.timers.enable({ apis: ["setTimeout", "setInterval", "Date"] }));
 afterEach(() => mock.timers.reset());
@@ -200,4 +200,9 @@ test("selecting the item already playing leaves it alone", () => {
   assert.deepEqual(audio.loads, [NTS1]);
   player.select(1);
   assert.deepEqual(audio.loads, [NTS1, NTS2]);
+});
+
+test("a channel's title leads with the channel", () => {
+  assert.equal(channelTitle("NTS 1", "Pool Side Slow Focus - London"), "NTS 1: Pool Side Slow Focus - London");
+  assert.equal(channelTitle("NTS 2", "A show"), "NTS 2: A show");
 });
