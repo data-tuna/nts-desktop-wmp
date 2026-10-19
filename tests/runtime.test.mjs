@@ -263,6 +263,12 @@ test("effects start on Bars, step through the visualisations, save them through 
   store.clear();
 });
 
+test("a skin with no visualisation tells the host on its first paint, so frames for the last skin stop", async () => {
+  const { sent } = load(`<theme><view width="100" height="100"/></theme>`);
+  await Promise.resolve();
+  assert.deepEqual(sent.filter((m) => m.type === "effects"), [{ type: "effects", on: false }]);
+});
+
 test("a saved effect the list no longer has, ATA-166's show card, loads as Bars", () => {
   store.clear();
   store.set("effectType", "NTS show");

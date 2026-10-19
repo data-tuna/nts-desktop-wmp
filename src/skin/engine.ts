@@ -726,7 +726,9 @@ export class Skin {
    * was on screen at the last paint (the host sends frames only then). */
   frame: Frame | null = null;
   effectsShown = false;
-  private effectsOn = false;
+  // Null until the first paint, so each skin tells the host whether it
+  // wants frames: a skin chosen in the picker replaces one that did.
+  private effectsOn: boolean | null = null;
   /** The effects element the visualisation menu was opened on (ATA-190). */
   private menuFor: El | null = null;
   /** How the visualisations were found at the last full paint: each one's
