@@ -6,6 +6,24 @@ the evidence.
 
 ## Stack
 
+### Mute in the tray (ATA-194, 2026-10-19)
+
+- **Ata's app went quiet because it was muted.** Mute is remembered across
+  restarts, and 9SeriesDefault's mute button (`bMute`) sits among Play,
+  Stop, Next and Previous, easy to hit and hard to spot.
+- **The tray has a Mute check item.** It toggles the same setting a skin's
+  mute button sets, in the trusted page, and `now_playing` checks it from
+  that setting, so the skin and the tray follow each other.
+- **The tray's tooltip says "(muted)".** One place only; the media overlay
+  is unchanged. A long title is cut before the suffix, never the suffix.
+- **The engine needed no change.** `bMute` is sticky, its `down` bound to
+  `wmpprop:player.settings.mute`, and its `onClick` sets `mute=down`: the
+  engine flips `down` before `onClick` reads it, then follows the setting
+  again. Checked on a release build on a hidden desktop: a click shows the
+  down image and mutes, a second click unmutes, and after the tray mutes the
+  button shows down and a click unmutes. The tray was stood in for by its
+  `tray` event; nobody has clicked the native menu yet.
+
 ### NTS accounts: a link to the show, no sign-in (ATA-168, ATA-172, 2026-10-14)
 
 - **The app cannot follow or save shows itself** (ATA-168). NTS's writes go

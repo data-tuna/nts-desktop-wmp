@@ -148,6 +148,30 @@ test("a sticky mute button flips down for its onClick, then follows the player a
   assert.equal(js("m.down"), true);
 });
 
+test("9SeriesDefault's mute button and the tray's Mute follow the same setting", () => {
+  // bMute as 9SeriesDefault has it, outside its button group.
+  const { js, sent, set } = load(`<theme><view width="20" height="20">
+       <button id="bMute" left="0" top="0" width="20" height="20" sticky="true"
+         onClick="jscript:player.settings.mute=down;" down="wmpprop:player.settings.mute"/>
+     </view></theme>`);
+  const click = () => {
+    const at = { button: 0, clientX: 5, clientY: 5 };
+    listeners.mousedown(at);
+    listeners.mouseup(at);
+  };
+  const mutes = () => sent.filter((m) => m.type === "mute").map((m) => m.value);
+  click();
+  assert.deepEqual(mutes(), [true], "a click mutes");
+  assert.equal(js("bMute.down"), true);
+  set({ mute: false }); // the tray unmutes
+  assert.equal(js("bMute.down"), false, "the button follows the tray");
+  set({ mute: true }); // the tray mutes
+  assert.equal(js("bMute.down"), true);
+  click();
+  assert.deepEqual(mutes(), [true, false], "a click on the down button unmutes");
+  assert.equal(js("bMute.down"), false);
+});
+
 test("a statement that throws keeps the functions declared below it", () => {
   const { js } = load(`<theme><view width="1" height="1" scriptFile="t.js" onLoad="ThrowLoaded = true;"/></theme>`, {
     "t.js": "/*\nfunction CommentedOut() {}\n*/\nvar a = 1;\nmediacenter.missing.member;\nfunction DeclaredBelowThrow() { return 7; }\n\tfunction Indented() { function NestedInIndented() {} return 8; }",

@@ -362,9 +362,9 @@ on the real one.
 **Dragging the window is unverified.** Rust follows the cursor while the
 primary button is down (`win32::drag` in `lib.rs`), because `start_dragging`
 did nothing under the skin webview. Nobody has dragged it with a real mouse
-yet, nor clicked the tray menu (its "Show on nts.live" entry included) or
-the credit, nor moved the window to a
-monitor with another scale (the shape is redone on `ScaleFactorChanged`).
+yet, nor clicked the tray menu (its "Show on nts.live" and Mute entries
+included) or the credit, nor moved the window to a monitor with another
+scale (the shape is redone on `ScaleFactorChanged`).
 ATA-115 has the list of checks for a person.
 
 **Stop from Windows ends the media session.** The overlay's Stop button, or

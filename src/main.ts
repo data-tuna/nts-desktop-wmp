@@ -122,9 +122,11 @@ function onSkin(m: FromSkin) {
 apply();
 await listen<FromSkin>("skin", (e) => onSkin(e.payload));
 await listen<boolean>("covered", (e) => (covered = e.payload));
-// The tray menu (lib.rs): play, stop and the two channels.
+// The tray menu (lib.rs): play, stop, mute and the two channels.
 await listen<string>("tray", ({ payload: id }) => {
   if (id === "play" || id === "stop") onSkin({ type: id });
+  // The setting a skin's mute button sets; the skin and the tray follow it (ATA-194).
+  else if (id === "mute") onSkin({ type: "mute", value: !settings.mute });
   else if (id === "nts1" || id === "nts2") {
     player.select(id === "nts1" ? 0 : 1);
     onSkin({ type: "play" });
@@ -199,7 +201,7 @@ if ("mediaSession" in navigator) {
   for (const [action, type] of actions) navigator.mediaSession.setActionHandler(action, () => onSkin({ type } as FromSkin));
 }
 
-// The tray's tooltip and check mark, its link to the show's page on nts.live, and while a pick
+// The tray's tooltip, which says when muted, its check marks, its link to the show's page on nts.live, and while a pick
 // plays its credit, which the app draws over the skin and lists in the tray (lib.rs, now_playing).
 let tray = "";
 function updateTray(title: string, i: number, playState: string) {
@@ -214,9 +216,10 @@ function updateTray(title: string, i: number, playState: string) {
     : pick?.showAlias && pick.episodeAlias
       ? { show: pick.showAlias, episode: pick.episodeAlias }
       : null;
-  if (tray === JSON.stringify([title, credit, channel, page])) return;
-  tray = JSON.stringify([title, credit, channel, page]);
-  void invoke("now_playing", { title, credit, channel, page }).catch((e: unknown) => console.warn("now_playing", e));
+  const { mute } = settings;
+  if (tray === JSON.stringify([title, mute, credit, channel, page])) return;
+  tray = JSON.stringify([title, mute, credit, channel, page]);
+  void invoke("now_playing", { title, mute, credit, channel, page }).catch((e: unknown) => console.warn("now_playing", e));
 }
 
 // 4 updates a second covers the clock and title. The visualisation gets its
