@@ -1,5 +1,7 @@
 // The skin picker: our own page, listing the skins skins/compatible.json
-// marks as working. It names skins and never runs their code (ATA-112).
+// marks as working. It names skins and never runs their code (ATA-112):
+// the selected skin's preview is the preview webview, which Rust lays over
+// the #preview pane (ATA-193).
 import { invoke } from "@tauri-apps/api/core";
 
 type SkinList = {
@@ -12,6 +14,8 @@ type SkinList = {
 const list = document.getElementById("skins")!;
 const random = document.getElementById("random") as HTMLInputElement;
 const status = document.getElementById("status")!;
+const preview = document.getElementById("preview")!;
+const use = document.getElementById("use") as HTMLButtonElement;
 
 const name = (path: string) => path.split("/").pop()!.replace(/\.wmz$/i, "");
 const mb = (bytes: number) => `${(bytes / 1e6).toFixed(1)} MB`;
@@ -19,6 +23,7 @@ const rows = new Map<string, { li: HTMLLIElement; button: HTMLButtonElement; lin
 let busy = false;
 // Why the last pick did not take, until the next one.
 let failed = "";
+let selected: string | null = null;
 
 function build({ skins }: SkinList) {
   for (const skin of skins) {
@@ -26,7 +31,8 @@ function build({ skins }: SkinList) {
     const button = document.createElement("button");
     button.type = "button";
     button.textContent = name(skin.path);
-    button.addEventListener("click", () => void choose(skin.path, name(skin.path)));
+    button.addEventListener("click", () => void select(skin.path));
+    button.addEventListener("dblclick", () => void choose(skin.path, name(skin.path)));
     const from = document.createElement("span");
     from.className = "from";
     from.textContent = skin.path.split("/")[0];
@@ -47,6 +53,7 @@ async function refresh() {
   const { choice, worn, fetching } = state;
   random.checked = choice === null;
   random.disabled = busy;
+  use.disabled = busy || !selected;
   if (!busy) status.textContent = failed || (fetching ? "Loading a skin…" : `Wearing ${worn ? name(worn) : "the house skin"}.${!choice ? "" : choice === worn ? " It stays on every launch." : ` ${name(choice)} is tried again next launch.`}`);
   for (const skin of state.skins) {
     const row = rows.get(skin.path);
@@ -54,6 +61,7 @@ async function refresh() {
     row.li.setAttribute("aria-current", String(skin.path === worn));
     row.button.className = skin.path === choice ? "chosen" : "";
     row.button.disabled = busy;
+    row.li.classList.toggle("selected", skin.path === selected);
     row.button.title = skin.cached ? "Downloaded" : `Downloads ${mb(skin.size)} from archive.org`;
     row.link.textContent = skin.cached ? "archive.org" : `archive.org, ${mb(skin.size)}`;
   }
@@ -64,6 +72,7 @@ async function choose(path: string | null, label: string) {
   failed = "";
   status.textContent = `Loading ${label}…`;
   random.disabled = true;
+  use.disabled = true;
   for (const row of rows.values()) row.button.disabled = true;
   await invoke("choose_skin", { path }).catch((e) => (failed = `${label} did not load (${String(e)}), so the house skin is on.`));
   busy = false;
@@ -71,6 +80,30 @@ async function choose(path: string | null, label: string) {
   list.querySelector('[aria-current="true"]')?.scrollIntoView({ block: "center" });
 }
 
+/** Shows a skin in the preview pane, downloading it if it is not cached. */
+async function select(path: string) {
+  // A click on the selected skin tries again only after "No preview".
+  if (path === selected && preview.textContent !== "No preview") return;
+  selected = path;
+  use.disabled = busy;
+  for (const [p, row] of rows) row.li.classList.toggle("selected", p === path);
+  preview.textContent = "Loading…";
+  const shown = await invoke("preview_skin", { path }).then(
+    () => true,
+    () => false,
+  );
+  if (selected === path) preview.textContent = shown ? "" : "No preview";
+  // The row of a skin the preview downloaded now says so.
+  if (!busy) void refresh();
+}
+
+// Rust keeps the preview webview over the pane, wherever the layout puts it.
+// The pane keeps its width when the window widens, but <main> does not.
+new ResizeObserver(() => {
+  const { x, y, width, height } = preview.getBoundingClientRect();
+  void invoke("preview_area", { x, y, width, height });
+}).observe(document.querySelector("main")!);
+use.addEventListener("click", () => selected && void choose(selected, name(selected)));
 random.addEventListener("change", () => void choose(null, "a random skin"));
 document.addEventListener("click", (e) => {
   const a = (e.target as HTMLElement).closest<HTMLAnchorElement>("a[data-link]");

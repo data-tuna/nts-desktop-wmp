@@ -1,8 +1,9 @@
-// Usage: node tools/escape.mjs <port> [webview|frame]
+// Usage: node tools/escape.mjs <port> [webview|frame|preview]
 // ATA-107: tries to reach Tauri from where skin code runs, and runs the same
 // calls from the trusted page as a control. "webview" attacks from the skin
 // webview (the chosen host); "frame" from a sandboxed srcdoc frame inside the
-// trusted page (the host ATA-103 used; dev builds only).
+// trusted page (the host ATA-103 used; dev builds only); "preview" from the
+// skin picker's preview webview (ATA-193; open the picker and select a skin).
 // The IPC attacks call our `skin_send` with a title unique to the row, and
 // "reached" says whether that title arrived in the skin webview. One also
 // tries `set_size`, and every row reads the window's size afterwards.
@@ -11,6 +12,7 @@ import { connect } from "./cdp.mjs";
 const [port, mode = "webview"] = process.argv.slice(2);
 const main = await connect(port, "main");
 const skin = await connect(port, "skin");
+const preview = mode === "preview" && (await connect(port, "preview"));
 const APP_URL = main.url;
 const REMOTE = "https://example.com/";
 const q = JSON.stringify;
@@ -76,6 +78,8 @@ const ATTACKS = {
   "__TAURI_INTERNALS__.invoke list_skins": invoke("list_skins", {}),
   "__TAURI_INTERNALS__.invoke choose_skin": invoke("choose_skin", { path: null }),
   "__TAURI_INTERNALS__.invoke open_link": invoke("open_link", { url: "https://www.nts.live/supporters" }),
+  "__TAURI_INTERNALS__.invoke preview_skin": invoke("preview_skin", { path: "microsoft/Classic.wmz" }),
+  "__TAURI_INTERNALS__.invoke preview_area": invoke("preview_area", { x: 0, y: 0, width: 4096, height: 4096 }),
   // The trusted page's and the credit's commands (ATA-115).
   "__TAURI_INTERNALS__.invoke now_playing": invoke("now_playing", { title: "escaped", mute: false, credit: null }),
   "__TAURI_INTERNALS__.invoke credit": invoke("credit", {}),
@@ -110,6 +114,7 @@ const IPC = ["replay IPC, no key", "replay IPC, with key", "__TAURI_INTERNALS__.
 
 async function attacker() {
   if (mode === "webview") return (expr) => skin.evaluate(expr);
+  if (mode === "preview") return (expr) => preview.evaluate(expr);
   await main.evaluate("frameHost()");
   await pause(1000);
   const frame = await connect(port, "frame");
@@ -126,10 +131,10 @@ const row = async (from, name, exec) => {
   rows.push({ name, from, result, ...(IPC.includes(name) && { reached: await reached(marker) }), size: await size() });
 };
 for (const name of Object.keys(ATTACKS)) {
-  if (name === "navigate to the app's page" && mode === "webview") {
+  if (name === "navigate to the app's page" && mode !== "frame") {
     await run(ATTACKS[name]());
     await pause(1500);
-    const now = await connect(port, "skin").then((s) => (s.close(), s.url)).catch((e) => e.message);
+    const now = await connect(port, mode === "preview" ? "preview" : "skin").then((s) => (s.close(), s.url)).catch((e) => e.message);
     rows.push({ name, from: "attacker", result: "now at " + now, size: await size() });
     continue;
   }
@@ -140,6 +145,7 @@ for (const name of IPC.slice(1)) await row("trusted page (control)", name, (e) =
 
 console.log(q({ mode, app: APP_URL, captured: { url: captured.url, headers: Object.keys(captured.headers) }, rows }, null, 1));
 skin.close();
+if (preview) preview.close();
 // The forced fallback leaves the trusted page on postMessage IPC for good.
 await main.evaluate("location.reload()");
 main.close();

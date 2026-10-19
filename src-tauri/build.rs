@@ -7,6 +7,8 @@ fn main() {
             "skin_send",
             "list_skins",
             "choose_skin",
+            "preview_skin",
+            "preview_area",
             "open_link",
             "now_playing",
             "credit",
