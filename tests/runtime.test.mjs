@@ -406,7 +406,7 @@ test("a double click that starts a pick from its row does not open its page", ()
   assert.deepEqual(sent.slice(at).filter((m) => m.type === "launchUrl"), [{ type: "launchUrl", url: "https://soundcloud.com/b" }]);
 });
 
-test("the playlist marks the current row in the skin's playing colours, or the list's own swapped", () => {
+test("the playlist marks the current row in the skin's playing colours, or WMP's green on #222222", () => {
   const items = ["NTS 1: A show", "NTS 2", "Poolside"];
   // The rows a paint draws: each row's text and the colour it is drawn in, and the row backgrounds.
   const rows = (skin) => {
@@ -417,16 +417,99 @@ test("the playlist marks the current row in the skin's playing colours, or the l
   const plain = load(`<theme><view width="100" height="60">
        <playlist id="pl" left="0" top="0" width="100" height="48" fontSize="6" backgroundColor="#000000" foregroundColor="#FFFFFF"/>
      </view></theme>`, {}, { ...STATE, items });
-  // 16 px rows: the background, then the current row in white with black text.
-  assert.deepEqual(rows(plain.skin), [["row at 0", "#000000"], ["row at 0", "#ffffff"], ["NTS 1: A show", "#000000"], ["NTS 2", "#ffffff"], ["Poolside", "#ffffff"]]);
+  // 16 px rows: the background, then the current row in WMP's colours, as on Headspace.
+  assert.deepEqual(rows(plain.skin), [["row at 0", "#000000"], ["row at 0", "#222222"], ["NTS 1: A show", "#00ff00"], ["NTS 2", "#ffffff"], ["Poolside", "#ffffff"]]);
   plain.set({ channel: 2 });
-  assert.deepEqual(rows(plain.skin), [["row at 0", "#000000"], ["NTS 1: A show", "#ffffff"], ["NTS 2", "#ffffff"], ["row at 32", "#ffffff"], ["Poolside", "#000000"]]);
+  assert.deepEqual(rows(plain.skin), [["row at 0", "#000000"], ["NTS 1: A show", "#ffffff"], ["NTS 2", "#ffffff"], ["row at 32", "#222222"], ["Poolside", "#00ff00"]]);
   const coloured = load(`<theme><view width="100" height="60">
        <playlist id="pl" left="0" top="0" width="100" height="48" fontSize="6" foregroundColor="#FFFFFF" itemPlayingColor="#FF0000"/>
      </view></theme>`, {}, { ...STATE, items, channel: 1 });
-  // A skin's own playing colour wins, and with no background colour named, no row is filled.
-  assert.deepEqual(rows(coloured.skin), [["NTS 1: A show", "#ffffff"], ["NTS 2", "#ff0000"], ["Poolside", "#ffffff"]]);
+  // A skin's own playing colour wins; the row behind it is WMP's.
+  assert.deepEqual(rows(coloured.skin), [["NTS 1: A show", "#ffffff"], ["row at 16", "#222222"], ["NTS 2", "#ff0000"], ["Poolside", "#ffffff"]]);
 });
+
+test("the playlist's scroll bar: dragging the thumb and clicking the track scroll the list", () => {
+  const items = Array.from({ length: 20 }, (_, i) => `Item ${i}`);
+  const { skin } = load(`<theme><view width="100" height="48">
+       <playlist id="pl" left="0" top="0" width="100" height="48" fontSize="6" backgroundColor="#000000" foregroundColor="#FFFFFF"/>
+     </view></theme>`, {}, { ...STATE, items });
+  // Three 16 px rows of 20: an 8 px thumb on a 48 px track, in the bar's 16 px at the right.
+  const first = () => {
+    drawn.length = 0;
+    skin.paint();
+    return drawn.find(([k, , a]) => k === "fillText" && items.includes(a))[2];
+  };
+  const bar = () => drawn.filter(([k, , x]) => k === "fillRect" && x >= 84).map(([, style, x, y, w, h]) => [style, x, y, w, h]);
+  first();
+  assert.deepEqual(bar(), [["#262626", 84, 0, 16, 48], ["#8c8c8c", 86, 1, 12, 6]]);
+  const at = (y) => ({ button: 0, clientX: 92, clientY: y, detail: 1 });
+  // Grab the thumb 4 px down and drag it 20 px: 20 of 40 px to travel is row 9 of 17 (8.5, rounded).
+  listeners.mousedown(at(4));
+  listeners.mousemove(at(24));
+  listeners.mouseup(at(24));
+  assert.equal(first(), "Item 9");
+  // A press on the track below the thumb pages down by three rows, above it up.
+  listeners.mousedown(at(46));
+  listeners.mouseup(at(46));
+  assert.equal(first(), "Item 12");
+  listeners.mousedown(at(2));
+  listeners.mouseup(at(2));
+  assert.equal(first(), "Item 9");
+  // The wheel still scrolls, and a press on the bar selects nothing.
+  listeners.wheel({ clientX: 40, clientY: 20, deltaY: 1 });
+  assert.equal(first(), "Item 10");
+  assert.equal(skin.state.channel, 0);
+});
+
+test("a long name on the playing row scrolls right to left; other rows are cut off", () => {
+  const long = "A show with a name far too long for the list";
+  const items = ["NTS 1", long, `Not playing: ${long}`];
+  const { skin } = load(`<theme><view width="100" height="48">
+       <playlist id="pl" left="0" top="0" width="100" height="48" fontSize="6"/>
+     </view></theme>`, {}, { ...STATE, items, channel: 1 });
+  const texts = () => {
+    drawn.length = 0;
+    skin.paint();
+    return drawn.filter(([k]) => k === "fillText").map(([, , a, x]) => [a, x]);
+  };
+  // 6 px a character: 264 px of text in an 88 px box. Two copies, a loop (264 + 44 px) apart.
+  const shown = texts().filter(([a]) => a === long);
+  assert.equal(shown.length, 2);
+  assert.equal(shown[0][1] - shown[1][1], 264 + 44);
+  assert.equal(shown[1][1], 6, "it starts from its first word");
+  assert.deepEqual(texts().filter(([a]) => a !== long), [["NTS 1", 6], [`Not playing: ${long}`, 6]]);
+  assert.ok(skin.stepAt < Infinity, "the next step is due");
+});
+
+test("a double click on the scroll bar never opens a pick's page", () => {
+  const items = Array.from({ length: 20 }, (_, i) => `Pick ${i}`);
+  const { sent } = load(`<theme><view width="100" height="48">
+       <playlist id="pl" left="0" top="0" width="100" height="48" fontSize="6"/>
+     </view></theme>`, {}, { ...STATE, items, channel: 19, title: items[19], link: "https://soundcloud.com/a" });
+  // The pick is on the bottom row of the last page: one press on it arms the link.
+  const at = (x, detail) => ({ button: 0, clientX: x, clientY: 44, detail });
+  listeners.mousedown(at(40, 1));
+  listeners.mouseup(at(40, 1));
+  // Then a double click on the thumb, level with it.
+  listeners.mousedown(at(92, 1));
+  listeners.mouseup(at(92, 1));
+  listeners.mousedown(at(92, 2));
+  listeners.mouseup(at(92, 2));
+  listeners.dblclick(at(92, 2));
+  assert.deepEqual(sent.filter((m) => m.type === "launchUrl"), []);
+});
+
+test("scrolling stops while other windows cover the player, and starts again after", () => {
+  const { skin, set } = load(`<theme><view width="100" height="48">
+       <playlist id="pl" left="0" top="0" width="100" height="48" fontSize="6"/>
+     </view></theme>`, {}, { ...STATE, items: ["A show with a name far too long for the list"], covered: true });
+  skin.paint();
+  assert.equal(skin.stepAt, Infinity);
+  set({ covered: false });
+  skin.paint();
+  assert.ok(skin.stepAt < Infinity);
+});
+
 
 test("clocks read as WMP's: minutes and seconds, then hours from an hour on", () => {
   assert.deepEqual([0, 5.9, 75, 3599, 3600, 7080, 36_061].map(clock), ["00:00", "00:05", "01:15", "59:59", "1:00:00", "1:58:00", "10:01:01"]);

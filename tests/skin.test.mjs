@@ -6,7 +6,7 @@ import assert from "node:assert/strict";
 import { deflateRawSync } from "node:zlib";
 import { unzip } from "../src/skin/wmz.ts";
 import { constants, decode, parse } from "../src/skin/wms.ts";
-import { keyed, mappedElement, overlay, parseColor, runs } from "../src/skin/pixels.ts";
+import { firstAt, keyed, mappedElement, mix, overlay, parseColor, playingColors, runs, thumb } from "../src/skin/pixels.ts";
 
 /** A zip with one entry per [name, bytes, deflate?], as skin tools write them. */
 function zip(entries) {
@@ -146,6 +146,30 @@ test("keyed clears or keeps colours, and runs traces the opaque rows", () => {
   const kept = { ...img, data: keyed(img, [0xff00ff], true) };
   assert.deepEqual(runs(kept), [[0, 0, 1, 1], [3, 0, 1, 1]]);
   assert.equal(img.data[3], 255, "the source is left alone");
+});
+
+test("playlist: the playing row takes the skin's colours, else WMP's green on #222222", () => {
+  // Headspace names neither, so its row is green as in WMP.
+  assert.deepEqual(playingColors(null, null), [0x00ff00, 0x222222]);
+  // circle names only the text, Plus! Hard Boiled only the background.
+  assert.deepEqual(playingColors(0xffffff, null), [0xffffff, 0x222222]);
+  assert.deepEqual(playingColors(null, 0x666666), [0x00ff00, 0x666666]);
+  // The house skin names both.
+  assert.deepEqual(playingColors(0xf5a540, 0x18252b), [0xf5a540, 0x18252b]);
+  assert.equal(mix(0x285f03, 0xffffff, 0), 0x285f03);
+  assert.equal(mix(0x000000, 0xffffff, 0.5), 0x808080);
+});
+
+test("playlist: the scroll bar's thumb shows how much is in sight, and dragging it scrolls", () => {
+  assert.equal(thumb(5, 5, 0, 140), null, "no bar when every row fits");
+  // 20 rows, 7 in sight, a 140 px track: a 49 px thumb with 91 px to travel.
+  assert.deepEqual(thumb(20, 7, 0, 140), { at: 0, size: 49 });
+  assert.deepEqual(thumb(20, 7, 13, 140), { at: 91, size: 49 });
+  assert.deepEqual(thumb(20, 7, 6, 140), { at: 42, size: 49 });
+  assert.deepEqual(thumb(500, 2, 0, 48), { at: 0, size: 8 }, "never shorter than 8 px");
+  for (const first of [0, 1, 6, 12, 13]) assert.equal(firstAt(thumb(20, 7, first, 140).at, 20, 7, 140, 49), first);
+  assert.equal(firstAt(-30, 20, 7, 140, 49), 0, "dragged above the track");
+  assert.equal(firstAt(500, 20, 7, 140, 49), 13, "dragged below it");
 });
 
 test("effects: bars are log-spaced spectrum peaks, the wave is evenly sampled, and unknown effects fall back", async () => {

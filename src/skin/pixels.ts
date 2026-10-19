@@ -90,3 +90,31 @@ export function overlay(white: Uint8ClampedArray, black: Uint8ClampedArray) {
   }
   return { mask, cover };
 }
+
+/** The playlist's playing row, text and background: the skin's colours, or
+ * WMP's defaults, green on near-black (ATA-191). */
+export function playingColors(color: number | null, background: number | null): [number, number] {
+  return [color ?? 0x00ff00, background ?? 0x222222];
+}
+
+/** `a` moved `t` of the way to `b`, channel by channel. */
+export function mix(a: number, b: number, t: number): number {
+  let out = 0;
+  for (const s of [16, 8, 0]) out |= Math.round(((a >> s) & 255) * (1 - t) + ((b >> s) & 255) * t) << s;
+  return out;
+}
+
+/** A scroll bar's thumb along a `track` px track, for `count` rows with
+ * `shown` in sight from row `first`: its offset and length, or null when
+ * every row fits. Never shorter than `min` px. */
+export function thumb(count: number, shown: number, first: number, track: number, min = 8): { at: number; size: number } | null {
+  if (count <= shown) return null;
+  const size = Math.min(track, Math.max(min, Math.round((track * shown) / count)));
+  return { at: Math.round(((track - size) * first) / (count - shown)), size };
+}
+
+/** The first row in sight with the thumb dragged to `at`: thumb's inverse. */
+export function firstAt(at: number, count: number, shown: number, track: number, size: number): number {
+  const first = track > size ? Math.round((at * (count - shown)) / (track - size)) : 0;
+  return Math.max(0, Math.min(count - shown, first));
+}
