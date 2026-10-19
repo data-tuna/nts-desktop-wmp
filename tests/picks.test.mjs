@@ -1,6 +1,6 @@
 // Run with `npm test`. Node strips the TypeScript types itself (22.18+).
 // Copied from nts-desktop-winamp at bdc0f10 with its fixture; keep the two in step.
-// The `name`, `tags` and alias checks are this copy's own.
+// The alias checks are this copy's own.
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
@@ -14,8 +14,6 @@ test("name, location and tags; the SoundCloud page without its query string", ()
   assert.deepEqual(first, {
     url: "https://soundcloud.com/user-202286394-991268468/buried-light-100-ashtrejinkins",
     title: "Buried Light - 100% AshTreJinkins - Los Angeles (Experimental, Minimal, Beats, Minimal Talkin)",
-    name: "Buried Light - 100% AshTreJinkins",
-    tags: ["Experimental", "Minimal", "Beats", "Minimal Talkin"],
     artwork: "https://media3.ntslive.co.uk/resize/200x200/70a734c2-b5a5-475a-84e9-35451a1726d6_1791244800.png",
     showAlias: "ashtrejinkins",
     episodeAlias: "ashtrejinkins-7th-october-2026",
@@ -34,7 +32,7 @@ test("a pick with no SoundCloud copy, or no name, is skipped; bare picks keep th
       { name: "A &amp; B", audio_sources: sc, genres: "nope" },
     ],
   };
-  assert.deepEqual(parsePicks(body), [{ url: "https://soundcloud.com/a/b", title: "A & B", name: "A & B", tags: [], artwork: undefined, showAlias: undefined, episodeAlias: undefined }]);
+  assert.deepEqual(parsePicks(body), [{ url: "https://soundcloud.com/a/b", title: "A & B", artwork: undefined, showAlias: undefined, episodeAlias: undefined }]);
 });
 
 test("anything not shaped like the API gives no picks", () => {

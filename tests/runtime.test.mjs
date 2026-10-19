@@ -228,19 +228,14 @@ test("wmploc stand-ins: our own strings and glyphs, nothing for the rest", () =>
   assert.equal(resImage("res://wmploc/RT_IMAGE/#9999"), null);
 });
 
-test("effects start on the show card, step through the visualisations, save them through their _onchange, and ask for frames only while one shows", async () => {
+test("effects start on Bars, step through the visualisations, save them through their _onchange, and ask for frames only while shown", async () => {
   store.clear();
   const { js, sent } = load(`<theme><view width="100" height="100">
        <effects id="vis" width="50" height="40"
          currentEffectType="wmpprop:mediacenter.effectType" currentEffectType_onchange="mediacenter.effectType=currentEffectType;"
          currentPreset="wmpprop:mediacenter.effectPreset" currentPreset_onchange="mediacenter.effectPreset=currentPreset;"/>
      </view></theme>`);
-  assert.deepEqual(js("[vis.currentEffectType, vis.currentPreset, vis.currentEffectTitle]"), ["NTS show", 0, "NTS show"]);
-  const effects = () => sent.filter((m) => m.type === "effects").map((m) => m.on);
-  assert.deepEqual(effects(), [false], "the card wants no frames, but the host hears the skin start");
-  js("vis.next()");
-  assert.equal(js("vis.currentEffectTitle"), "Bars");
-  await Promise.resolve();
+  assert.deepEqual(js("[vis.currentEffectType, vis.currentPreset, vis.currentEffectTitle]"), ["Bars and Waves", 0, "Bars"]);
   js("vis.next()");
   assert.deepEqual(js("[vis.currentEffectTitle, mediacenter.effectType, mediacenter.effectPreset]"), ["Scope", "Bars and Waves", 1]);
   js("vis.next()");
@@ -251,19 +246,54 @@ test("effects start on the show card, step through the visualisations, save them
   assert.deepEqual(js("[vis.currentEffectTitle, vis.currentPreset]"), ["Milkdrop", 1], "next() moves to Milkdrop's next preset");
   js("vis.currentPreset = 28");
   js("vis.next()");
-  assert.equal(js("vis.currentEffectTitle"), "NTS show", "round the list");
+  assert.equal(js("vis.currentEffectTitle"), "Bars", "round the list");
   js("vis.previous()");
   js("vis.previous()");
   assert.deepEqual(js("[vis.currentEffectTitle, vis.currentPreset]"), ["Milkdrop", 27]);
   for (let i = 0; i < 28; i++) js("vis.previous()");
   assert.equal(js("vis.currentEffectTitle"), "Ambience");
+  const effects = () => sent.filter((m) => m.type === "effects").map((m) => m.on);
   await Promise.resolve();
-  assert.deepEqual(effects(), [false, true]);
+  assert.deepEqual(effects(), [true]);
   js("vis.visible = false");
   await Promise.resolve();
-  assert.deepEqual(effects(), [false, true, false], "hidden: no more frames");
+  assert.deepEqual(effects(), [true, false], "hidden: no more frames");
   // The next launch, in a skin that binds nothing: the last choice.
   assert.equal(load(`<theme><view width="100" height="100"><effects id="vis2" width="50" height="40"/></view></theme>`).js("vis2.currentEffectTitle"), "Ambience");
+  store.clear();
+});
+
+test("a skin with no visualisation tells the host on its first paint, so frames for the last skin stop", async () => {
+  const { sent } = load(`<theme><view width="100" height="100"/></theme>`);
+  await Promise.resolve();
+  assert.deepEqual(sent.filter((m) => m.type === "effects"), [{ type: "effects", on: false }]);
+});
+
+test("a saved effect the list no longer has, ATA-166's show card, loads as Bars", () => {
+  store.clear();
+  store.set("effectType", "NTS show");
+  store.set("effectPreset", "0");
+  const { js } = load(`<theme><view width="100" height="100">
+       <effects id="vis" width="50" height="40" currentEffectType="wmpprop:mediacenter.effectType" currentPreset="wmpprop:mediacenter.effectPreset"/>
+     </view></theme>`);
+  assert.deepEqual(js("[vis.currentEffectType, vis.currentPreset, vis.currentEffectTitle, mediacenter.effectType]"), ["Bars and Waves", 0, "Bars", "Bars and Waves"]);
+  store.clear();
+});
+
+test("a right click on a visualisation asks the host for the effects menu; the pick is shown and saved", () => {
+  store.clear();
+  const { skin, js, sent } = load(`<theme><view width="100" height="100">
+       <effects id="vis" left="0" top="0" width="50" height="40"/>
+     </view></theme>`);
+  assert.equal(skin.menu({ clientX: 80, clientY: 80 }), false, "elsewhere: the skin picker");
+  assert.equal(skin.menu({ clientX: 10, clientY: 10 }), true);
+  assert.deepEqual(sent.at(-1), { type: "effectsMenu", effect: 0 });
+  skin.pickEffect(3 + 5);
+  assert.deepEqual(js("[vis.currentEffectTitle, vis.currentPreset, mediacenter.effectType, mediacenter.effectPreset]"), ["Milkdrop", 5, "Milkdrop", 5]);
+  for (const bad of [-1, 1.5, 999, "3", null]) skin.pickEffect(bad);
+  assert.equal(js("vis.currentPreset"), 5, "anything but an index is ignored");
+  skin.menu({ clientX: 10, clientY: 10 });
+  assert.deepEqual(sent.at(-1), { type: "effectsMenu", effect: 8 });
   store.clear();
 });
 

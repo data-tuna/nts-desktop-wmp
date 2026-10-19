@@ -81,6 +81,8 @@ const ATTACKS = {
   "__TAURI_INTERNALS__.invoke credit": invoke("credit", {}),
   "__TAURI_INTERNALS__.invoke credit_size": invoke("credit_size", { width: 4096 }),
   "__TAURI_INTERNALS__.invoke open_credit": invoke("open_credit", {}),
+  // The trusted page builds the visualisation menu (ATA-190); the skin may not.
+  "__TAURI_INTERNALS__.invoke plugin:menu|new": invoke("plugin:menu|new", { kind: "Menu", options: {} }),
   "forced postMessage fallback": (m) => `(async () => {
     if (!window.__TAURI_INTERNALS__) return "no __TAURI_INTERNALS__";
     const real = window.fetch;

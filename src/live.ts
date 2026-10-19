@@ -3,8 +3,7 @@
 // Copied from nts-desktop-winamp's src/live.ts at 6379c0e (PR #9, which
 // exports `text`); fix a bug in both copies. Since then this copy also keeps
 // the show and the location apart (`show`, `location`), for WMP's item info,
-// reads the show's genres for the show card (ATA-166), and its alias for the
-// tray's link to its page (ATA-172).
+// and reads the show's alias for the tray's link to its page (ATA-172).
 
 export const LIVE_API = "https://www.nts.live/api/v2/live";
 
@@ -18,7 +17,6 @@ export type OnAir = {
   show: string;
   location?: string;
   artwork?: string;
-  genres: string[];
   /** `details.show_alias`: the show's page is `/shows/<alias>` on nts.live. */
   showAlias?: string;
   /** Epoch ms; undefined when the API's timestamp does not parse. */
@@ -87,7 +85,6 @@ export function parseLive(body: unknown): (OnAir | undefined)[] {
       show: show.title,
       location,
       artwork: url(details?.media?.picture_small),
-      genres: Array.isArray(details?.genres) ? details.genres.flatMap((g: { value?: unknown } | null) => text(g?.value) ?? []) : [],
       showAlias: text(details?.show_alias),
       endsAt: time(show.end_timestamp),
       next: next && { title: next.title, startsAt: time(next.start_timestamp) },
@@ -99,7 +96,7 @@ type Broadcast = {
   title: string;
   start_timestamp?: unknown;
   end_timestamp?: unknown;
-  embeds?: { details?: { location_long?: unknown; media?: { picture_small?: unknown }; genres?: unknown; show_alias?: unknown } | null };
+  embeds?: { details?: { location_long?: unknown; media?: { picture_small?: unknown }; show_alias?: unknown } | null };
 };
 
 function asBroadcast(value: unknown): Broadcast | undefined {

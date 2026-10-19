@@ -172,15 +172,15 @@ test("effects: bars are log-spaced spectrum peaks, the wave is evenly sampled, a
   assert.equal(effectIndex("{some-clsid}", 3), 0);
 });
 
-test("effects: Milkdrop has one entry per preset in the pack the protocol serves, before the show card", async () => {
-  const { EFFECTS, SHOW, effectIndex } = await import("../src/skin/effects.ts");
+test("effects: Milkdrop has one entry per preset in the pack the protocol serves, by its name", async () => {
+  const { EFFECTS, effectIndex } = await import("../src/skin/effects.ts");
   const { PRESETS } = await import("../src/skin/milkdrop.ts");
   const { createRequire } = await import("node:module");
   const pack = createRequire(import.meta.url)("butterchurn-presets/lib/butterchurnPresetsMinimal.min.js");
-  assert.equal(Object.keys(pack.getPresets()).length, PRESETS);
+  assert.deepEqual(Object.keys(pack.getPresets()), PRESETS);
   const milk = EFFECTS.flatMap((e, i) => (e.type === "Milkdrop" ? [i] : []));
-  assert.deepEqual(milk.map((i) => EFFECTS[i].preset), [...Array(PRESETS).keys()]);
-  assert.equal(milk.at(-1) + 1, SHOW, "next() from the last preset goes to the card");
+  assert.deepEqual(milk.map((i) => EFFECTS[i].preset), [...PRESETS.keys()]);
+  assert.equal(milk.at(-1), EFFECTS.length - 1, "next() from the last preset goes round to Bars");
   assert.equal(effectIndex("milkdrop", 5), milk[5]);
 });
 
@@ -205,56 +205,19 @@ test("overlay: a visualisation redrawn under its mask and cover matches the skin
   }
 });
 
-test("show card: the title wraps and ends in an ellipsis, genres that do not fit are left out", async () => {
-  const { wrap, flow } = await import("../src/skin/effects.ts");
-  const t = { measureText: (s) => ({ width: s.length * 6 }) };
-  assert.deepEqual(wrap(t, "NTS 1", 60, 2), ["NTS 1"]);
-  assert.deepEqual(wrap(t, "MOXIE W/ THEO KOTTIS", 66, 2), ["MOXIE W/", "THEO KOTTIS"]);
-  assert.deepEqual(wrap(t, "NO WEAPON IS ABSOLUTE", 60, 1), ["NO WEAPON…"]);
-  assert.deepEqual(wrap(t, "", 60, 2), []);
-  // Pills are 6 px a character plus 6, with 4 px between.
-  assert.deepEqual(flow(t, ["Soul", "Detroit Techno", "House"], 100, 1), [
-    { text: "Soul", x: 0, w: 30, row: 0 },
-    { text: "House", x: 34, w: 36, row: 0 },
+test("effects menu: Bars, Scope and Ambience, then every Milkdrop preset by name, the current one checked", async () => {
+  const { EFFECTS, effectsMenu } = await import("../src/skin/effects.ts");
+  const { PRESETS } = await import("../src/skin/milkdrop.ts");
+  const { effects, milkdrop } = effectsMenu(5);
+  assert.deepEqual(effects, [
+    { index: 0, text: "Bars", checked: false },
+    { index: 1, text: "Scope", checked: false },
+    { index: 2, text: "Ambience", checked: false },
   ]);
-  assert.deepEqual(flow(t, ["Soul", "Detroit Techno", "House"], 100, 2).map((p) => [p.text, p.row]), [["Soul", 0], ["Detroit Techno", 1]]);
-});
-
-test("show card: the text goes where the skin leaves the area widest clear", async () => {
-  const { place } = await import("../src/skin/effects.ts");
-  const { clearRows } = await import("../src/skin/pixels.ts");
-  // 10 × 6: a pod over the left of rows 0-2, nothing shown in row 5.
-  const mask = new Uint8ClampedArray(10 * 6 * 4);
-  for (let y = 0; y < 6; y++) for (let x = 0; x < 10; x++) mask[(y * 10 + x) * 4 + 3] = y === 5 || (y < 3 && x < 6) ? 0 : 255;
-  const clear = clearRows(mask, 10, 6);
-  assert.deepEqual(clear, [[6, 10], [6, 10], [6, 10], [0, 10], [0, 10], [0, 0]]);
-  assert.deepEqual(place(clear, 2), { top: 3, x0: 0, x1: 10 });
-  assert.deepEqual(place(clear, 3), { top: 1, x0: 6, x1: 10 }, "of equal spans, the one nearest the middle");
-  // A circle: the widest chord is the middle.
-  const circle = Array.from({ length: 21 }, (_, y) => {
-    const half = Math.floor(Math.sqrt(100 - (y - 10) ** 2));
-    return [10 - half, 10 + half];
-  });
-  assert.equal(place(circle, 5).top, 8);
-  // No band fits: a 0-wide span.
-  assert.deepEqual(place(Array(20).fill([0, 100]), 21), { top: 0, x0: 0, x1: 0 }, "too short");
-  assert.deepEqual(place(Array(60).fill([0, 0]), 20), { top: 20, x0: 0, x1: 0 }, "all covered");
-});
-
-test("show card: genres give way when the block with them would not fit; with nothing fitting, the title goes in the middle", async () => {
-  const { layCard } = await import("../src/skin/effects.ts");
-  const t = { font: "", measureText: (s) => ({ width: s.length * 6 }) };
-  const card = { title: "MOXIE W/ THEO KOTTIS", genres: ["Soul", "Detroit Techno", "House", "Deep House"], image: null };
-  // modernblue's 41 px oval: two tag rows would make the block 49 px.
-  const oval = layCard(t, card, 100, 41, Array(41).fill([0, 100]));
-  assert.deepEqual(oval.layout.tags, []);
-  assert.ok(oval.spot.top >= 0 && oval.spot.top + oval.layout.block + 2 * oval.pad <= 41, JSON.stringify(oval.spot));
-  assert.ok(oval.spot.x1 > oval.spot.x0);
-  // Taller and clear: the genres stay.
-  assert.ok(layCard(t, card, 140, 120, null).layout.tags.length > 0);
-  // Too short for even the title, or all covered: the middle, the whole width.
-  for (const clear of [Array(20).fill([0, 104]), Array(60).fill([0, 0])]) {
-    const { spot, layout } = layCard(t, card, 104, clear.length, clear);
-    assert.deepEqual([spot.x0, spot.x1, layout.tags], [0, 104, []]);
-  }
+  assert.equal(milkdrop.length, PRESETS.length);
+  assert.deepEqual(milkdrop.map((e) => e.index), [...PRESETS.keys()].map((i) => i + 3));
+  assert.deepEqual(milkdrop.filter((e) => e.checked).map((e) => e.index), [5]);
+  assert.equal(milkdrop[0].text, "$$$ Royal - Mashup (197)");
+  assert.equal(milkdrop[25].text, "Unchained && Rovastar - Wormhole Pillars (Hall of Shadows mix)", "a lone & would be a mnemonic");
+  assert.equal(effects.length + milkdrop.length, EFFECTS.length);
 });

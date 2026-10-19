@@ -8,7 +8,7 @@
 import { CHANNELS } from "../player.ts";
 import { constants, type Node } from "./wms.ts";
 import { css, keyed, mappedElement, overlay, parseColor, rgbAt, runs, type Pixels } from "./pixels.ts";
-import { drawEffect, EFFECTS, effectIndex, SHOW, type Card, type Frame, type Memory } from "./effects.ts";
+import { drawEffect, EFFECTS, effectIndex, type Frame, type Memory } from "./effects.ts";
 import { clock, CONSTANTS, OS_MEDIA_CHANGING, OS_MEDIA_OPEN, objects, playState, resImage, resScript, resString, wmpObject, type Host } from "./runtime.ts";
 
 /** A text showing the current item's name, title or author. */
@@ -86,7 +86,7 @@ class El {
   private canvases = new Map<string, HTMLCanvasElement>();
   api: object | null = null;
   /** An effects element's peaks and trails. */
-  readonly memory: Memory = { peaks: [], trail: null, cover: null, card: null, milk: null };
+  readonly memory: Memory = { peaks: [], trail: null, milk: null };
   move: ReturnType<typeof setTimeout> | null = null;
 
   readonly node: Node;
@@ -534,8 +534,7 @@ class El {
   private paintEffects(g: CanvasRenderingContext2D) {
     const skin = this.skin;
     if (skin.finding) skin.fxFound.push(this);
-    // The show card is static: it wants no analyser frames.
-    if (skin.effect(this) !== SHOW) skin.effectsShown = true;
+    skin.effectsShown = true;
     g.fillStyle = skin.fxSolid;
     g.fillRect(this.x, this.y, this.w, this.h);
   }
@@ -546,7 +545,7 @@ class El {
     const skin = this.skin;
     const fg = this.color("foregroundcolor");
     const frame = skin.state.playState === "playing" ? skin.frame : null;
-    drawEffect(g, skin.effect(this), frame, skin.card, [x, y, this.w, this.h], css(this.color("backgroundcolor") ?? 0), fg === null ? null : css(fg), this.memory);
+    drawEffect(g, skin.effect(this), frame, [x, y, this.w, this.h], css(this.color("backgroundcolor") ?? 0), fg === null ? null : css(fg), this.memory);
   }
 
   /** The playlist's row height, in px. */
@@ -727,12 +726,11 @@ export class Skin {
    * was on screen at the last paint (the host sends frames only then). */
   frame: Frame | null = null;
   effectsShown = false;
-  // Null until the first paint after start, which always tells the host:
-  // that is how the trusted page knows to send the show card again.
+  // Null until the first paint, so each skin tells the host whether it
+  // wants frames: a skin chosen in the picker replaces one that did.
   private effectsOn: boolean | null = null;
-  /** The show card the trusted page last sent (ATA-166), and which `show` message that was. */
-  card: Card | null = null;
-  private cardGen = 0;
+  /** The effects element the visualisation menu was opened on (ATA-190). */
+  private menuFor: El | null = null;
   /** How the visualisations were found at the last full paint: each one's
    * place on the canvas, the part of the canvas it touches, how much of it
    * shows there and what lies over it (pixels.ts `overlay`). A frame redraws
@@ -1001,7 +999,11 @@ export class Skin {
   /** effects.next() and previous(): the next effect, round the list. Each
    * property's _onchange runs, so the skin can save it to `mediacenter`. */
   private stepEffect(e: El, by: number) {
-    const { type, preset } = EFFECTS[(this.effect(e) + by + EFFECTS.length) % EFFECTS.length];
+    this.setEffect(e, (this.effect(e) + by + EFFECTS.length) % EFFECTS.length);
+  }
+
+  private setEffect(e: El, index: number) {
+    const { type, preset } = EFFECTS[index];
     // Saved for the next launch, whether or not the skin binds it.
     Object.assign(this.extras.mediacenter, { effecttype: type, effectpreset: preset });
     this.setProp(e, "currenteffecttype", type);
@@ -1269,8 +1271,6 @@ export class Skin {
           return c.canvas;
         };
         this.fx.push({ el, x, y, part, mask: image("mask", mask), cover: image("cover", cover) });
-        // What lies over it, for the show card's layout.
-        el.memory.cover = { mask, w: part[2], h: part[3], dx: part[0] - x, dy: part[1] - y };
       }
     }
     if (this.canvas.width !== w || this.canvas.height !== h) [this.canvas.width, this.canvas.height] = [w, h];
@@ -1296,20 +1296,19 @@ export class Skin {
     if (this.effectsOn) this.animate("fx");
   }
 
-  /** The show card from the host: its picture decoded, then drawn. A
-   * picture that does not decode leaves the card without one. */
-  setShow(m: { title?: unknown; genres?: unknown; image?: unknown }) {
-    const gen = ++this.cardGen;
-    const card: Card = { title: String(m.title ?? ""), genres: Array.isArray(m.genres) ? m.genres.map(String) : [], image: null };
-    const img = new Image();
-    if (typeof m.image === "string") img.src = m.image;
-    const show = () => {
-      if (gen !== this.cardGen) return;
-      this.card = card;
-      this.animate("fx");
-    };
-    if (!img.src) return show();
-    img.decode().then(() => (card.image = img), () => console.warn("skin: the show picture does not decode")).finally(show);
+  /** A right click: on a visualisation, the host's menu of effects for it
+   * (ATA-190), and true; elsewhere false. */
+  menu(ev: MouseEvent): boolean {
+    const found = this.at(ev);
+    if (found?.kind !== "effects") return false;
+    this.menuFor = found;
+    this.send({ type: "effectsMenu", effect: this.effect(found) });
+    return true;
+  }
+
+  /** The effect picked in that menu, saved as next() saves it. */
+  pickEffect(index: unknown) {
+    if (this.menuFor && Number.isInteger(index) && EFFECTS[index as number]) this.setEffect(this.menuFor, index as number);
   }
 
   /** Redraws each visualisation in its part of the canvas, under what covers it. */

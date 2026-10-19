@@ -95,6 +95,11 @@ enum FromSkin {
     Effects {
         on: bool,
     },
+    /// A right click on a visualisation: the trusted page shows the menu of
+    /// effects, `effect` checked (ATA-190).
+    EffectsMenu {
+        effect: u32,
+    },
 }
 
 /// Trusted page to skin: play state, time, title, levels, and analyser
@@ -1316,6 +1321,11 @@ mod tests {
             Some(FromSkin::Effects { on: true })
         );
         assert_eq!(parse(r#"{"type":"effects","on":"yes"}"#), None);
+        assert_eq!(
+            parse(r#"{"type":"effectsMenu","effect":4}"#),
+            Some(FromSkin::EffectsMenu { effect: 4 })
+        );
+        assert_eq!(parse(r#"{"type":"effectsMenu","effect":-1}"#), None);
         assert_eq!(
             parse(r#"{"type":"seek","seconds":600.5}"#),
             Some(FromSkin::Seek { seconds: 600.5 })
