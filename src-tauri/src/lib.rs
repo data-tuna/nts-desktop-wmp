@@ -520,9 +520,9 @@ fn show_page(page: &Page) -> Option<Url> {
 }
 
 /// The tray menu, its Mute, checked while muted, its two channels, checked
-/// while current, its "Show on
-/// nts.live" entry, in the menu only while the current show has a page, and
-/// its credit entry, in the menu only while a pick plays.
+/// while current, its "Show on nts.live" entry, in the menu only while the
+/// current show has a page, and its credit entry, in the menu only while a
+/// pick plays.
 struct Tray {
     menu: Menu<Wry>,
     mute: CheckMenuItem<Wry>,
@@ -587,8 +587,8 @@ fn tooltip(title: &str, mute: bool) -> String {
 }
 
 /// The trusted page, whenever what plays or the mute changes: its title for
-/// the tray's tooltip, the mute to check in the tray, the channel to check in the tray, the show's or pick's aliases on
-/// nts.live, and a pick's credit, or none.
+/// the tray's tooltip, the mute and the channel to check in the tray, the
+/// show's or pick's aliases on nts.live, and a pick's credit, or none.
 /// While a pick plays the app draws the credit itself, above the skin, in a
 /// webview of its own: a skin's code cannot hide it, and a skin with no title
 /// text still shows it.
@@ -707,9 +707,9 @@ fn open_credit() {
     }
 }
 
-/// The tray icon: play, stop, mute, the two channels, the show's page while it has
-/// one, the pick's credit while one plays, and quit. A left click brings the
-/// player forward.
+/// The tray icon: play, stop, mute, the two channels, the show's page while
+/// it has one, the pick's credit while one plays, and quit. A left click
+/// brings the player forward.
 fn build_tray(app: &AppHandle) -> tauri::Result<()> {
     let item = |id: &str, text: &str| MenuItem::with_id(app, id, text, true, None::<&str>);
     let channel = |id: &str, text: &str| {
