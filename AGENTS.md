@@ -39,9 +39,9 @@ Written in English.
                           a pick through SoundCloud's hidden widget.
                           picker.ts is the skin picker (picker.html), a
                           trusted page of its own; the selected skin's
-                          preview is a skin-engine webview over its pane. credit.ts (credit.html)
-                          is the SoundCloud credit drawn over the skin
-                          while a pick plays.
+                          preview is a skin-engine webview over its pane.
+                          credit.ts (credit.html) is the SoundCloud credit
+                          drawn over the skin while a pick plays.
     src/skin/             The skin engine, which runs in the skin webview:
                           wmz.ts unzips, wms.ts decodes and parses the .wms,
                           engine.ts lays out and paints the view, runs the
@@ -141,17 +141,19 @@ skin names and checksums, never the skins. The only skin that ships is our
 own house skin, `skins/house/`, the one `.wmz` the repository holds. Be
 polite to archive.org: one skin per launch, no bulk downloads. The app
 downloads at most one skin per launch, plus one for each skin the listener
-selects in the picker, to preview or wear it. `tools/compat.mjs` is the one bulk download, run by hand when the
-engine changes: it fetches each file once, a few seconds apart, into a cache
-outside the repository, and fetches only what is missing on a rerun.
+selects in the picker, to preview or wear it, and never two at once for
+the same skin. `tools/compat.mjs` is the one bulk download, run by hand
+when the engine changes: it fetches each file once, a few seconds apart,
+into a cache outside the repository, and fetches only what is missing on a
+rerun.
 
 **Skin scripts never run where they can reach Tauri.** A skin's JScript is
 untrusted code. It runs only in the `skin` webview, which no capability
 names, and talks to the trusted page only through the `skin` protocol's
 fixed message list. The picker's `preview` webview is the same, and Rust
-drops every message from it but its shape (ATA-193). Capabilities match by `webviews`, never `windows` (the
-skin webview is a child of the main window), and every app command goes in
-the app manifest in `build.rs`. Everything the skin protocol serves carries
+drops every message from it but its shape (ATA-193). Capabilities match
+by `webviews`, never `windows` (the skin webview is a child of the main
+window), and every app command goes in the app manifest in `build.rs`. Everything the skin protocol serves carries
 a CSP with no network and no frames. Run `node tools/escape.mjs` after
 touching any of it, and after every Tauri upgrade. `docs/decisions.md` (ATA-107) has the protocol and the evidence.
 

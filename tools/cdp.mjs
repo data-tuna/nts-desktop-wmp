@@ -7,7 +7,7 @@
 export async function connect(port, which) {
   const targets = await (await fetch(`http://127.0.0.1:${port}/json`)).json();
   const isSkin = (t) => t.url.startsWith("http://skin.localhost");
-  const isPreview = (t) => isSkin(t) && new URL(t.url).search === "?preview";
+  const isPreview = (t) => isSkin(t) && new URL(t.url).searchParams.has("preview");
   // "frame": the newest sub-frame with a target of its own (sandboxed frames run out of process).
   // "main" is the trusted page at "/", not the skin picker (picker.html).
   const isMain = (t) => !isSkin(t) && new URL(t.url).pathname === "/";

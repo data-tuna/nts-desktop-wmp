@@ -88,9 +88,38 @@ fn md5_hex(bytes: &[u8]) -> String {
         .collect()
 }
 
+/// The md5s of the skins being fetched now.
+static FETCHING: Mutex<Vec<String>> = Mutex::new(Vec::new());
+static FETCHED: Condvar = Condvar::new();
+
+/// One fetch per skin at a time: a preview and a pick of the same skin, or a
+/// double click, download it once, and never write the same `.part` file.
+/// Held for the fetch; a second caller waits, then finds the skin cached.
+struct Claim(String);
+
+impl Claim {
+    fn new(md5: &str) -> Self {
+        let mut busy = FETCHED
+            .wait_while(FETCHING.lock().unwrap(), |busy| {
+                busy.iter().any(|m| m == md5)
+            })
+            .unwrap();
+        busy.push(md5.to_owned());
+        Claim(md5.to_owned())
+    }
+}
+
+impl Drop for Claim {
+    fn drop(&mut self) {
+        FETCHING.lock().unwrap().retain(|m| *m != self.0);
+        FETCHED.notify_all();
+    }
+}
+
 /// The skin's bytes from the cache, or downloaded into it. Either way they
 /// must match the md5 the compatibility list was built from.
 pub fn fetch(app: &AppHandle, skin: &Skin) -> Result<Vec<u8>, String> {
+    let _claim = Claim::new(&skin.md5);
     let dir = cache_dir(app)?;
     let path = dir.join(format!("{}.wmz", skin.md5));
     if let Ok(bytes) = fs::read(&path) {
@@ -348,6 +377,21 @@ mod tests {
         assert!(worn(Duration::from_millis(10)).is_none());
         finish(slow, Worn::Skin(skin, bytes));
         assert!(worn(Duration::ZERO).is_none());
+    }
+
+    #[test]
+    fn a_second_fetch_of_a_skin_waits_for_the_first() {
+        let first = Claim::new("a");
+        let other = Claim::new("b");
+        let waiter = std::thread::spawn(|| {
+            let _second = Claim::new("a");
+            SystemTime::now()
+        });
+        std::thread::sleep(Duration::from_millis(100));
+        let released = SystemTime::now();
+        drop(first);
+        assert!(waiter.join().unwrap() >= released);
+        drop(other);
     }
 
     #[test]

@@ -287,8 +287,9 @@ struct Preview {
     bytes: Option<Arc<Vec<u8>>>,
     /// The pane to fit it in, `[x, y, width, height]` in CSS pixels.
     area: [f64; 4],
-    /// The skin's size once drawn.
-    size: Option<(u32, u32)>,
+    /// The box around the skin's opaque runs, `[x, y, width, height]`, once
+    /// drawn.
+    size: Option<[u32; 4]>,
     /// Drawn, or given up on: what `preview_skin` waits for.
     done: Option<bool>,
 }
@@ -331,13 +332,17 @@ async fn preview_skin(app: AppHandle, path: String) -> Result<(), String> {
         }
         p.bytes = Some(Arc::new(bytes));
     }
+    // The id in the page's URL comes back as each request's Referer, so a
+    // request from the page of an earlier selection is told apart.
     match app.get_webview("preview") {
-        Some(webview) => webview.eval("location.reload()"),
+        Some(webview) => webview.eval(format!("location.replace('/?preview={id}')")),
         None => {
             let picker = app.get_window("picker").ok_or("no picker")?;
             let builder = WebviewBuilder::new(
                 "preview",
-                WebviewUrl::CustomProtocol("skin://localhost/?preview".parse().unwrap()),
+                WebviewUrl::CustomProtocol(
+                    format!("skin://localhost/?preview={id}").parse().unwrap(),
+                ),
             )
             .additional_browser_args(BROWSER_ARGS)
             .background_color(PREVIEW_BACKGROUND)
@@ -380,17 +385,17 @@ fn preview_area(app: AppHandle, x: f64, y: f64, width: f64, height: f64) {
         p.area = [x, y, width, height];
         p.size
     };
-    if let Some((w, h)) = size {
-        place_preview(&app, w, h);
+    if let Some(size) = size {
+        place_preview(&app, size);
     }
 }
 
 /// The picker pane's colour, behind a skin's transparent parts.
 const PREVIEW_BACKGROUND: tauri::webview::Color = tauri::webview::Color(58, 58, 58, 255);
 
-/// Zooms the preview webview so a `width` by `height` skin fits the pane,
-/// never past its own size, centres it there, and shows it.
-fn place_preview(app: &AppHandle, width: u32, height: u32) {
+/// Zooms the preview webview so the skin's opaque box fits the pane, never
+/// past its own size, crops the view to that box, centres it, and shows it.
+fn place_preview(app: &AppHandle, [left, top, width, height]: [u32; 4]) {
     let Some(webview) = app.get_webview("preview") else {
         return;
     };
@@ -398,19 +403,42 @@ fn place_preview(app: &AppHandle, width: u32, height: u32) {
     let zoom = (w / width as f64).min(h / height as f64).min(1.0);
     let (sw, sh) = (width as f64 * zoom, height as f64 * zoom);
     let _ = webview.set_zoom(zoom);
+    let _ = webview.eval(format!(
+        "document.body.style.margin = '-{top}px 0 0 -{left}px'"
+    ));
     let _ = webview.set_size(LogicalSize::new(sw, sh));
     let _ = webview.set_position(LogicalPosition::new(x + (w - sw) / 2.0, y + (h - sh) / 2.0));
     let _ = webview.show();
 }
 
+/// The box around a shape's runs, `[x, y, width, height]`; none for no runs.
+fn bounds(rects: &[[u32; 4]]) -> Option<[u32; 4]> {
+    let left = rects.iter().map(|r| r[0]).min()?;
+    let top = rects.iter().map(|r| r[1]).min()?;
+    let right = rects.iter().map(|r| r[0] + r[2]).max()?;
+    let bottom = rects.iter().map(|r| r[1] + r[3]).max()?;
+    Some([left, top, right - left, bottom - top])
+}
+
+/// The selection a preview request comes from: the id in its page's URL.
+fn preview_id(req: &Request<Vec<u8>>) -> Option<u64> {
+    let page = Url::parse(req.headers().get("Referer")?.to_str().ok()?).ok()?;
+    let id = page.query_pairs().find(|(k, _)| k == "preview")?.1;
+    id.parse().ok()
+}
+
 /// The skin protocol for the preview webview: the engine, the selected
 /// skin, and of its messages only the shape, which sizes the preview.
 fn respond_preview(app: &AppHandle, req: Request<Vec<u8>>) -> Response<Vec<u8>> {
-    let finish = |done: Option<bool>, size: Option<(u32, u32)>| {
+    // Only requests from the page of the current selection count.
+    let current = |p: &Preview| preview_id(&req) == Some(p.id);
+    let finish = |done: bool, size: Option<[u32; 4]>| {
         let mut p = PREVIEW.lock().unwrap();
-        p.size = size;
-        p.done = done;
-        PREVIEWED.notify_all();
+        if current(&p) {
+            p.size = size;
+            p.done = Some(done);
+            PREVIEWED.notify_all();
+        }
     };
     match (req.method(), req.uri().path()) {
         (&Method::GET, "/") => Response::builder()
@@ -421,13 +449,16 @@ fn respond_preview(app: &AppHandle, req: Request<Vec<u8>>) -> Response<Vec<u8>> 
             .header("Content-Type", "text/javascript; charset=utf-8")
             .body(engine_js())
             .unwrap(),
-        (&Method::GET, "/skin.wmz") => match PREVIEW.lock().unwrap().bytes.clone() {
-            Some(bytes) => Response::builder().body(bytes.to_vec()).unwrap(),
-            None => status(StatusCode::NOT_FOUND),
-        },
+        (&Method::GET, "/skin.wmz") => {
+            let p = PREVIEW.lock().unwrap();
+            match p.bytes.clone().filter(|_| current(&p)) {
+                Some(bytes) => Response::builder().body(bytes.to_vec()).unwrap(),
+                None => status(StatusCode::NOT_FOUND),
+            }
+        }
         // The engine could not load the skin: no house skin here, no preview.
         (&Method::GET, "/house.wmz") => {
-            finish(Some(false), None);
+            finish(false, None);
             status(StatusCode::NOT_FOUND)
         }
         (&Method::POST, "/msg") => {
@@ -437,9 +468,10 @@ fn respond_preview(app: &AppHandle, req: Request<Vec<u8>>) -> Response<Vec<u8>> 
                 rects,
             }) = serde_json::from_slice(req.body())
             {
-                if valid_shape(width, height, &rects) && PREVIEW.lock().unwrap().bytes.is_some() {
-                    finish(Some(true), Some((width, height)));
-                    place_preview(app, width, height);
+                let size = bounds(&rects).unwrap_or([0, 0, width, height]);
+                if valid_shape(width, height, &rects) && current(&PREVIEW.lock().unwrap()) {
+                    finish(true, Some(size));
+                    place_preview(app, size);
                 }
             }
             status(StatusCode::NO_CONTENT)
@@ -1286,8 +1318,14 @@ pub fn run() {
             // they stop until it is restored; the audio plays on.
             if let tauri::WindowEvent::Resized(_) = event {
                 let hide = window.is_minimized().unwrap_or(false);
+                // The preview shows only once the selected skin has drawn.
+                let drawn = PREVIEW.lock().unwrap().done == Some(true);
                 for webview in window.webviews() {
-                    let _ = if hide { webview.hide() } else { webview.show() };
+                    let _ = if hide || (webview.label() == "preview" && !drawn) {
+                        webview.hide()
+                    } else {
+                        webview.show()
+                    };
                 }
             }
         })
@@ -1362,6 +1400,25 @@ mod tests {
         // One 3 px row, opaque-clear-opaque: two runs.
         assert!(valid_shape(3, 1, &[[0, 0, 1, 1], [2, 0, 1, 1]]));
         assert!(!valid_shape(3, 1, &[[0, 0, 1, 1]; 3]));
+    }
+
+    #[test]
+    fn preview_box_and_selection() {
+        assert_eq!(bounds(&[]), None);
+        assert_eq!(bounds(&[[10, 5, 20, 1], [4, 6, 2, 3]]), Some([4, 5, 26, 4]));
+        let req = |referer: &str| {
+            Request::builder()
+                .header("Referer", referer)
+                .body(Vec::new())
+                .unwrap()
+        };
+        assert_eq!(
+            preview_id(&req("http://skin.localhost/?preview=7")),
+            Some(7)
+        );
+        assert_eq!(preview_id(&req("http://skin.localhost/?preview")), None);
+        assert_eq!(preview_id(&req("http://skin.localhost/")), None);
+        assert_eq!(preview_id(&Request::new(Vec::new())), None);
     }
 
     #[test]

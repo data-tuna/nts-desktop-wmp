@@ -82,7 +82,8 @@ async function choose(path: string | null, label: string) {
 
 /** Shows a skin in the preview pane, downloading it if it is not cached. */
 async function select(path: string) {
-  if (path === selected) return;
+  // A click on the selected skin tries again only after "No preview".
+  if (path === selected && preview.textContent !== "No preview") return;
   selected = path;
   use.disabled = busy;
   for (const [p, row] of rows) row.li.classList.toggle("selected", p === path);
@@ -92,13 +93,16 @@ async function select(path: string) {
     () => false,
   );
   if (selected === path) preview.textContent = shown ? "" : "No preview";
+  // The row of a skin the preview downloaded now says so.
+  if (!busy) void refresh();
 }
 
 // Rust keeps the preview webview over the pane, wherever the layout puts it.
+// The pane keeps its width when the window widens, but <main> does not.
 new ResizeObserver(() => {
   const { x, y, width, height } = preview.getBoundingClientRect();
   void invoke("preview_area", { x, y, width, height });
-}).observe(preview);
+}).observe(document.querySelector("main")!);
 use.addEventListener("click", () => selected && void choose(selected, name(selected)));
 random.addEventListener("change", () => void choose(null, "a random skin"));
 document.addEventListener("click", (e) => {

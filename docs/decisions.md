@@ -16,8 +16,11 @@ the skin selected in the picker.
   from the cache straight away, or downloaded once into the cache, so
   wearing it afterwards downloads nothing. That is one download per
   selection of a skin not cached, never ahead of time and never in bulk.
-  A failed download, or a skin the engine cannot load, says "No preview";
-  the list stays usable.
+  `skins::fetch` lets one caller at a time fetch a given skin; a second
+  (a double click, or "Use this skin" while the preview downloads) waits
+  and then reads the cache. A failed download, or a skin the engine cannot
+  load, says "No preview"; another click on it tries again, and the list
+  stays usable.
 - **The preview is the engine itself, scripts and all,** in a `preview`
   webview: a child of the picker window, on the `skin` protocol, which no
   capability names, as the `skin` webview. Running the scripts draws skins
@@ -25,10 +28,16 @@ the skin selected in the picker.
   not. Rust serves it the engine and the selected skin and drops every
   message it sends except `shape`, which sizes the preview: no play, no
   window moves, no links. It has no house-skin fallback; asking for one
-  means "No preview". Rust zooms the webview (WebView2's zoom factor) so
-  the skin fits the pane, never above 100 %, and centres it. The picker
-  page tells Rust where the pane is (`preview_area`); it still runs no skin
-  code and gains only that and `preview_skin`.
+  means "No preview". Each selection loads the page as
+  `/?preview=<id>`, and Rust ignores requests whose `Referer` names an
+  earlier selection, so a late page cannot answer for the current one.
+  Rust zooms the webview (WebView2's zoom factor) so the box around the
+  skin's opaque runs fits the pane, never above 100 %, crops the view to
+  that box, and centres it. It shows the webview only once the selected
+  skin has drawn, a resize or restore of the picker included. The picker
+  page tells Rust where the pane is (`preview_area`, whenever `<main>`
+  changes size); it still runs no skin code and gains only that and
+  `preview_skin`.
 - **No thumbnails.** A cached skin draws in about 0.3 s, so nothing is
   saved but the `.wmz` the cache already keeps.
 
@@ -49,8 +58,13 @@ for Rust's downloads (`HTTPS_PROXY`), with clicks sent through DevTools:
   skin, the CSP blocked the remote fetch and both frames, navigation stayed
   on `skin.localhost`. `minimize`, `drag` and `picker` posted from the
   preview changed nothing.
-- Not tried: a real mouse, and resizing the picker by hand (the pane
-  follows through a `ResizeObserver`).
+- **After review** (same setup; the window resized with `SetWindowPos`): the
+  pane followed the picker from 1016 to 816 to 1216 px wide. "No preview"
+  stayed after a resize, with the webview hidden. A double click on
+  uncached Goo downloaded it once and wore it. 80 pairs of clicks on two
+  cached skins, 4 to 60 ms apart, each ended on the second skin drawn and
+  no "No preview". 9SeriesDefault fills the pane, cropped to its player.
+- Not tried: a real mouse, and resizing the picker by hand.
 
 ### Tiled sliders keep their end caps (ATA-192, 2026-10-19)
 
