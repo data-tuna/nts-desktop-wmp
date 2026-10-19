@@ -527,15 +527,17 @@ class El {
 
   /** Draws `text` (`width` px) scrolling right to left through a box `w` px
    * wide at x, by scrollingAmount px every scrollingDelay ms, with a gap, and
-   * asks for the next step. Returns where the text starts. */
-  private marquee(g: CanvasRenderingContext2D, text: string, x: number, y: number, w: number, width: number): number {
+   * asks for the next step. Starts at `since` on the paint clock. Returns
+   * where the text starts. */
+  private marquee(g: CanvasRenderingContext2D, text: string, x: number, y: number, w: number, width: number, since = 0): number {
     const step = this.skin.num(this, "scrollingamount") ?? 1;
     const delay = Math.max(16, this.skin.num(this, "scrollingdelay") ?? 100);
     const loop = width + w / 2;
-    const left = x - ((Math.floor(this.skin.clock / delay) * step) % loop);
+    const t = this.skin.clock - since;
+    const left = x - ((Math.floor(t / delay) * step) % loop);
     g.fillText(text, left + loop, y);
     g.fillText(text, left, y);
-    this.skin.later(delay - (this.skin.clock % delay), this.skin.overFx(this));
+    this.skin.later(delay - (t % delay), this.skin.overFx(this));
     return left;
   }
 
@@ -566,6 +568,10 @@ class El {
   /** The playlist's first row in sight, and the item it last scrolled to. */
   private scroll = 0;
   private scrolledTo = -1;
+  /** The playing row and name its scrolling started for, and when: a new
+   * one starts from its first word (ATA-191). */
+  private rolling = "";
+  private rollingSince = 0;
 
   /** How many whole rows the playlist shows. */
   private rows(): number {
@@ -627,6 +633,10 @@ class El {
     const rows = this.rows();
     const fg = this.color("foregroundcolor") ?? 0xffffff;
     const [playingFg, playingBg] = playingColors(this.color("itemplayingcolor"), this.color("itemplayingbackgroundcolor"));
+    if (`${channel}\n${items[channel]}` !== this.rolling) {
+      this.rolling = `${channel}\n${items[channel]}`;
+      this.rollingSince = this.skin.clock;
+    }
     if (channel !== this.scrolledTo) {
       this.scrolledTo = channel;
       if (channel < this.scroll || channel >= this.scroll + rows) {
@@ -651,7 +661,7 @@ class El {
       g.rect(x + 6, top, inner - 12, row);
       g.clip();
       const width = g.measureText(title).width;
-      if (playing && width > inner - 12) this.marquee(g, title, x + 6, top + row / 2, inner - 12, width);
+      if (playing && width > inner - 12) this.marquee(g, title, x + 6, top + row / 2, inner - 12, width, this.rollingSince);
       else g.fillText(title, x + 6, top + row / 2);
       g.restore();
     });
@@ -1549,6 +1559,8 @@ export class Skin {
         if (grab === null) this.pick(found, ev);
         else {
           if (grab >= 0) this.held = { list: found, grab };
+          // A double click on the bar scrolls; it never opens a pick's page.
+          this.linkRow = -1;
           this.paint();
         }
       } else if (found || this.opaque(ev)) {

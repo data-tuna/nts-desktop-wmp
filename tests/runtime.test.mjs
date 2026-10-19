@@ -452,9 +452,27 @@ test("a long name on the playing row scrolls right to left; other rows are cut o
   const shown = texts().filter(([a]) => a === long);
   assert.equal(shown.length, 2);
   assert.equal(shown[0][1] - shown[1][1], 264 + 44);
-  assert.ok(shown[1][1] <= 6 && shown[1][1] > 6 - 308);
+  assert.equal(shown[1][1], 6, "it starts from its first word");
   assert.deepEqual(texts().filter(([a]) => a !== long), [["NTS 1", 6], [`Not playing: ${long}`, 6]]);
   assert.ok(skin.stepAt < Infinity, "the next step is due");
+});
+
+test("a double click on the scroll bar never opens a pick's page", () => {
+  const items = Array.from({ length: 20 }, (_, i) => `Pick ${i}`);
+  const { sent } = load(`<theme><view width="100" height="48">
+       <playlist id="pl" left="0" top="0" width="100" height="48" fontSize="6"/>
+     </view></theme>`, {}, { ...STATE, items, channel: 19, title: items[19], link: "https://soundcloud.com/a" });
+  // The pick is on the bottom row of the last page: one press on it arms the link.
+  const at = (x, detail) => ({ button: 0, clientX: x, clientY: 44, detail });
+  listeners.mousedown(at(40, 1));
+  listeners.mouseup(at(40, 1));
+  // Then a double click on the thumb, level with it.
+  listeners.mousedown(at(92, 1));
+  listeners.mouseup(at(92, 1));
+  listeners.mousedown(at(92, 2));
+  listeners.mouseup(at(92, 2));
+  listeners.dblclick(at(92, 2));
+  assert.deepEqual(sent.filter((m) => m.type === "launchUrl"), []);
 });
 
 test("scrolling stops while other windows cover the player, and starts again after", () => {
