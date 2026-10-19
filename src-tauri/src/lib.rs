@@ -6,7 +6,7 @@
 mod skins;
 
 use serde::Deserialize;
-use std::sync::Mutex;
+use std::sync::{Arc, Condvar, Mutex};
 use std::time::{Duration, Instant};
 use tauri::http::{HeaderValue, Method, Request, Response, StatusCode};
 use tauri::menu::{CheckMenuItem, Menu, MenuEvent, MenuItem, PredefinedMenuItem};
@@ -134,6 +134,9 @@ fn skin_protocol(app: &AppHandle, from: &str, req: Request<Vec<u8>>) -> Response
 }
 
 fn respond(app: &AppHandle, from: &str, req: Request<Vec<u8>>) -> Response<Vec<u8>> {
+    if from == "preview" {
+        return respond_preview(app, req);
+    }
     if from != "skin" {
         return status(StatusCode::FORBIDDEN);
     }
@@ -274,6 +277,177 @@ async fn choose_skin(app: AppHandle, path: Option<String>) -> Result<(), String>
     result
 }
 
+/// The picker's preview (ATA-193): the selected skin, drawn by the engine in
+/// the `preview` webview, a child of the picker window that no capability
+/// names, as the `skin` webview is. It runs the skin's scripts, but every
+/// message it sends except its shape is dropped.
+struct Preview {
+    /// Bumped on each selection, so a late download is not shown.
+    id: u64,
+    bytes: Option<Arc<Vec<u8>>>,
+    /// The pane to fit it in, `[x, y, width, height]` in CSS pixels.
+    area: [f64; 4],
+    /// The skin's size once drawn.
+    size: Option<(u32, u32)>,
+    /// Drawn, or given up on: what `preview_skin` waits for.
+    done: Option<bool>,
+}
+
+static PREVIEW: Mutex<Preview> = Mutex::new(Preview {
+    id: 0,
+    bytes: None,
+    area: [0.0; 4],
+    size: None,
+    done: None,
+});
+static PREVIEWED: Condvar = Condvar::new();
+
+/// Shows the selected skin in the picker's pane: from the cache, or
+/// downloaded into it (one skin per selection). Err means "No preview".
+#[tauri::command]
+async fn preview_skin(app: AppHandle, path: String) -> Result<(), String> {
+    let skin = skins::find(&path).ok_or_else(|| format!("{path} is not on the list"))?;
+    let id = {
+        let mut p = PREVIEW.lock().unwrap();
+        p.id += 1;
+        p.bytes = None;
+        p.size = None;
+        p.done = None;
+        p.id
+    };
+    if let Some(webview) = app.get_webview("preview") {
+        let _ = webview.hide();
+    }
+    let bytes = tauri::async_runtime::spawn_blocking({
+        let app = app.clone();
+        move || skins::fetch(&app, skin)
+    })
+    .await
+    .map_err(|e| e.to_string())??;
+    {
+        let mut p = PREVIEW.lock().unwrap();
+        if p.id != id {
+            return Err("another skin was selected".into());
+        }
+        p.bytes = Some(Arc::new(bytes));
+    }
+    match app.get_webview("preview") {
+        Some(webview) => webview.eval("location.reload()"),
+        None => {
+            let picker = app.get_window("picker").ok_or("no picker")?;
+            let builder = WebviewBuilder::new(
+                "preview",
+                WebviewUrl::CustomProtocol("skin://localhost/?preview".parse().unwrap()),
+            )
+            .additional_browser_args(BROWSER_ARGS)
+            .background_color(PREVIEW_BACKGROUND)
+            .on_navigation(is_skin_url)
+            .on_new_window(|_, _| NewWindowResponse::Deny);
+            let webview = picker
+                .add_child(
+                    builder,
+                    LogicalPosition::new(0.0, 0.0),
+                    LogicalSize::new(1.0, 1.0),
+                )
+                .map_err(|e| e.to_string())?;
+            webview.hide()
+        }
+    }
+    .map_err(|e| e.to_string())?;
+    let shown = tauri::async_runtime::spawn_blocking(move || {
+        let (p, _) = PREVIEWED
+            .wait_timeout_while(PREVIEW.lock().unwrap(), Duration::from_secs(10), |p| {
+                p.id == id && p.done.is_none()
+            })
+            .unwrap();
+        p.id == id && p.done == Some(true)
+    })
+    .await
+    .map_err(|e| e.to_string())?;
+    if shown {
+        Ok(())
+    } else {
+        Err(format!("{path} did not draw"))
+    }
+}
+
+/// The pane the picker keeps for the preview, in CSS pixels, whenever it
+/// lays out.
+#[tauri::command]
+fn preview_area(app: AppHandle, x: f64, y: f64, width: f64, height: f64) {
+    let size = {
+        let mut p = PREVIEW.lock().unwrap();
+        p.area = [x, y, width, height];
+        p.size
+    };
+    if let Some((w, h)) = size {
+        place_preview(&app, w, h);
+    }
+}
+
+/// The picker pane's colour, behind a skin's transparent parts.
+const PREVIEW_BACKGROUND: tauri::webview::Color = tauri::webview::Color(58, 58, 58, 255);
+
+/// Zooms the preview webview so a `width` by `height` skin fits the pane,
+/// never past its own size, centres it there, and shows it.
+fn place_preview(app: &AppHandle, width: u32, height: u32) {
+    let Some(webview) = app.get_webview("preview") else {
+        return;
+    };
+    let [x, y, w, h] = PREVIEW.lock().unwrap().area;
+    let zoom = (w / width as f64).min(h / height as f64).min(1.0);
+    let (sw, sh) = (width as f64 * zoom, height as f64 * zoom);
+    let _ = webview.set_zoom(zoom);
+    let _ = webview.set_size(LogicalSize::new(sw, sh));
+    let _ = webview.set_position(LogicalPosition::new(x + (w - sw) / 2.0, y + (h - sh) / 2.0));
+    let _ = webview.show();
+}
+
+/// The skin protocol for the preview webview: the engine, the selected
+/// skin, and of its messages only the shape, which sizes the preview.
+fn respond_preview(app: &AppHandle, req: Request<Vec<u8>>) -> Response<Vec<u8>> {
+    let finish = |done: Option<bool>, size: Option<(u32, u32)>| {
+        let mut p = PREVIEW.lock().unwrap();
+        p.size = size;
+        p.done = done;
+        PREVIEWED.notify_all();
+    };
+    match (req.method(), req.uri().path()) {
+        (&Method::GET, "/") => Response::builder()
+            .header("Content-Type", "text/html; charset=utf-8")
+            .body(SKIN_PAGE.as_bytes().to_vec())
+            .unwrap(),
+        (&Method::GET, "/engine.js") => Response::builder()
+            .header("Content-Type", "text/javascript; charset=utf-8")
+            .body(engine_js())
+            .unwrap(),
+        (&Method::GET, "/skin.wmz") => match PREVIEW.lock().unwrap().bytes.clone() {
+            Some(bytes) => Response::builder().body(bytes.to_vec()).unwrap(),
+            None => status(StatusCode::NOT_FOUND),
+        },
+        // The engine could not load the skin: no house skin here, no preview.
+        (&Method::GET, "/house.wmz") => {
+            finish(Some(false), None);
+            status(StatusCode::NOT_FOUND)
+        }
+        (&Method::POST, "/msg") => {
+            if let Ok(FromSkin::Shape {
+                width,
+                height,
+                rects,
+            }) = serde_json::from_slice(req.body())
+            {
+                if valid_shape(width, height, &rects) && PREVIEW.lock().unwrap().bytes.is_some() {
+                    finish(Some(true), Some((width, height)));
+                    place_preview(app, width, height);
+                }
+            }
+            status(StatusCode::NO_CONTENT)
+        }
+        _ => status(StatusCode::NOT_FOUND),
+    }
+}
+
 /// The picker's links: a skin's archive.org page, and NTS's supporters page.
 #[tauri::command]
 fn open_link(url: String) -> Result<(), String> {
@@ -295,8 +469,8 @@ fn open_link(url: String) -> Result<(), String> {
 fn open_picker(app: &AppHandle) {
     let built = WebviewWindowBuilder::new(app, "picker", WebviewUrl::App("picker.html".into()))
         .title("Skins - NTS Radio Bootleg Media Player")
-        .inner_size(380.0, 520.0)
-        .min_inner_size(300.0, 300.0)
+        .inner_size(700.0, 520.0)
+        .min_inner_size(560.0, 360.0)
         .additional_browser_args(BROWSER_ARGS)
         .build();
     if let Err(e) = built {
@@ -1073,6 +1247,8 @@ pub fn run() {
             skin_send,
             list_skins,
             choose_skin,
+            preview_skin,
+            preview_area,
             open_link,
             now_playing,
             credit,
@@ -1093,6 +1269,10 @@ pub fn run() {
             if let tauri::WindowEvent::Destroyed = event {
                 if window.label() == "main" {
                     window.app_handle().exit(0);
+                }
+                // The preview webview went with the picker; so does its skin.
+                if window.label() == "picker" {
+                    PREVIEW.lock().unwrap().bytes = None;
                 }
             }
             // A new monitor scale resizes the window but leaves its region in

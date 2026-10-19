@@ -6,6 +6,52 @@ the evidence.
 
 ## Stack
 
+### Previews in the skin picker (ATA-193, 2026-10-19)
+
+Reverses ATA-112's "No preview images" below. Ata asked for a preview of
+the skin selected in the picker.
+
+- **One click selects, "Use this skin" or a double click wears.** The
+  picker gained a pane beside the list. Selecting a skin shows it there:
+  from the cache straight away, or downloaded once into the cache, so
+  wearing it afterwards downloads nothing. That is one download per
+  selection of a skin not cached, never ahead of time and never in bulk.
+  A failed download, or a skin the engine cannot load, says "No preview";
+  the list stays usable.
+- **The preview is the engine itself, scripts and all,** in a `preview`
+  webview: a child of the picker window, on the `skin` protocol, which no
+  capability names, as the `skin` webview. Running the scripts draws skins
+  sized by `jscript:` (Classic) as they are worn; a static first view would
+  not. Rust serves it the engine and the selected skin and drops every
+  message it sends except `shape`, which sizes the preview: no play, no
+  window moves, no links. It has no house-skin fallback; asking for one
+  means "No preview". Rust zooms the webview (WebView2's zoom factor) so
+  the skin fits the pane, never above 100 %, and centres it. The picker
+  page tells Rust where the pane is (`preview_area`); it still runs no skin
+  code and gains only that and `preview_skin`.
+- **No thumbnails.** A cached skin draws in about 0.3 s, so nothing is
+  saved but the `.wmz` the cache already keeps.
+
+Checked on a release build on a hidden desktop, behind `tools/proxy.mjs`
+for Rust's downloads (`HTTPS_PROXY`), with clicks sent through DevTools:
+- **Cached** (bluegrid, anemone, Headspace): the preview showed 250 to
+  290 ms after the click.
+- **Not cached** (amped2, 807 KB): the proxy logged one download, a tunnel
+  to archive.org for the redirect and one of 812 KB to its data host; the
+  preview showed after 4.1 s. "Use this skin" then wore it with no new
+  tunnel, and `skin.json` named it. A double click on bluegrid wore it.
+- **archive.org cut** at the proxy, with Headspace moved out of the cache:
+  Headspace said "No preview" after 1.0 s (both tries refused), and anemone,
+  cached, previewed in 0.29 s.
+- **Isolation:** `tools/escape.mjs <port> preview` gives the same rows from
+  the preview webview as from the skin webview: every command refused by
+  the ACL, `preview_skin` and `preview_area` included, no IPC reached the
+  skin, the CSP blocked the remote fetch and both frames, navigation stayed
+  on `skin.localhost`. `minimize`, `drag` and `picker` posted from the
+  preview changed nothing.
+- Not tried: a real mouse, and resizing the picker by hand (the pane
+  follows through a `ResizeObserver`).
+
 ### Tiled sliders keep their end caps (ATA-192, 2026-10-19)
 
 - **Headspace's EQ drew a cap, a stub, a cap.** Its sliders set
@@ -851,9 +897,11 @@ four genres as outlined tags. It joins Bars, Scope and Ambience in
   so it follows a launch download landing or a skin falling back to the
   house skin; when a kept skin failed, it says the kept one is tried again
   next launch. archive.org has no preview per skin, so the picker shows
-  none; picking one puts it on the window. "A random skin on every launch"
+  none; picking one puts it on the window. (ATA-193 added previews drawn by
+  the engine; see above.) "A random skin on every launch"
   also puts a new random skin on at once, so the choice shows.
-- **No preview images** (Mika for Ata, 2026-10-11). The issue asked for
+- **No preview images** (Mika for Ata, 2026-10-11; reversed by ATA-193,
+  above, which draws them live instead). The issue asked for
   archive.org preview images, but the item has none per skin. Drawing our
   own would mean committing or bundling images of third-party skins, which
   the standing rules forbid, and previewing a skin before wearing it would

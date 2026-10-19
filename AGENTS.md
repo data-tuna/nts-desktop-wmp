@@ -38,7 +38,8 @@ Written in English.
                           nts-desktop-winamp; see Gotchas. widget.ts plays
                           a pick through SoundCloud's hidden widget.
                           picker.ts is the skin picker (picker.html), a
-                          trusted page of its own. credit.ts (credit.html)
+                          trusted page of its own; the selected skin's
+                          preview is a skin-engine webview over its pane. credit.ts (credit.html)
                           is the SoundCloud credit drawn over the skin
                           while a pick plays.
     src/skin/             The skin engine, which runs in the skin webview:
@@ -140,14 +141,15 @@ skin names and checksums, never the skins. The only skin that ships is our
 own house skin, `skins/house/`, the one `.wmz` the repository holds. Be
 polite to archive.org: one skin per launch, no bulk downloads. The app
 downloads at most one skin per launch, plus one for each skin the listener
-picks. `tools/compat.mjs` is the one bulk download, run by hand when the
+selects in the picker, to preview or wear it. `tools/compat.mjs` is the one bulk download, run by hand when the
 engine changes: it fetches each file once, a few seconds apart, into a cache
 outside the repository, and fetches only what is missing on a rerun.
 
 **Skin scripts never run where they can reach Tauri.** A skin's JScript is
 untrusted code. It runs only in the `skin` webview, which no capability
 names, and talks to the trusted page only through the `skin` protocol's
-fixed message list. Capabilities match by `webviews`, never `windows` (the
+fixed message list. The picker's `preview` webview is the same, and Rust
+drops every message from it but its shape (ATA-193). Capabilities match by `webviews`, never `windows` (the
 skin webview is a child of the main window), and every app command goes in
 the app manifest in `build.rs`. Everything the skin protocol serves carries
 a CSP with no network and no frames. Run `node tools/escape.mjs` after
@@ -291,9 +293,9 @@ hidden desktop (a debug build needs `npx vite` running for its pages):
 
     powershell -File tools/hidden-run.ps1 src-tauri/target/release/nts-desktop-wmp.exe
 
-    node tools/cdp.mjs 9355 main|skin "<expr>"   Evaluate in either webview
+    node tools/cdp.mjs 9355 main|skin|preview "<expr>"   Evaluate in a webview
     node tools/click.mjs 9355 "#play"            Click an element in the skin
-    node tools/escape.mjs 9355 webview|frame     The ATA-107 escape attempts
+    node tools/escape.mjs 9355 webview|frame|preview   The ATA-107 escape attempts
     powershell -File tools/window-shot.ps1 "NTS Radio Bootleg Media Player" shot.png
     powershell -File tools/region-shot.ps1 "NTS Radio Bootleg Media Player" shot.png
     powershell -File tools/ram.ps1 nts-desktop-wmp
@@ -385,10 +387,9 @@ one: a `previewView` for WMP's skin chooser, or a `mediaSwitcherView` or
 `versionView`. The engine draws only the first view (below), so
 `compatible.json` marks them broken until it opens others.
 
-**The picker shows no previews.** archive.org holds no preview image per
-skin (the item has one image for the whole collection), and screenshots of
-the skins are third-party works too, so none are committed. Picking a skin
-puts it on the window, which is the preview.
+**Previews are drawn live, never kept as images** (ATA-193). Each selection
+in the picker loads the skin into the preview webview again, from the
+cache: about 0.3 s. No thumbnails are saved.
 
 **The icon is the Winamp app's.** Both apps look the same in the taskbar
 until this one gets its own.
