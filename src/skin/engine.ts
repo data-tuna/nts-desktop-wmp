@@ -7,7 +7,7 @@
 // skin reference (learn.microsoft.com/windows/win32/wmp/skin-programming-reference).
 import { CHANNELS } from "../player.ts";
 import { constants, type Node } from "./wms.ts";
-import { css, keyed, mappedElement, overlay, parseColor, rgbAt, runs, type Pixels } from "./pixels.ts";
+import { css, firstAt, keyed, mappedElement, mix, overlay, parseColor, playingColors, rgbAt, runs, thumb, type Pixels } from "./pixels.ts";
 import { drawEffect, EFFECTS, effectIndex, type Frame, type Memory } from "./effects.ts";
 import { clock, CONSTANTS, OS_MEDIA_CHANGING, OS_MEDIA_OPEN, objects, playState, resImage, resScript, resString, wmpObject, type Host } from "./runtime.ts";
 
@@ -35,8 +35,13 @@ export type State = {
   balance: number;
   eq: number[];
   level: number;
+  /** Whether other windows hide the player: scrolling text stops then (ATA-191). */
+  covered?: boolean;
 };
 export type Send = (msg: { type: string; [k: string]: unknown }) => void;
+
+/** The playlist's scroll bar width, in px: WMP's list draws Windows' own, about this wide at 96 dpi. */
+const BAR = 16;
 
 type Kind = "container" | "button" | "group" | "element" | "slider" | "custom" | "progress" | "text" | "effects" | "playlist" | "none";
 
@@ -515,18 +520,23 @@ class El {
     const width = g.measureText(text).width;
     const justify = (this.skin.str(this, "justification") || "left").toLowerCase();
     let left = justify === "center" ? x + (w - width) / 2 : justify === "right" ? x + w - width : x;
-    const scroll = this.skin.bool(this, "scrolling", false) && width > w;
-    if (scroll) {
-      // Scroll right to left by scrollingAmount px every scrollingDelay ms, with a gap.
-      const step = this.skin.num(this, "scrollingamount") ?? 1;
-      const delay = Math.max(16, this.skin.num(this, "scrollingdelay") ?? 100);
-      const loop = width + w / 2;
-      left = x - ((Math.floor(this.skin.clock / delay) * step) % loop);
-      g.fillText(text, left + loop, y + 1);
-      this.skin.later(delay - (this.skin.clock % delay), this.skin.overFx(this));
-    }
-    g.fillText(text, left, y + 1);
+    if (this.skin.bool(this, "scrolling", false) && width > w) left = this.marquee(g, text, x, y + 1, w, width);
+    else g.fillText(text, left, y + 1);
     if (this.skin.str(this, "fontstyle").toLowerCase().includes("underline")) g.fillRect(left, y + this.fontPx() + 1, width, 1);
+  }
+
+  /** Draws `text` (`width` px) scrolling right to left through a box `w` px
+   * wide at x, by scrollingAmount px every scrollingDelay ms, with a gap, and
+   * asks for the next step. Returns where the text starts. */
+  private marquee(g: CanvasRenderingContext2D, text: string, x: number, y: number, w: number, width: number): number {
+    const step = this.skin.num(this, "scrollingamount") ?? 1;
+    const delay = Math.max(16, this.skin.num(this, "scrollingdelay") ?? 100);
+    const loop = width + w / 2;
+    const left = x - ((Math.floor(this.skin.clock / delay) * step) % loop);
+    g.fillText(text, left + loop, y);
+    g.fillText(text, left, y);
+    this.skin.later(delay - (this.skin.clock % delay), this.skin.overFx(this));
+    return left;
   }
 
   /** A solid box where the visualisation goes: Skin.paint works out from
@@ -557,10 +567,37 @@ class El {
   private scroll = 0;
   private scrolledTo = -1;
 
+  /** How many whole rows the playlist shows. */
+  private rows(): number {
+    return Math.max(1, Math.floor(this.h / this.rowHeight()));
+  }
+
   /** Scrolls the playlist by `by` rows. */
   scrollBy(by: number) {
-    const rows = Math.max(1, Math.floor(this.h / this.rowHeight()));
-    this.scroll = Math.max(0, Math.min(this.skin.state.items.length - rows, this.scroll + by));
+    this.scroll = Math.max(0, Math.min(this.skin.state.items.length - this.rows(), this.scroll + by));
+  }
+
+  /** The scroll bar's thumb, or null when every item fits. */
+  private thumb() {
+    return thumb(this.skin.state.items.length, this.rows(), this.scroll, this.h);
+  }
+
+  /** A press at (px, py), in the parent's coordinates: null when it is not
+   * on the scroll bar; -1 when it paged up or down on the track; else how
+   * far down the thumb it grabbed it. */
+  pressBar(px: number, py: number): number | null {
+    const t = this.thumb();
+    if (!t || px < this.x + this.w - BAR) return null;
+    const ly = py - this.y;
+    if (ly >= t.at && ly < t.at + t.size) return ly - t.at;
+    this.scrollBy(ly < t.at ? -this.rows() : this.rows());
+    return -1;
+  }
+
+  /** Moves the thumb's top to `at` px down the track. */
+  dragThumb(at: number) {
+    const t = this.thumb();
+    if (t) this.scroll = firstAt(at, this.skin.state.items.length, this.rows(), this.h, t.size);
   }
 
   /** The playlist row under a point in the parent's coordinates, or -1. */
@@ -570,7 +607,9 @@ class El {
   }
 
   /** The playlist: the channels, mixtapes and picks, one row each, the
-   * current one in the playing colours and scrolled into sight when it changes. */
+   * current one in the playing colours, scrolled into sight when it changes,
+   * and its name scrolling when it does not fit. A scroll bar, in the list's
+   * own colours, when they do not all fit. */
   private paintPlaylist(g: CanvasRenderingContext2D) {
     const { x, y, w, h } = this;
     const bg = this.color("backgroundcolor");
@@ -585,12 +624,9 @@ class El {
     g.textBaseline = "middle";
     const row = this.rowHeight();
     const { items, channel } = this.skin.state;
-    const rows = Math.max(1, Math.floor(h / row));
+    const rows = this.rows();
     const fg = this.color("foregroundcolor") ?? 0xffffff;
-    let playingFg = this.color("itemplayingcolor");
-    let playingBg = this.color("itemplayingbackgroundcolor");
-    // Most skins name neither colour; their playing row gets the list's own colours swapped.
-    if (playingFg === null && playingBg === null) [playingFg, playingBg] = [bg ?? 0, fg];
+    const [playingFg, playingBg] = playingColors(this.color("itemplayingcolor"), this.color("itemplayingbackgroundcolor"));
     if (channel !== this.scrolledTo) {
       this.scrolledTo = channel;
       if (channel < this.scroll || channel >= this.scroll + rows) {
@@ -598,17 +634,34 @@ class El {
         this.scrollBy(channel);
       }
     }
+    const t = this.thumb();
+    const inner = w - (t ? BAR : 0);
     items.forEach((title, n) => {
       const i = n - this.scroll;
       if (i < 0 || i > rows) return;
+      const top = y + i * row;
       const playing = n === channel;
-      if (playing && playingBg !== null) {
+      if (playing) {
         g.fillStyle = css(playingBg);
-        g.fillRect(x, y + i * row, w, row);
+        g.fillRect(x, top, inner, row);
       }
-      g.fillStyle = css((playing ? playingFg : null) ?? fg);
-      g.fillText(title, x + 6, y + i * row + row / 2);
+      g.fillStyle = css(playing ? playingFg : fg);
+      g.save();
+      g.beginPath();
+      g.rect(x + 6, top, inner - 12, row);
+      g.clip();
+      const width = g.measureText(title).width;
+      if (playing && width > inner - 12) this.marquee(g, title, x + 6, top + row / 2, inner - 12, width);
+      else g.fillText(title, x + 6, top + row / 2);
+      g.restore();
     });
+    if (!t) return;
+    // No images of WMP's: a track and a thumb in the list's own colours.
+    const back = bg ?? 0;
+    g.fillStyle = css(mix(back, fg, 0.15));
+    g.fillRect(x + inner, y, BAR, h);
+    g.fillStyle = css(mix(back, fg, 0.55));
+    g.fillRect(x + inner + 2, y + t.at + 1, BAR - 4, t.size - 2);
   }
 
   // Hit testing, in the parent's coordinates. Returns the topmost interactive
@@ -770,6 +823,8 @@ export class Skin {
   private resImages = new Map<string, Img | undefined>();
   private logged = new Set<string>();
   private pressed: El | null = null;
+  /** The playlist whose scroll bar thumb is held, and where it was grabbed. */
+  private held: { list: El; grab: number } | null = null;
   /** The playlist row a double click may open: the current pick's, when the first press landed on it. */
   private linkRow = -1;
   /** Whether the pressed button showed down before the press (sticky buttons). */
@@ -1377,7 +1432,7 @@ export class Skin {
     const before = { ps: playState(old.playState), status: this.status(), title: old.title, channel: old.channel };
     this.state = s;
     // Repaint for what skins show, not for the level or a sub-second clock.
-    const shown = (t: State) => JSON.stringify([t.playState, t.channel, t.title, t.author, t.location, t.items, t.volume, t.mute, t.balance, t.eq]);
+    const shown = (t: State) => JSON.stringify([t.playState, t.channel, t.title, t.author, t.location, t.items, t.volume, t.mute, t.balance, t.eq, t.covered]);
     if (shown(old) !== shown(s)) this.changed();
     else if (Math.floor(old.time) !== Math.floor(s.time)) this.changed(false);
     if (this.started) this.events(before);
@@ -1414,8 +1469,10 @@ export class Skin {
   }
 
   /** Repaint everything in `ms`, or sooner if already due: a scrolling
-   * text's next step, rather than every display frame (ATA-116). */
+   * text's next step, rather than every display frame (ATA-116). None while
+   * the player is covered; minimised, Rust hides the webview, which stops it. */
   later(ms: number, overFx: boolean) {
+    if (this.state.covered) return;
     this.stepOverFx ||= overFx;
     const at = performance.now() + ms;
     if (at >= this.stepAt) return;
@@ -1460,6 +1517,12 @@ export class Skin {
   private listen() {
     const c = this.canvas;
     c.addEventListener("mousemove", (ev) => {
+      if (this.held) {
+        const { list, grab } = this.held;
+        list.dragThumb(this.point(ev)[1] - list.origin()[1] - list.y - grab);
+        this.paint();
+        return;
+      }
       if (this.pressed && (this.pressed.kind === "slider" || this.pressed.kind === "custom")) {
         this.slide(this.pressed, ev, false);
         return;
@@ -1480,7 +1543,14 @@ export class Skin {
         this.fire(found, "onmousedown");
         this.paint();
       } else if (found?.kind === "playlist") {
-        this.pick(found, ev);
+        const [px, py] = this.point(ev);
+        const [ox, oy] = found.origin();
+        const grab = found.pressBar(px - ox, py - oy);
+        if (grab === null) this.pick(found, ev);
+        else {
+          if (grab >= 0) this.held = { list: found, grab };
+          this.paint();
+        }
       } else if (found || this.opaque(ev)) {
         // The body of the skin: move the window.
         this.send({ type: "drag" });
@@ -1501,6 +1571,7 @@ export class Skin {
         this.send({ type: "launchUrl", url: this.state.link });
     });
     window.addEventListener("mouseup", (ev) => {
+      this.held = null;
       const e = this.pressed;
       if (!e) return;
       this.pressed = null;

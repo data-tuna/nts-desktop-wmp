@@ -417,8 +417,10 @@ though its script sets it visible (ATA-170). Kenwood_MPXP has the same
 markup and likely the same fault.
 
 **Video, item and drop-down playlists, and popups are not drawn.**
-`<playlist>` lists the channels, mixtapes and picks, and scrolls with the
-wheel; it has no columns or scroll bar. Their methods
+`<playlist>` lists the channels, mixtapes and picks, with a scroll bar
+when they do not all fit, and scrolls the playing row's name when it is
+too long (ATA-191); it has no columns. Nobody has dragged that scroll bar
+with a real mouse yet. Their methods
 (`setColumnResizeMode`, `appendItem`) are logged and do nothing.
 
 **Three visualisations and Milkdrop** (ATA-114, ATA-167, ATA-190): bars,

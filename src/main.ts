@@ -226,7 +226,7 @@ setInterval(() => {
   const { artwork: _, ...shown } = info(now.channel);
   updateOverlay(now.channel);
   updateTray(shown.title, now.channel, now.playState);
-  const state = { type: "state", ...now, ...shown, items: items.map((_, i) => info(i).title), ...settings, level: level() };
+  const state = { type: "state", ...now, ...shown, items: items.map((_, i) => info(i).title), ...settings, level: level(), covered };
   void invoke("skin_send", { msg: state }).catch(() => {});
   startVis();
 }, 250);

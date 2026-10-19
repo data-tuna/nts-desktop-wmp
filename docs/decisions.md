@@ -333,13 +333,15 @@ a second (ATA-109):
 
     { "type": "state", "playState", "channel", "title", "url", "author", "location",
       "link", "items", "time", "duration",
-      "volume", "mute", "balance", "eq", "level" }
+      "volume", "mute", "balance", "eq", "level", "covered" }
 
 `playState` is `playing`, `buffering`, `reconnecting`, `paused` or
 `stopped`. `duration` is 0 for a live stream, as in WMP: a skin shows its
 seek bar disabled. For a pick it is its length in seconds (ATA-165).
 `volume`, `mute`, `balance` and `eq` (ten gains in dB) are the saved
 settings, so a skin's controls start where the listener left them.
+`covered` is true while other windows hide the player (ATA-122's
+`win32::watch_cover`); scrolling text stops then (ATA-191).
 
 From ATA-114, also 20 times a second (30 before ATA-122) while the skin
 shows a visualisation, no other window covers the player, and the stream
@@ -526,6 +528,52 @@ full 25 times a second for its title. RAM, playing, on the merged build:
 than once), against 280 MB (540 MB) for the Winamp app.
 
 ## Skins
+
+### The playlist like WMP's: scroll bar, colours, long names (ATA-191, 2026-10-19)
+
+Ata, on v0.2.1 with Headspace next to pictures of it in WMP: WMP's list has
+a scroll bar, its playing row is green, and long show names are cut off.
+
+- **The green is WMP's default, not Headspace's.** Headspace's `<playlist>`
+  names only `backgroundColor="#285F03"` and `foregroundColor="white"`.
+  Microsoft's reference gives `itemPlayingColor` a default of `#00FF00` and
+  `itemPlayingBackgroundColor` `#222222`, and archive.org's one picture of
+  Headspace in WMP (`headspace.png`) shows exactly that: green text on a
+  near-black row. The engine used to swap the list's own colours when a
+  skin named neither. Now each colour the skin leaves out takes WMP's
+  default (`playingColors` in `pixels.ts`). Selection colours
+  (`itemSelected*`) are not used: a click here plays the row, so the
+  selected row is the playing one.
+- **Other skins.** The cached skins hold 223 `<playlist>` tags. 99 name
+  both colours, the house skin and The Skins Factory's among them, and do
+  not change. 9 name only the text (circle, Nautical, Sports, Spider-man,
+  HOB, Jaws and three more): WMP's `#222222` row now sits behind it. 6
+  name only the background (elvis and four Plus! skins): their text turns
+  green. The other 109, Headspace among them, look like Headspace.
+- **The scroll bar** is drawn by the engine, 16 px wide (Windows' own is
+  about that at 96 dpi), only when the rows do not all fit. It has no
+  arrows and uses no images of WMP's: a track and a thumb mixed from the
+  list's background and text colours (15 % and 55 % of the way to the
+  text). The thumb's length is the share of rows in sight, never under
+  8 px. Dragging it scrolls, a press on the track pages by a screenful,
+  and the wheel scrolls by a row as before (`thumb` and `firstAt` in
+  `pixels.ts`).
+- **Long names.** The playing row's name scrolls right to left when it is
+  wider than the row, by the same code and timer as a `scrolling` text
+  (1 px every 100 ms unless the list names `scrollingAmount` or
+  `scrollingDelay`). Other rows are cut off, as before.
+- **Covered or minimised.** The state message gains `covered`, Rust's
+  existing cover check passed on by the trusted page. While it is true,
+  no scrolling step is scheduled, for the playlist or any `scrolling`
+  text; uncovered, the next state repaints and they move again. Minimised,
+  Rust already hides the webviews, which stops them.
+- **Release build, hidden desktop.** Headspace: a scroll bar and the green
+  row; NTS 1's long title moves between two captures a second apart. A
+  drag on the thumb through DevTools input scrolled to the last picks; a
+  click on one played it, and its name scrolled on the green row. The
+  house skin keeps its own orange row and gains the bar. bluegrid has no
+  playlist and is unchanged. `tools/escape.mjs`: every skin-side attempt
+  still fails as before.
 
 ### Milkdrop on a small preset budget (ATA-167, 2026-10-14)
 
