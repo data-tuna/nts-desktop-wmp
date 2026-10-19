@@ -468,8 +468,9 @@ fn respond_preview(app: &AppHandle, req: Request<Vec<u8>>) -> Response<Vec<u8>> 
                 rects,
             }) = serde_json::from_slice(req.body())
             {
-                let size = bounds(&rects).unwrap_or([0, 0, width, height]);
+                // Checked first: valid_shape keeps bounds' sums inside the view.
                 if valid_shape(width, height, &rects) && current(&PREVIEW.lock().unwrap()) {
+                    let size = bounds(&rects).unwrap_or([0, 0, width, height]);
                     finish(true, Some(size));
                     place_preview(app, size);
                 }

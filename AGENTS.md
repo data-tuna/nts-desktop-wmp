@@ -153,9 +153,11 @@ names, and talks to the trusted page only through the `skin` protocol's
 fixed message list. The picker's `preview` webview is the same, and Rust
 drops every message from it but its shape (ATA-193). Capabilities match
 by `webviews`, never `windows` (the skin webview is a child of the main
-window), and every app command goes in the app manifest in `build.rs`. Everything the skin protocol serves carries
-a CSP with no network and no frames. Run `node tools/escape.mjs` after
-touching any of it, and after every Tauri upgrade. `docs/decisions.md` (ATA-107) has the protocol and the evidence.
+window), and every app command goes in the app manifest in `build.rs`.
+Everything the skin protocol serves carries a CSP with no network and no
+frames. Run `node tools/escape.mjs` after touching any of it, and after
+every Tauri upgrade. `docs/decisions.md` (ATA-107) has the protocol and the
+evidence.
 
 **Microsoft's resources are not shipped.** Skins reference
 `res://wmploc.dll/...`; we write stand-ins for what skins call, and copy
