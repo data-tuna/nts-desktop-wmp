@@ -6,7 +6,7 @@ import assert from "node:assert/strict";
 import { deflateRawSync } from "node:zlib";
 import { unzip } from "../src/skin/wmz.ts";
 import { constants, decode, parse } from "../src/skin/wms.ts";
-import { firstAt, keyed, mappedElement, mix, overlay, parseColor, playingColors, runs, thumb } from "../src/skin/pixels.ts";
+import { firstAt, keyed, mappedElement, mix, overlay, parseColor, playingColors, runs, thumb, tiles } from "../src/skin/pixels.ts";
 
 /** A zip with one entry per [name, bytes, deflate?], as skin tools write them. */
 function zip(entries) {
@@ -170,6 +170,19 @@ test("playlist: the scroll bar's thumb shows how much is in sight, and dragging 
   for (const first of [0, 1, 6, 12, 13]) assert.equal(firstAt(thumb(20, 7, first, 140).at, 20, 7, 140, 49), first);
   assert.equal(firstAt(-30, 20, 7, 140, 49), 0, "dragged above the track");
   assert.equal(firstAt(500, 20, 7, 140, 49), 13, "dragged below it");
+});
+
+test("slider: a tiled image keeps borderSize px at each end as caps and repeats only the middle", () => {
+  // Headspace's EQ: a 15 px image, borderSize 7, on a 76 px slider. Cap, a
+  // 62 px bar of the image's one middle row, then the bottom cap.
+  const eq = tiles(76, 15, 7);
+  assert.deepEqual(eq.slice(0, 2), [[0, 0, 7], [8, 69, 7]]);
+  assert.equal(eq.length, 2 + 62);
+  assert.ok(eq.slice(2).every(([from, , px], i) => from === 7 && px === 1 && eq[i + 2][1] === 7 + i));
+  // No border: the whole image repeats, the last copy cut short.
+  assert.deepEqual(tiles(25, 10, 0), [[0, 0, 10], [0, 10, 10], [0, 20, 5]]);
+  // An image too short for both caps repeats whole.
+  assert.deepEqual(tiles(5, 2, 7), [[0, 0, 2], [0, 2, 2], [0, 4, 1]]);
 });
 
 test("effects: bars are log-spaced spectrum peaks, the wave is evenly sampled, and unknown effects fall back", async () => {

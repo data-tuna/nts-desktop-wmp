@@ -6,6 +6,36 @@ the evidence.
 
 ## Stack
 
+### Tiled sliders keep their end caps (ATA-192, 2026-10-19)
+
+- **Headspace's EQ drew a cap, a stub, a cap.** Its sliders set
+  `tiled="true"` and `borderSize="7"` on a 15 px `vertical_slider.bmp`: 7 rows
+  of metal cap, one row of green bar, 7 rows of cap. The engine repeated the
+  whole image down the 76 px slider.
+- **The rule, from Microsoft's `SLIDER.borderSize` page:** with `tiled` on,
+  the first and last `borderSize` px of the image along the slider are its
+  end caps, drawn once at each end; only the middle repeats. `tiles()` in
+  `pixels.ts` lays the copies out, and its test uses Headspace's numbers. An
+  image too short to hold both caps (sankofa's 2 px EQ image with
+  `borderSize="7"`) repeats whole, as before. The page names the
+  background image; the engine treats a tiled foreground the same way, since
+  it fills the same track.
+- **Stretched sliders are unchanged.** The page ties the caps to tiling
+  only, so a slider without `tiled` still stretches its whole image.
+- **What changed:** among the working skins, only tiled sliders with a
+  `borderSize`, an image longer than both caps, and an image length that
+  differs from the slider's draw differently: Headspace, iMusica, iconic,
+  Faith, and one slider each in Primitive and Plus! Aquarium. An image
+  exactly as long as its slider comes out pixel for pixel as before
+  (Miniplayer, Vario, Canvas and 9SeriesDefault). Nautical's seek slider
+  sets both attributes but has no image. Release-build screenshots of
+  bluegrid, Classic, anemone and the house skin match `main` pixel for pixel
+  outside the visualisation, title and clock, which move; none of them has
+  such a slider.
+- **Not changed:** the same page says `tiled` defaults to true; the engine
+  defaults it to false. Switching would change many skins at once, so that
+  is left for an issue of its own if a skin shows it.
+
 ### Mute in the tray (ATA-194, 2026-10-19)
 
 - **Ata's app went quiet because it was muted.** Mute is remembered across
