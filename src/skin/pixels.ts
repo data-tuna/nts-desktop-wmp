@@ -118,3 +118,14 @@ export function firstAt(at: number, count: number, shown: number, track: number,
   const first = track > size ? Math.round((at * (count - shown)) / (track - size)) : 0;
   return Math.max(0, Math.min(count - shown, first));
 }
+
+/** A tiled slider image of `size` px laid along a `length` px slider, as
+ * [from in the image, to on the slider, px] copies. The first and last
+ * `border` px are end caps drawn once; only the middle repeats. An image too
+ * short to hold both caps repeats whole. */
+export function tiles(length: number, size: number, border: number): [number, number, number][] {
+  const b = size > 2 * border ? border : 0;
+  const out: [number, number, number][] = b ? [[0, 0, b], [size - b, length - b, b]] : [];
+  for (let at = b; at < length - b; at += size - 2 * b) out.push([b, at, Math.min(size - 2 * b, length - b - at)]);
+  return out;
+}

@@ -7,7 +7,7 @@
 // skin reference (learn.microsoft.com/windows/win32/wmp/skin-programming-reference).
 import { CHANNELS } from "../player.ts";
 import { constants, type Node } from "./wms.ts";
-import { css, firstAt, keyed, mappedElement, mix, overlay, parseColor, playingColors, rgbAt, runs, thumb, type Pixels } from "./pixels.ts";
+import { css, firstAt, keyed, mappedElement, mix, overlay, parseColor, playingColors, rgbAt, runs, thumb, tiles, type Pixels } from "./pixels.ts";
 import { drawEffect, EFFECTS, effectIndex, type Frame, type Memory } from "./effects.ts";
 import { clock, CONSTANTS, OS_MEDIA_CHANGING, OS_MEDIA_OPEN, objects, playState, resImage, resScript, resString, wmpObject, type Host } from "./runtime.ts";
 
@@ -440,6 +440,8 @@ class El {
     const bg = this.img("backgroundimage");
     const fg = this.img("foregroundimage");
     const tiled = this.skin.bool(this, "tiled", false);
+    const vertical = this.vertical();
+    const border = this.skin.num(this, "bordersize") ?? 0;
     const drawTrack = (img: Img, clip?: [number, number, number, number]) => {
       g.save();
       g.beginPath();
@@ -447,16 +449,18 @@ class El {
       g.clip();
       const src = this.skin.keyedImage(img, this.color("transparencycolor"));
       if (tiled) {
-        g.translate(x, y);
-        g.fillStyle = g.createPattern(src, "repeat")!;
-        g.fillRect(0, 0, w, h);
+        // borderSize px at each end are caps; the middle repeats (Headspace's EQ).
+        const [iw, ih] = [img.width, img.height];
+        for (const [from, to, px] of tiles(vertical ? h : w, vertical ? ih : iw, border))
+          for (let c = 0; c < (vertical ? w : h); c += vertical ? iw : ih)
+            if (vertical) g.drawImage(src, 0, from, iw, px, x + c, y + to, iw, px);
+            else g.drawImage(src, from, 0, px, ih, x + to, y + c, px, ih);
       } else g.drawImage(src, x, y, w, h);
       g.restore();
     };
     if (bg) drawTrack(bg);
     const { from, span, thumb } = this.track();
     const t = this.fraction();
-    const vertical = this.vertical();
     const pos = Math.round(from + (vertical ? 1 - t : t) * span);
     if (fg) {
       // The foreground fills the track up to the thumb's middle.
