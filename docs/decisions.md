@@ -23,11 +23,12 @@ the evidence.
 - **Stretched sliders are unchanged.** The page ties the caps to tiling
   only, so a slider without `tiled` still stretches its whole image.
 - **What changed:** among the working skins, only tiled sliders with a
-  `borderSize` and an image longer than both caps draw differently:
-  Headspace, iMusica, iconic, Vario, Faith, and one slider each in
-  Primitive, 9SeriesDefault, Canvas and Plus!. Nautical's seek slider sets
-  both attributes but has no image; Miniplayer's seek image is exactly the
-  slider's length. Both draw as before. Release-build screenshots of
+  `borderSize`, an image longer than both caps, and an image length that
+  differs from the slider's draw differently: Headspace, iMusica, iconic,
+  Faith, and one slider each in Primitive and Plus! Aquarium. An image
+  exactly as long as its slider comes out pixel for pixel as before
+  (Miniplayer, Vario, Canvas and 9SeriesDefault). Nautical's seek slider
+  sets both attributes but has no image. Release-build screenshots of
   bluegrid, Classic, anemone and the house skin match `main` pixel for pixel
   outside the visualisation, title and clock, which move; none of them has
   such a slider.
