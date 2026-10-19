@@ -37,10 +37,12 @@ async function load(url: string): Promise<Skin> {
   return new Skin(parse(decode(files.get(wms)!)), images, send, scripts, `pref:${wms}:`);
 }
 
-// A right click opens the skin picker, as WMP's menu offered its skin chooser.
+// A right click opens the skin picker, as WMP's menu offered its skin
+// chooser; on a visualisation, the menu of effects (ATA-190).
+let shown: Skin | null = null;
 window.addEventListener("contextmenu", (e) => {
   e.preventDefault();
-  send({ type: "picker" });
+  if (!shown?.menu(e)) send({ type: "picker" });
 });
 
 // A skin the engine cannot load gives way to the house skin (ATA-112).
@@ -49,10 +51,11 @@ load("/skin.wmz").catch((e) => (console.warn(`skin: ${String(e)}; wearing the ho
   (skin) => {
     document.body.append(skin.canvas);
     skin.start();
+    shown = skin;
     window.addEventListener("message", (e) => {
       if (e.data?.type === "state") skin.setState(e.data as State);
       else if (e.data?.type === "vis") skin.setFrame(e.data as Frame);
-      else if (e.data?.type === "show") skin.setShow(e.data);
+      else if (e.data?.type === "effect") skin.pickEffect(e.data.index);
     });
   },
   (e) => {

@@ -325,6 +325,7 @@ unknown fields included, and refuses requests from any webview but `skin`
 | `{ "type": "launchUrl", "url": "…" }` | Rust: opens the URL in the default browser, only if it parses as http(s), is at most 2048 characters, and comes 3 s or more after the last one (ATA-110) |
 | `{ "type": "picker" }` | Rust: opens the skin picker, unless it is open already or one opened in the last 3 s (ATA-112) |
 | `{ "type": "effects", "on": true \| false }` | the trusted page: whether a visualisation is on screen, so wants analyser frames (ATA-114) |
+| `{ "type": "effectsMenu", "effect": n }` | the trusted page: shows the visualisation menu with effect `n` checked, unless one is open already (ATA-190) |
 
 Host to skin: the trusted page calls the `skin_send` command, and Rust
 dispatches a `message` event in the skin webview. Today that is, four times
@@ -348,10 +349,12 @@ plays:
 
 `pcm` is for Milkdrop (ATA-167); a pick's flat frame has none.
 
-From ATA-166, when the item or its show changes, and in answer to each
-`effects` message (a skin sends one on its first paint):
+From ATA-190, the effect picked in the visualisation menu, by its index in
+`EFFECTS` (`effects.ts`):
 
-    { "type": "show", "title", "genres": [up to 4], "image": "data:image/…" | null }
+    { "type": "effect", "index": n }
+
+ATA-166's `show` message (the show card) is gone since ATA-190.
 
 The skin also gets `GET /` (the engine page), `GET /engine.js` (the
 engine), `GET /milkdrop.js` (Butterchurn and its presets; ATA-167),
@@ -558,10 +561,10 @@ on size; this adds it within a budget of 1.5 MB on the installer.
 - **Lazy.** The engine adds `<script src="/milkdrop.js">` the first time
   Milkdrop has a frame to draw; until it loads the area is the background
   colour. Without WebGL 2 it stays that colour and logs why.
-- **The cycle.** "Milkdrop", presets 0 to 28, between Ambience and the show
-  card. As in WMP, `next()` walks an effect's presets before the next
-  effect, so `next` within Milkdrop moves to the next preset, and after the
-  last one to the card. A new preset blends in over a second. The choice
+- **The cycle.** "Milkdrop", presets 0 to 28, after Ambience (and, until
+  ATA-190, before the show card). As in WMP, `next()` walks an effect's
+  presets before the next effect, so `next` within Milkdrop moves to the
+  next preset, and after the last one round to Bars. A new preset blends in over a second. The choice
   is saved like the others (`mediacenter.effectType` and `effectPreset`).
 - **Frames.** Butterchurn renders once per `vis` frame, 20 a second
   (ATA-122), into a WebGL canvas of the area's size, copied to a 2D canvas
@@ -592,7 +595,49 @@ issue allows, so it keeps the 20 frames a second. Bars may cost a point or
 two more than on `main`, for the 1024 samples each frame now carries; the
 spread is wider than that.
 
-### The NTS show card (ATA-166, 2026-10-14)
+### The visualisation menu; the show card goes (ATA-190, 2026-10-19)
+
+Ata, on v0.2.1: the visualiser should show only visualisations, no text or
+pictures; show titles belong in the playlist. And clicking through 29
+Milkdrop presets one at a time is slow. This reverses the show card
+(ATA-166, below).
+
+- **The card is gone.** The "NTS show" effect, its drawing and layout, the
+  `show` message and the trusted page's picture fetch are deleted, with
+  what only they used: the live API's genres, the mixtapes' pictures and
+  bare titles, the picks' bare names and tags (`name`, `tags`). The
+  playlist and the title never used those: they show each item's full
+  `title`, as before ATA-166. The pick's picture stays, for the overlay.
+- **Default and fallback.** The first launch shows Bars again, as before
+  ATA-166. The choice is still saved (`mediacenter` in the skin webview's
+  `localStorage`); a saved effect the list does not have, such as "NTS
+  show", reads as Bars, so a skin bound to `mediacenter` sees Bars too.
+- **The menu.** As in WMP, a right click on the skin's `effects` area opens
+  a menu: Bars, Scope, Ambience, and a Milkdrop submenu with the 29 presets
+  by name (Butterchurn's names, `PRESETS` in `milkdrop.ts`; a test checks
+  them against the pack). The current one is checked. Picking one shows it
+  and saves it as `next()` does. A right click anywhere else still opens
+  the skin picker. Clicking the area and the skin's own next and previous
+  controls still step through the list.
+- **Isolation.** The skin only asks: it sends `effectsMenu` with the index
+  it shows. The trusted page builds the native menu with Tauri's menu API
+  (`core:default`, which only the trusted page's capability names) and
+  sends back `effect` with the index picked. The skin never names the
+  entries, so it cannot put its own text in the menu. The trusted page
+  shows one menu at a time; like the picker, a skin can send
+  `effectsMenu` itself and open the menu, nothing more. `tools/escape.mjs`
+  now also tries the menu plugin from the skin: `Command plugin:menu|new
+  not allowed by ACL`.
+- **Release build, hidden desktop.** anemone and bluegrid show Bars on a
+  first launch; 33 `next()` calls on bluegrid step through 32 effects and
+  never reach a card. A right click on anemone's area lists all 33 entries
+  (read back from the open menu); picking Milkdrop preset 10 shows it, and
+  after a relaunch bluegrid shows it and the menu has it checked. A saved
+  "NTS show" opens on Bars. A right click on anemone's frame opens the
+  picker, not the menu. The menu was driven with key messages posted to
+  its window on that desktop; nobody has clicked it with a real mouse.
+
+### The NTS show card (ATA-166, 2026-10-14; reversed by ATA-190)
 
 Ata asked for the show's picture and genres, as nts.live shows them, in the
 skin's visualiser area. A fourth effect, **NTS show** (`effectType` "NTS
@@ -822,7 +867,8 @@ WMP or from the GPL WMP 8 clone. `src/skin/effects.ts` has them.
   shows Bars. `next()` and `previous()` step round the list and run the
   properties' `_onchange` handlers, which is how anemone, bluegrid and
   cerulean save the choice to `mediacenter`. `mediacenter` is not saved
-  across launches (it is since ATA-166).
+  across launches (it is since ATA-166, and the first launch shows Bars
+  again since ATA-190).
 - **Colours.** `backgroundColor` (black if none) behind, and
   `foregroundColor` for bars and scope if the skin gives one (the house
   skin's amber); otherwise WMP-like green to red.

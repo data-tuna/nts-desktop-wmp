@@ -3,8 +3,39 @@
 // the first time Milkdrop shows. Butterchurn renders with WebGL 2 from the
 // samples the trusted page sends in each frame: no audio reaches this webview.
 
-/** Presets in butterchurnPresetsMinimal; tests check the pack agrees. */
-export const PRESETS = 29;
+/** The presets in butterchurnPresetsMinimal, by name, for the visualisation
+ * menu; tests check the pack agrees. */
+export const PRESETS = [
+  "$$$ Royal - Mashup (197)",
+  "$$$ Royal - Mashup (431)",
+  "_Mig_085",
+  "An AdamFX n Martin Infusion 2 flexi - Why The Sky Looks Diffrent Today - AdamFx n Martin Infusion - Tack Tile Disfunction B",
+  "Eo.S. + Phat - cubetrace - v2",
+  "Flexi - alien fish pond",
+  "flexi - bouncing balls [double mindblob neon mix]",
+  "Flexi - mindblob [shiny mix]",
+  "Flexi, fishbrain, Geiss + Martin - tokamak witchery",
+  "Flexi, martin + geiss - dedicated to the sherwin maxawow",
+  "Geiss - Cauldron - painterly 2 (saturation remix)",
+  "Geiss - Reaction Diffusion 2",
+  "Geiss - Thumb Drum",
+  "Idiot - Star Of Annon",
+  "Krash + Illusion - Spiral Movement",
+  "Martin - acid wiring",
+  "martin - chain breaker",
+  "martin - extreme heat",
+  "martin - mandelbox explorer - high speed demo version",
+  "Martin - QBikal - Surface Turbulence IIb",
+  "martin - reflections on black tiles",
+  "martin - witchcraft reloaded",
+  "martin [shadow harlequins shape code] - fata morgana",
+  "Milk Artist At our Best - FED - SlowFast Ft AdamFX n Martin - HD CosmoFX",
+  "suksma - uninitialized variabowl (hydroponic chronic)",
+  "Unchained & Rovastar - Wormhole Pillars (Hall of Shadows mix)",
+  "Unchained - Rewop",
+  "yin - 191 - Temporal singularities",
+  "Zylot - Paint Spill (Music Reactive Paint Mix)",
+];
 
 type Visualizer = {
   loadPreset(preset: object, blendSeconds: number): void;

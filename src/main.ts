@@ -3,12 +3,13 @@
 // state back (docs/decisions.md, ATA-107).
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import { CheckMenuItem, Menu, Submenu } from "@tauri-apps/api/menu";
 import { fetchLive, mergeOnAir, nextPollDelay, type OnAir } from "./live";
 import { MIXTAPES_API, parseMixtapes } from "./mixtapes";
 import { PICKS_API, parsePicks, type Pick } from "./picks";
 import { CHANNELS, channelTitle, createPlayer, type Item } from "./player";
 import { createWidget } from "./widget";
-import { bands, samples } from "./skin/effects";
+import { bands, effectsMenu, samples } from "./skin/effects";
 
 const BANDS = [31, 62, 125, 250, 500, 1000, 2000, 4000, 8000, 16000];
 const SETTINGS_KEY = "player";
@@ -58,7 +59,8 @@ type FromSkin =
   | { type: "mute"; value: boolean }
   | { type: "seek"; seconds: number }
   | { type: "eq"; band: number; gain: number }
-  | { type: "effects"; on: boolean };
+  | { type: "effects"; on: boolean }
+  | { type: "effectsMenu"; effect: number };
 
 const clamp = (v: unknown, lo: number, hi: number, fallback: number) =>
   typeof v === "number" && Number.isFinite(v) ? Math.min(hi, Math.max(lo, v)) : fallback;
@@ -105,9 +107,7 @@ function onSkin(m: FromSkin) {
   else if (m.type === "effects") {
     effectsOn = m.on;
     startVis();
-    // A skin sends this on its first paint: a new skin needs the card too.
-    sendCard();
-  }
+  } else if (m.type === "effectsMenu") void openEffectsMenu(m.effect);
   else if (m.type === "select") player.select(m.index);
   else if (m.type === "seek") player.seek(m.seconds);
   else {
@@ -157,46 +157,34 @@ function info(i: number) {
   return { title: item.title, url, author: "", location: "", link: "", artwork: undefined };
 }
 
-// The show card, the "NTS show" visualisation (ATA-166): the show's title,
-// up to 4 genres and its picture. The skin has no network, so this page
-// fetches the picture and hands it over as a data: URL, once per change.
-// Without the API or the picture, the card is the item's title alone.
-let card = "";
-let cardMsg: { type: "show"; title: string; genres: string[]; image: string | null } | null = null;
-function sendCard() {
-  if (cardMsg) void invoke("skin_send", { msg: cardMsg }).catch(() => {});
-}
-async function updateCard(i: number) {
-  const item = items[i];
-  const show = i < CHANNELS.length ? onAir[i] : undefined;
-  const pick = picks.get(item.url);
-  // A mixtape's name without its subtitle; a pick's without its location and tags.
-  const title = show?.show ?? pick?.name ?? item.name ?? item.title;
-  const genres = (show?.genres ?? pick?.tags ?? []).slice(0, 4);
-  const artwork = show ? show.artwork : (pick?.artwork ?? item.artwork);
-  const key = JSON.stringify([title, genres, artwork]);
-  if (key === card) return;
-  card = key;
-  let image: string | null = null;
+// The visualisation menu (ATA-190): a right click on a skin's effects area
+// lists every effect and Milkdrop preset, as WMP's did. Built here, not in
+// the skin webview; the skin gets back only the index picked. One at a time.
+let fxMenu: Promise<{ menu: Menu; items: CheckMenuItem[] }> | null = null;
+let menuOpen = false;
+async function openEffectsMenu(current: number) {
+  if (menuOpen || !Number.isInteger(current)) return;
+  menuOpen = true;
   try {
-    const response = artwork ? await fetch(artwork, { signal: AbortSignal.timeout(10_000) }) : null;
-    const blob = response?.ok ? await response.blob() : null;
-    if (blob?.type.startsWith("image/")) image = await dataUrl(blob);
+    const { effects, milkdrop } = effectsMenu(current);
+    const all = [...effects, ...milkdrop];
+    // Built once; each time only the checks change.
+    fxMenu ??= (async () => {
+      const pick = (index: number) => () => void invoke("skin_send", { msg: { type: "effect", index } }).catch(() => {});
+      const items = await Promise.all(all.map(({ index, text }) => CheckMenuItem.new({ text, checked: false, action: pick(index) })));
+      const menu = await Menu.new({ items: [...items.slice(0, effects.length), await Submenu.new({ text: "Milkdrop", items: items.slice(effects.length) })] });
+      return { menu, items };
+    })();
+    const { menu, items } = await fxMenu;
+    await Promise.all(all.map((e, i) => items[i].setChecked(e.checked)));
+    await menu.popup();
   } catch (error: unknown) {
-    console.warn("show picture failed", error);
+    console.warn("effects menu failed", error);
+    fxMenu = null;
+  } finally {
+    menuOpen = false;
   }
-  // Another item or show came along while this one loaded.
-  if (key !== card) return;
-  cardMsg = { type: "show", title, genres, image };
-  sendCard();
 }
-const dataUrl = (blob: Blob) =>
-  new Promise<string>((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = () => reject(reader.error);
-    reader.readAsDataURL(blob);
-  });
 
 // Windows' media overlay, through WebView2's Media Session.
 let overlay = "";
@@ -237,7 +225,6 @@ setInterval(() => {
   const now = player.state();
   const { artwork: _, ...shown } = info(now.channel);
   updateOverlay(now.channel);
-  void updateCard(now.channel);
   updateTray(shown.title, now.channel, now.playState);
   const state = { type: "state", ...now, ...shown, items: items.map((_, i) => info(i).title), ...settings, level: level() };
   void invoke("skin_send", { msg: state }).catch(() => {});
