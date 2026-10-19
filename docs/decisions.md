@@ -22,10 +22,12 @@ the evidence.
   it fills the same track.
 - **Stretched sliders are unchanged.** The page ties the caps to tiling
   only, so a slider without `tiled` still stretches its whole image.
-- **What changed:** among the working skins, only sliders with both
-  `tiled="true"` and a `borderSize` draw differently: Headspace, iMusica,
-  iconic, Vario, Faith, and one slider each in Primitive, 9SeriesDefault,
-  Canvas, Miniplayer, Plus! and Nautical. Release-build screenshots of
+- **What changed:** among the working skins, only tiled sliders with a
+  `borderSize` and an image longer than both caps draw differently:
+  Headspace, iMusica, iconic, Vario, Faith, and one slider each in
+  Primitive, 9SeriesDefault, Canvas and Plus!. Nautical's seek slider sets
+  both attributes but has no image; Miniplayer's seek image is exactly the
+  slider's length. Both draw as before. Release-build screenshots of
   bluegrid, Classic, anemone and the house skin match `main` pixel for pixel
   outside the visualisation, title and clock, which move; none of them has
   such a slider.
