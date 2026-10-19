@@ -519,11 +519,13 @@ fn show_page(page: &Page) -> Option<Url> {
     Url::parse(&url).ok()
 }
 
-/// The tray menu, its two channels, checked while current, its "Show on
+/// The tray menu, its Mute, checked while muted, its two channels, checked
+/// while current, its "Show on
 /// nts.live" entry, in the menu only while the current show has a page, and
 /// its credit entry, in the menu only while a pick plays.
 struct Tray {
     menu: Menu<Wry>,
+    mute: CheckMenuItem<Wry>,
     channels: [CheckMenuItem<Wry>; 2],
     show: MenuItem<Wry>,
     credit: MenuItem<Wry>,
@@ -563,18 +565,29 @@ fn soundcloud_page(url: &str) -> bool {
 /// Windows keeps 127 UTF-16 units of a tray tooltip, and tray-icon copies a
 /// longer one without its terminator. Cut on a character boundary. From the
 /// Winamp app.
-fn fit_tooltip(text: &str) -> String {
+fn fit_tooltip(text: &str, max: usize) -> String {
     let mut units = 0;
     text.chars()
         .take_while(|c| {
             units += c.len_utf16();
-            units <= 127
+            units <= max
         })
         .collect()
 }
 
-/// The trusted page, whenever what plays changes: its title for the tray's
-/// tooltip, the channel to check in the tray, the show's or pick's aliases on
+/// The tray's tooltip: the title, and while muted " (muted)", which a long
+/// title never cuts off (ATA-194).
+fn tooltip(title: &str, mute: bool) -> String {
+    const MUTED: &str = " (muted)";
+    if mute {
+        fit_tooltip(title, 127 - MUTED.len()) + MUTED
+    } else {
+        fit_tooltip(title, 127)
+    }
+}
+
+/// The trusted page, whenever what plays or the mute changes: its title for
+/// the tray's tooltip, the mute to check in the tray, the channel to check in the tray, the show's or pick's aliases on
 /// nts.live, and a pick's credit, or none.
 /// While a pick plays the app draws the credit itself, above the skin, in a
 /// webview of its own: a skin's code cannot hide it, and a skin with no title
@@ -583,21 +596,23 @@ fn fit_tooltip(text: &str) -> String {
 async fn now_playing(
     app: AppHandle,
     title: String,
+    mute: bool,
     channel: Option<usize>,
     credit: Option<Credit>,
     page: Option<Page>,
 ) -> Result<(), String> {
     if let Some(tray) = app.tray_by_id("main") {
-        let _ = tray.set_tooltip(Some(fit_tooltip(&title)));
+        let _ = tray.set_tooltip(Some(tooltip(&title, mute)));
     }
     let tray = app.state::<Tray>();
+    let _ = tray.mute.set_checked(mute);
     tray.check(channel);
     // Without a page (a mixtape, the live API down) the entry leaves the menu.
     let page = page.as_ref().and_then(show_page);
     let shown = page.is_some();
     let had_page = std::mem::replace(&mut *SHOW_PAGE.lock().unwrap(), page).is_some();
     if shown && !had_page {
-        let _ = tray.menu.insert(&tray.show, 5);
+        let _ = tray.menu.insert(&tray.show, 6);
     } else if had_page && !shown {
         let _ = tray.menu.remove(&tray.show);
     }
@@ -621,7 +636,7 @@ async fn now_playing(
                 .set_text(credit_text(c).replace('&', "&&"))
                 .map_err(|e| e.to_string())?;
             if !had {
-                let _ = tray.menu.insert(&tray.credit, 5 + shown as usize);
+                let _ = tray.menu.insert(&tray.credit, 6 + shown as usize);
             }
             // As wide as the window while it lays out; credit_size narrows it.
             let width = window
@@ -692,7 +707,7 @@ fn open_credit() {
     }
 }
 
-/// The tray icon: play, stop, the two channels, the show's page while it has
+/// The tray icon: play, stop, mute, the two channels, the show's page while it has
 /// one, the pick's credit while one plays, and quit. A left click brings the
 /// player forward.
 fn build_tray(app: &AppHandle) -> tauri::Result<()> {
@@ -702,15 +717,18 @@ fn build_tray(app: &AppHandle) -> tauri::Result<()> {
     };
     let sep = || PredefinedMenuItem::separator(app);
     let channels = [channel("nts1", "NTS 1")?, channel("nts2", "NTS 2")?];
+    // Checked or not by now_playing, from the trusted page's settings.
+    let mute = CheckMenuItem::with_id(app, "mute", "Mute", true, false, None::<&str>)?;
     let menu = Menu::with_items(
         app,
         &[
             &item("play", "Play")?,
             &item("stop", "Stop")?,
+            &mute,
             &sep()?,
             &channels[0],
             &channels[1],
-            // "Show on nts.live" goes here, at 5, while the show has a page,
+            // "Show on nts.live" goes here, at 6, while the show has a page,
             // then the credit while a pick plays.
             &sep()?,
             &item("quit", "Quit")?,
@@ -720,6 +738,7 @@ fn build_tray(app: &AppHandle) -> tauri::Result<()> {
     let credit = item("credit", "SoundCloud")?;
     app.manage(Tray {
         menu: menu.clone(),
+        mute,
         channels,
         show,
         credit,
@@ -763,7 +782,8 @@ fn on_tray_menu(app: &AppHandle, event: MenuEvent) {
             app.state::<Tray>().check(Some((id == "nts2") as usize));
             let _ = app.emit_to(EventTarget::webview("main"), "tray", id);
         }
-        // main.ts plays, stops and switches.
+        // main.ts plays, stops, mutes and switches. Windows flips Mute's mark
+        // itself; now_playing then sets it from the setting.
         id => {
             let _ = app.emit_to(EventTarget::webview("main"), "tray", id);
         }
@@ -1229,9 +1249,21 @@ mod tests {
 
     #[test]
     fn fit_tooltip_keeps_127_utf16_units_on_a_char_boundary() {
-        assert_eq!(fit_tooltip("NTS 1 - Show"), "NTS 1 - Show");
-        assert_eq!(fit_tooltip(&"a".repeat(200)).len(), 127);
-        assert_eq!(fit_tooltip(&"\u{1F4FB}".repeat(64)).chars().count(), 63);
+        assert_eq!(fit_tooltip("NTS 1 - Show", 127), "NTS 1 - Show");
+        assert_eq!(fit_tooltip(&"a".repeat(200), 127).len(), 127);
+        assert_eq!(
+            fit_tooltip(&"\u{1F4FB}".repeat(64), 127).chars().count(),
+            63
+        );
+    }
+
+    #[test]
+    fn a_muted_tooltip_says_so_however_long_the_title() {
+        assert_eq!(tooltip("NTS 1: Show", false), "NTS 1: Show");
+        assert_eq!(tooltip("NTS 1: Show", true), "NTS 1: Show (muted)");
+        let long = tooltip(&"a".repeat(200), true);
+        assert_eq!(long.len(), 127);
+        assert!(long.ends_with(" (muted)"));
     }
 
     #[test]
