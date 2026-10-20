@@ -124,7 +124,10 @@ fn pick_audio(rate: u32) -> tauri::ipc::Response {
     #[cfg(windows)]
     let samples = loopback::latest(rate.clamp(8_000, 192_000));
     #[cfg(not(windows))]
-    let samples: Vec<f32> = Vec::new();
+    let samples: Vec<f32> = {
+        let _ = rate;
+        Vec::new()
+    };
     tauri::ipc::Response::new(
         samples
             .iter()

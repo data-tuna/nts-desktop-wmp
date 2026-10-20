@@ -27,7 +27,8 @@ cross-origin frame, so its audio never reaches our Web Audio graph.
   same dB range), so Bars, Scope, Ambience and Milkdrop get their frames
   the same way on both. The capture comes after the widget's volume, so
   the samples are divided by it: the visualisation moves at any volume,
-  as on a stream, and is still when muted. NTS 1 and 2 still use the Web
+  as on a stream, but is still when muted, unlike a stream's, which reads
+  before the volume and moves when muted. NTS 1 and 2 still use the Web
   Audio analyser.
 - **WebView2's audio is in the tree.** WebView2 plays from a sandboxed
   audio-service process under its browser process, which runs under ours.

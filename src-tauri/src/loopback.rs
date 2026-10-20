@@ -95,7 +95,11 @@ fn run((client, packets, event): Stream) -> Result<(), Box<dyn std::error::Error
             continue;
         }
         while packets.get_next_packet_size()?.unwrap_or(0) > 0 {
-            packets.read_from_device_to_deque(&mut bytes)?;
+            let start = bytes.len();
+            // A silent packet's data is to be ignored, but wasapi copies it anyway.
+            if packets.read_from_device_to_deque(&mut bytes)?.flags.silent {
+                bytes.range_mut(start..).for_each(|b| *b = 0);
+            }
         }
         push(&mut STATE.lock().unwrap().samples, bytes.make_contiguous());
         bytes.clear();

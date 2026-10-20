@@ -264,9 +264,9 @@ async function pickFrame() {
       loopback = false;
       return;
     }
-    // The capture comes after the widget's volume; undo it, so the
-    // visualisation moves at any volume, as on a stream. Muted, it is still.
-    const volume = settings.mute ? 0 : settings.volume;
+    // The capture comes after the widget's volume, which it rounds to whole
+    // percent; undo it, so the visualisation moves at any volume. Muted, it is still.
+    const volume = settings.mute ? 0 : Math.round(settings.volume * 100) / 100;
     if (volume > 0) pcm.forEach((v, i) => (pcm[i] = v / volume));
     pickAnalyser.frequency(pcm, spectrum);
     pickAnalyser.time(pcm, wave);
