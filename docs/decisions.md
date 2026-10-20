@@ -456,7 +456,8 @@ a second (ATA-109):
 `stopped`. `duration` is 0 for a live stream, as in WMP: a skin shows its
 seek bar disabled. For a pick it is its length in seconds (ATA-165).
 `volume`, `mute`, `balance` and `eq` (ten gains in dB) are the current
-settings, so a skin's controls start where the listener left them.
+settings. A skin's controls start where the listener left them, except
+mute, which always starts off (ATA-196).
 `covered` is true while other windows hide the player (ATA-122's
 `win32::watch_cover`); scrolling text stops then (ATA-191).
 
