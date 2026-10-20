@@ -685,22 +685,24 @@ test("a button group with no image takes clicks only on its elements (Cablemusic
   assert.deepEqual(js("[closes, tabs]"), [1, 1]);
 });
 
-test("a button whose image is all transparencyColor is clicked where its hover image is drawn (Grinch's playlist button)", () => {
-  const clear = new Uint8ClampedArray(10 * 10 * 4);
-  for (let i = 0; i < 100; i++) clear.set([255, 51, 204, 255], i * 4);
-  const lit = new Uint8ClampedArray(10 * 10 * 4).fill(255);
+test("a button whose image is all transparencyColor is a hotspot over its box (holiday_skin, Grinch's playlist button)", () => {
+  // A 2×2 tile of the transparency colour on a 16×12 button, as holiday_skin's are.
+  const clear = new Uint8ClampedArray(2 * 2 * 4);
+  for (let i = 0; i < 4; i++) clear.set([51, 51, 51, 255], i * 4);
   const { js } = load(
-    `<theme><view width="10" height="10">
-       <button id="b" image="clear.bmp" hoverImage="lit.bmp" transparencyColor="#FF33CC" onClick="presses++;"/>
+    `<theme><view width="20" height="20">
+       <button id="b" image="clear.gif" tiled="true" width="16" height="12" transparencyColor="#333333" onClick="presses++;"/>
      </view></theme>`,
     {},
     STATE,
-    new Map([["clear.bmp", { width: 10, height: 10, data: clear, bitmap: {} }], ["lit.bmp", { width: 10, height: 10, data: lit, bitmap: {} }]]),
+    new Map([["clear.gif", { width: 2, height: 2, data: clear, bitmap: {} }]]),
   );
   js("presses = 0");
-  listeners.mousedown({ button: 0, clientX: 5, clientY: 5 });
-  listeners.mouseup({ button: 0, clientX: 5, clientY: 5 });
-  assert.equal(js("presses"), 1);
+  for (const [x, y] of [[10, 8], [18, 18]]) {
+    listeners.mousedown({ button: 0, clientX: x, clientY: y });
+    listeners.mouseup({ button: 0, clientX: x, clientY: y });
+  }
+  assert.equal(js("presses"), 1, "inside the box, not outside it");
 });
 
 test("playlist.setColumnWidth does nothing, so the code after it runs (TwinBlade's playlist drawer)", () => {

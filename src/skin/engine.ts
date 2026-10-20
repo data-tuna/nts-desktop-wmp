@@ -715,9 +715,12 @@ class El {
       const img = this.img("image");
       return img && this.solid(img, lx, ly) ? this : null;
     }
-    // Where its image or its hover image is drawn: Grinch's playlist button
-    // is all transparencyColor until the pointer is over it.
-    if (this.kind === "button") return this.solid(this.img("image"), lx, ly) || (this.has("hoverimage") && this.solid(this.img("hoverimage"), lx, ly)) ? this : null;
+    if (this.kind === "button") {
+      // An image that is all transparencyColor makes the button an invisible
+      // hotspot over its box: holiday_skin's controls, Grinch's playlist button.
+      const img = this.img("image");
+      return this.solid(img, lx, ly) || (img !== undefined && this.skin.blank(img, this.color("transparencycolor"))) ? this : null;
+    }
     if (this.kind === "custom") {
       const pos = this.img("positionimage");
       return pos && this.gray(pos, lx, ly) !== null ? this : null;
@@ -848,6 +851,7 @@ export class Skin {
   private players: El[] = [];
   private compiled = new Map<string, (...args: unknown[]) => unknown>();
   private keyCache = new WeakMap<Img, Map<string, HTMLCanvasElement>>();
+  private blanks = new WeakMap<Img, Map<number, boolean>>();
   private resImages = new Map<string, Img | undefined>();
   private logged = new Set<string>();
   private pressed: El | null = null;
@@ -1263,6 +1267,20 @@ export class Skin {
   str(e: El, name: string): string {
     const { ok, v } = this.value(e, name);
     return ok && v !== undefined && v !== null ? String(v) : "";
+  }
+
+  /** Whether every pixel of `img` is `rgb`, cached. */
+  blank(img: Img, rgb: number | null): boolean {
+    if (rgb === null) return false;
+    let byColor = this.blanks.get(img);
+    if (!byColor) this.blanks.set(img, (byColor = new Map()));
+    let all = byColor.get(rgb);
+    if (all === undefined) {
+      all = true;
+      for (let y = 0; y < img.height && all; y++) for (let x = 0; x < img.width && all; x++) all = rgbAt(img, x, y) === rgb;
+      byColor.set(rgb, all);
+    }
+    return all;
   }
 
   /** `img` with the given colour made transparent, cached. */

@@ -129,8 +129,9 @@ cache); with none picked, every launch wears a random working skin.
 
 **No SoundCloud credit or name.** Ata dropped the credit SoundCloud's terms
 ask for and accepts the risk (ATA-197, 2026-10-20). A pick's title is the
-episode's, from the picks API. Do not add "SoundCloud" or the uploader back
-to the skin, the tray or the media overlay.
+episode's, from the picks API, and a double click on it opens the episode
+on nts.live, not on SoundCloud (ATA-198). Do not add "SoundCloud" or the
+uploader back to the skin, the tray, the media overlay or a link.
 
 **Skins are fetched at runtime and never committed.** `.wmz` skins are
 third-party works, and many of the classic ones are Microsoft's own. They
@@ -414,7 +415,19 @@ points more (ATA-167).
 
 **Only a skin's first view is drawn.** `theme.openView` and
 `theme.currentViewID` are logged and ignored, so circle's video, playlist
-and settings views and 9SeriesDefault's compact view never open.
+and settings views and 9SeriesDefault's compact view never open. 47 of the
+136 listed skins with a playlist have it only in a view the engine never
+opens (circle, Kenwood_MP7, portals, QuantumRedshift and more; ATA-198).
+
+**Some playlists still cannot be opened** (ATA-198). The skin's own
+button or script fails to show them: Faith Hill, Unity, UPRISING and Kids
+call functions from a `.js` that no `scriptFile` names; tubeframe's
+toggle recurses until the stack overflows; Cablemusic's hangs; Crystalball
+leaves the list's subview hidden; TwinBlade's and Bluesky's playlist
+buttons are under other parts of the skin; Darkling's sit in subviews
+chosen by screen size, all hidden. Light text on a
+light list (Secura, deepbluesomething, Stealth, NPR, raveworld) is the
+skin's own choice of colours.
 
 **Kenwood_MP7 loses its display.** It is listed as "works", but its
 `mainMeta` subview (title, clock, seek bar, EQ) is never drawn or hit,
@@ -424,7 +437,9 @@ markup and likely the same fault.
 **Video, item and drop-down playlists, and popups are not drawn.**
 `<playlist>` lists the channels, mixtapes and picks, with a scroll bar
 when they do not all fit, and scrolls the playing row's name when it is
-too long (ATA-191); it has no columns. Nobody has dragged that scroll bar
+too long (ATA-191); it has no columns. It lies over every image in the
+view and is part of the window shape, as WMP's own window was (ATA-198).
+Its `backgroundImage` is not drawn. Nobody has dragged that scroll bar
 with a real mouse yet. Their methods
 (`setColumnResizeMode`, `appendItem`) are logged and do nothing.
 
