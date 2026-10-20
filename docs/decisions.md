@@ -32,7 +32,8 @@ shows Album Art, not Bars.
   message). The skin CSP is unchanged. `tools/escape.mjs` on the release
   build: every attempt from the skin is still refused.
 - **CPU.** Album Art wants no analyser frames (`effects` `on: false`); none
-  arrived in 3 s. Release build, anemone, NTS 1 playing muted on a hidden
+  arrived in 3 s. A picture that fails to load is fetched again a minute
+  later, since the URL stays the same for the whole show. Release build, anemone, NTS 1 playing muted on a hidden
   desktop, 30 s samples alternated on one running app: Album Art 6.1, 6.8,
   4.3 % of one core, visualisation hidden 5.3, 5.6, 4.7 %. Bars in an
   earlier launch: 21.9 %.
@@ -926,15 +927,18 @@ Milkdrop presets one at a time is slow. This reverses the show card
 (ATA-166, below).
 
 - **The card is gone.** The "NTS show" effect, its drawing and layout, the
-  `show` message and the trusted page's picture fetch are deleted, with
-  what only they used: the live API's genres, the mixtapes' pictures and
+  `show` message and the trusted page's picture fetch are deleted (the
+  fetch is back since ATA-200), with
+  what only they used: the live API's genres, the mixtapes' pictures (back
+  since ATA-200) and
   bare titles, the picks' bare names and tags (`name`, `tags`). The
   playlist and the title never used those: they show each item's full
   `title`, as before ATA-166. The pick's picture stays, for the overlay.
 - **Default and fallback.** The first launch shows Bars again, as before
-  ATA-166. The choice is still saved (`mediacenter` in the skin webview's
+  ATA-166 (Album Art since ATA-200). The choice is still saved (`mediacenter` in the skin webview's
   `localStorage`); a saved effect the list does not have, such as "NTS
-  show", reads as Bars, so a skin bound to `mediacenter` sees Bars too.
+  show", reads as Bars, so a skin bound to `mediacenter` sees Bars too
+  (Album Art since ATA-200).
 - **The menu.** As in WMP, a right click on the skin's `effects` area opens
   a menu: Bars, Scope, Ambience, and a Milkdrop submenu with the 29 presets
   by name (Butterchurn's names, `PRESETS` in `milkdrop.ts`; a test checks
@@ -1193,7 +1197,7 @@ WMP or from the GPL WMP 8 clone. `src/skin/effects.ts` has them.
   properties' `_onchange` handlers, which is how anemone, bluegrid and
   cerulean save the choice to `mediacenter`. `mediacenter` is not saved
   across launches (it is since ATA-166, and the first launch shows Bars
-  again since ATA-190).
+  again since ATA-190, Album Art since ATA-200).
 - **Colours.** `backgroundColor` (black if none) behind, and
   `foregroundColor` for bars and scope if the skin gives one (the house
   skin's amber); otherwise WMP-like green to red.

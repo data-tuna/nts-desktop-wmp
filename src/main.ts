@@ -158,6 +158,10 @@ async function updateArt(i: number) {
   }
   // Another item or show came along while this one loaded.
   if (artwork !== art) return;
+  // A picture that failed is fetched again in a minute: the URL stays the same for the whole show.
+  if (artwork && !image) setTimeout(() => {
+      if (art === artwork) art = undefined;
+    }, 60_000);
   artMsg = { type: "art", image };
   sendArt();
 }
