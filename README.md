@@ -13,8 +13,9 @@ you listen a lot, support the station directly:
 
 Status: in progress. The app opens on NTS 1 in a
 random skin from the archive, one of the 59 the engine draws well so far.
-Right-click the skin to pick another; the app keeps your pick. Right-click
-the visualisation to pick an effect or a Milkdrop preset. The tray icon
+Right-click the skin to pick another; the app keeps your pick. The
+visualisation area shows the show's picture; right-click it to pick an
+effect or a Milkdrop preset instead. The tray icon
 plays, stops and switches channels, and opens the current show's page on
 nts.live, where you can follow or save it. The media keys work, and only one copy
 runs at a time. The window opens where you left it. Without a

@@ -6,6 +6,43 @@ the evidence.
 
 ## Stack
 
+### Album Art: the show's picture alone, first and by default (ATA-200, 2026-10-20)
+
+Ata (ATA-163): "once you're in a visualisation you can't go back to the
+general visualisation of the show, like the images." Mika read it as WMP's
+Album Art: the picture alone, no text (ATA-190 dropped the text card).
+This partly reverses ATA-190's "Default and fallback": the first launch now
+shows Album Art, not Bars.
+
+- **What.** A fifth effect, **Album Art** (`effectType` "Album Art",
+  preset 0), draws the show's picture over the whole `effects` area,
+  cropped and centred, and nothing else. With no picture it is the
+  element's background colour. On a channel or a pick the picture is the
+  media overlay's: the live API's `media.picture_small`, or the picks
+  API's episode picture. On a mixtape it is the mixtapes API's
+  `media.picture_small` (`mixtapes.ts` reads it again, as ATA-166 did).
+- **Easy to reach.** It is index 0 of `EFFECTS`: first in the right-click
+  menu, first in the `next()`/`previous()` cycle (after the last Milkdrop
+  preset comes Album Art), and what an unknown or missing saved effect
+  reads as, so the default on a first launch. A saved choice still wins.
+- **Isolation.** As ATA-166: the trusted page fetches the picture
+  (`media*.ntslive.co.uk` sends `Access-Control-Allow-Origin: *`) and sends
+  it as a `data:` URL in an `art` message through `skin_send`, when the
+  picture changes and again on each skin's first paint (its `effects`
+  message). The skin CSP is unchanged. `tools/escape.mjs` on the release
+  build: every attempt from the skin is still refused.
+- **CPU.** Album Art wants no analyser frames (`effects` `on: false`); none
+  arrived in 3 s. Release build, anemone, NTS 1 playing muted on a hidden
+  desktop, 30 s samples alternated on one running app: Album Art 6.1, 6.8,
+  4.3 % of one core, visualisation hidden 5.3, 5.6, 4.7 %. Bars in an
+  earlier launch: 21.9 %.
+- **Release build, hidden desktop.** anemone, bluegrid and the house skin
+  open on Album Art and show the show's picture on NTS 1 and NTS 2, with
+  no text (screenshots on ATA-200). On anemone, from Milkdrop, a right
+  click on the area followed by the menu's pick of entry 0 (sent as the
+  menu sends it) goes straight back to the picture. Nobody has clicked the
+  menu with a real mouse.
+
 ### The visualisation during a pick: the app's own output (ATA-199, 2026-10-20)
 
 Ata (ATA-163): "why doesn't the visualiser, Milkdrop etc., work when I'm
@@ -587,7 +624,11 @@ From ATA-190, the effect picked in the visualisation menu, by its index in
 
     { "type": "effect", "index": n }
 
-ATA-166's `show` message (the show card) is gone since ATA-190.
+ATA-166's `show` message (the show card) is gone since ATA-190. From
+ATA-200, the show's picture for Album Art, when it changes and after each
+skin's first `effects` message; `image` is null when there is none:
+
+    { "type": "art", "image": "data:image/jpeg;base64,…" | null }
 
 The skin also gets `GET /` (the engine page), `GET /engine.js` (the
 engine), `GET /milkdrop.js` (Butterchurn and its presets; ATA-167),

@@ -40,3 +40,19 @@ test("anything not shaped like the API gives no mixtapes", () => {
     assert.deepEqual(parseMixtapes(body), []);
   }
 });
+
+// This copy's own (ATA-200): the picture for Album Art, https only.
+test("a mixtape's picture, when it is an https url", () => {
+  const hls = "https://streams.radiomast.io/abc-123/hls.m3u8";
+  const picture_small = "https://media3.ntslive.co.uk/resize/200x200/a.jpeg";
+  const body = {
+    results: [
+      { title: "A", audio_stream_endpoint_hls_mp3: hls, media: { picture_small } },
+      { title: "B", audio_stream_endpoint_hls_mp3: hls, media: { picture_small: "http://media3.ntslive.co.uk/b.jpeg" } },
+    ],
+  };
+  assert.deepEqual(
+    parseMixtapes(body).map((m) => m.artwork),
+    [picture_small, undefined],
+  );
+});

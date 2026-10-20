@@ -5,7 +5,7 @@
 import type { Pick as NtsPick } from "./picks.ts";
 
 /** A playlist row. A pick plays through `Widget`, everything else through the <audio> element. */
-export type Item = { title: string; url: string; pick?: boolean };
+export type Item = { title: string; url: string; pick?: boolean; artwork?: string };
 
 /** What plays a pick (main.ts: SoundCloud's widget). It reports a finish or an error to the caller itself. */
 export type Widget = {

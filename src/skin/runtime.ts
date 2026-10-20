@@ -191,7 +191,8 @@ export function objects(host: Host) {
     logstring: () => {},
   };
   // The effect is saved for the next launch (ATA-166); the first launch shows
-  // Bars. One the list no longer has (ATA-166's "NTS show") reads as Bars too.
+  // Album Art (ATA-200). One the list no longer has (ATA-166's "NTS show")
+  // reads as Album Art too.
   const saved = () => EFFECTS[effectIndex(localStorage.getItem("effectType") ?? "", Number(localStorage.getItem("effectPreset")) || 0)];
   const mediacenter = {
     get effecttype() {
