@@ -96,10 +96,19 @@ for Rust's downloads (`HTTPS_PROXY`), with clicks sent through DevTools:
   defaults it to false. Switching would change many skins at once, so that
   is left for an issue of its own if a skin shows it.
 
+### The app always opens unmuted (ATA-196, 2026-10-20)
+
+- **Mute no longer survives a restart.** Ata's app opened silent two days
+  running: it was still muted from ATA-194, and the visualiser kept moving
+  because it reads the stream before the volume. Mika decided the app
+  always opens unmuted; volume, balance and EQ are still remembered.
+- **The saved `mute` is ignored on load** (`src/settings.ts`). It is still
+  written, which is harmless and keeps the change to one line.
+
 ### Mute in the tray (ATA-194, 2026-10-19)
 
-- **Ata's app went quiet because it was muted.** Mute is remembered across
-  restarts, and 9SeriesDefault's mute button (`bMute`) sits among Play,
+- **Ata's app went quiet because it was muted.** Mute was remembered across
+  restarts (no longer, since ATA-196), and 9SeriesDefault's mute button (`bMute`) sits among Play,
   Stop, Next and Previous, easy to hit and hard to spot.
 - **The tray has a Mute check item.** It toggles the same setting a skin's
   mute button sets, in the trusted page, and `now_playing` checks it from
@@ -334,8 +343,8 @@ from there. Back on NTS 1 the slider was disabled and `duration` 0.
   (the buffer played out first), six retries all to `/nts1`, and playback
   5 s after the cut ended. A pause during a cut stayed paused: no tunnel
   opened after the cut ended.
-- **Remembered:** volume, mute, balance and the EQ, in the trusted page's
-  `localStorage`, clamped on load. The skin came later, with ATA-112: a
+- **Remembered:** volume, balance and the EQ, in the trusted page's
+  `localStorage`, clamped on load. Mute was too, until ATA-196. The skin came later, with ATA-112: a
   skin picked in the picker is remembered, and with none picked every
   launch wears a random one (Mika decided this for Ata on 2026-10-11; see
   Skins below).
@@ -446,7 +455,7 @@ a second (ATA-109):
 `playState` is `playing`, `buffering`, `reconnecting`, `paused` or
 `stopped`. `duration` is 0 for a live stream, as in WMP: a skin shows its
 seek bar disabled. For a pick it is its length in seconds (ATA-165).
-`volume`, `mute`, `balance` and `eq` (ten gains in dB) are the saved
+`volume`, `mute`, `balance` and `eq` (ten gains in dB) are the current
 settings, so a skin's controls start where the listener left them.
 `covered` is true while other windows hide the player (ATA-122's
 `win32::watch_cover`); scrolling text stops then (ATA-191).

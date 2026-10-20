@@ -120,8 +120,9 @@ skip to the next channel on a drop. Pause and stop are never undone by a
 retry. `player.ts` does this, and treats an error, an `ended` event and a
 clock stuck for 10 s alike.
 
-**The app always opens on NTS 1 and plays it.** Volume, mute, balance and the
-EQ are remembered (`localStorage` in the trusted page); the channel is not.
+**The app always opens on NTS 1 and plays it, unmuted.** Volume, balance and
+the EQ are remembered (`localStorage` in the trusted page); the channel and
+mute are not (ATA-196).
 The skin picked in the picker is remembered too (`skin.json` beside the skin
 cache); with none picked, every launch wears a random working skin.
 
