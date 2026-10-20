@@ -46,7 +46,7 @@ Written in English.
                           engine.ts lays out and paints the view, runs the
                           skin's scripts and handles the pointer, runtime.ts
                           is the WMP object model the scripts see, effects.ts
-                          draws the visualisations,
+                          draws the visualisations and Album Art,
                           milkdrop.ts runs Butterchurn for Milkdrop,
                           pixels.ts holds the pixel helpers its tests share.
                           main.ts is the entry; index.html the page.
@@ -455,12 +455,13 @@ Its `backgroundImage` is not drawn. Nobody has dragged that scroll bar
 with a real mouse yet. Their methods
 (`setColumnResizeMode`, `appendItem`) are logged and do nothing.
 
-**Three visualisations and Milkdrop** (ATA-114, ATA-167, ATA-190): bars,
-scope and ambience are our own; Milkdrop is Butterchurn with 29 presets,
-one `next()` each. A right click on the visualisation opens a menu of all
-of them. The chosen effect is saved in the skin webview's `localStorage`;
-the first launch shows Bars. Nobody has clicked that menu with a real
-mouse yet.
+**Album Art, three visualisations and Milkdrop** (ATA-114, ATA-167,
+ATA-190, ATA-200): Album Art draws the show's picture alone; bars, scope
+and ambience are our own; Milkdrop is Butterchurn with 29 presets, one
+`next()` each. A right click on the visualisation opens a menu of all of
+them, Album Art first. The chosen effect is saved in the skin webview's
+`localStorage`; the first launch shows Album Art. Nobody has clicked that
+menu with a real mouse yet.
 
 **Nobody has looked at the media overlay itself.** Windows lists the app's
 session with its title and show (`NTS 1: <show> - <location>`), and plays,

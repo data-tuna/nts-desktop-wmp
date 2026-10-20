@@ -8,7 +8,7 @@
 import { CHANNELS } from "../player.ts";
 import { constants, type Node } from "./wms.ts";
 import { average, css, firstAt, keyed, mappedElement, mix, overlay, parseColor, playingColors, rgbAt, runs, textOn, thumb, tiles, type Pixels } from "./pixels.ts";
-import { drawEffect, EFFECTS, effectIndex, type Frame, type Memory } from "./effects.ts";
+import { ALBUM_ART, drawEffect, EFFECTS, effectIndex, type Frame, type Memory } from "./effects.ts";
 import { clock, CONSTANTS, OS_MEDIA_CHANGING, OS_MEDIA_OPEN, objects, playState, resImage, resScript, resString, wmpObject, type Host } from "./runtime.ts";
 
 /** A text showing the current item's name, title or author. */
@@ -555,7 +555,8 @@ class El {
   private paintEffects(g: CanvasRenderingContext2D) {
     const skin = this.skin;
     if (skin.finding) skin.fxFound.push(this);
-    skin.effectsShown = true;
+    // Album Art is static: it wants no analyser frames (ATA-200).
+    if (skin.effect(this) !== ALBUM_ART) skin.effectsShown = true;
     g.fillStyle = skin.fxSolid;
     g.fillRect(this.x, this.y, this.w, this.h);
   }
@@ -566,7 +567,7 @@ class El {
     const skin = this.skin;
     const fg = this.color("foregroundcolor");
     const frame = skin.state.playState === "playing" ? skin.frame : null;
-    drawEffect(g, skin.effect(this), frame, [x, y, this.w, this.h], css(this.color("backgroundcolor") ?? 0), fg === null ? null : css(fg), this.memory);
+    drawEffect(g, skin.effect(this), frame, skin.art, [x, y, this.w, this.h], css(this.color("backgroundcolor") ?? 0), fg === null ? null : css(fg), this.memory);
   }
 
   /** The playlist's row height, in px. */
@@ -813,6 +814,9 @@ export class Skin {
   // Null until the first paint, so each skin tells the host whether it
   // wants frames: a skin chosen in the picker replaces one that did.
   private effectsOn: boolean | null = null;
+  /** The show's picture from the trusted page's last `art` message (ATA-200). */
+  art: HTMLImageElement | null = null;
+  private artGen = 0;
   /** The effects element the visualisation menu was opened on (ATA-190). */
   private menuFor: El | null = null;
   /** How the visualisations were found at the last full paint: each one's
@@ -1401,6 +1405,27 @@ export class Skin {
   setFrame(f: Frame) {
     this.frame = f;
     if (this.effectsOn) this.animate("fx");
+  }
+
+  /** The show's picture from the host, decoded, then drawn. One that does
+   * not decode leaves the background colour. */
+  setArt(image: unknown) {
+    const gen = ++this.artGen;
+    const show = (img: HTMLImageElement | null) => {
+      if (gen !== this.artGen) return;
+      this.art = img;
+      this.animate("fx");
+    };
+    if (typeof image !== "string") return show(null);
+    const img = new Image();
+    img.src = image;
+    img.decode().then(
+      () => show(img),
+      () => {
+        console.warn("skin: the show picture does not decode");
+        show(null);
+      },
+    );
   }
 
   /** A right click: on a visualisation, the host's menu of effects for it

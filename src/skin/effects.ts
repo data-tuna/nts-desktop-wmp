@@ -2,7 +2,8 @@
 // an Ambience-style glow, after the look of WMP's built-in ones. They draw
 // the frames the trusted page sends while one is on screen (the `vis`
 // message, docs/decisions.md ATA-114). Milkdrop is Butterchurn's
-// (milkdrop.ts, ATA-167). The trusted page reduces its analyser data with
+// (milkdrop.ts, ATA-167). Album Art is static: it draws the picture the
+// `art` message brings, and needs no frames (ATA-200). The trusted page reduces its analyser data with
 // `bands` and `samples`; no DOM here, so `node --test` can run them.
 import { milkdrop, PRESETS, type Milk } from "./milkdrop.ts";
 
@@ -10,9 +11,14 @@ import { milkdrop, PRESETS, type Milk } from "./milkdrop.ts";
  * newest 1024 samples for Milkdrop (none in a pick's flat frame). */
 export type Frame = { bars: number[]; wave: number[]; pcm?: number[] };
 
+/** The effect that shows the show's picture and wants no frames. */
+export const ALBUM_ART = 0;
+
 /** The effects in the order next() steps through them, by the names
  * `mediacenter.effectType` and `effectPreset` carry. */
 export const EFFECTS = [
+  // First: the default, and first in the menu (ATA-200).
+  { type: "Album Art", preset: 0, title: "Album Art" },
   { type: "Bars and Waves", preset: 0, title: "Bars" },
   { type: "Bars and Waves", preset: 1, title: "Scope" },
   { type: "Ambience", preset: 0, title: "Ambience" },
@@ -59,8 +65,8 @@ export type Memory = { peaks: number[]; trail: HTMLCanvasElement | null; milk: M
 
 /** Draws effect `index` into (x, y, w, h). `frame` is null when nothing
  * plays: the screen stays dark, as WMP's does. `fg` is the skin's
- * foregroundColor, if it gave one. */
-export function drawEffect(g: CanvasRenderingContext2D, index: number, frame: Frame | null, box: [number, number, number, number], bg: string, fg: string | null, mem: Memory) {
+ * foregroundColor, if it gave one; `art` the show's picture, if any. */
+export function drawEffect(g: CanvasRenderingContext2D, index: number, frame: Frame | null, art: HTMLImageElement | null, box: [number, number, number, number], bg: string, fg: string | null, mem: Memory) {
   const [x, y, w, h] = box;
   if (w <= 0 || h <= 0) return;
   g.save();
@@ -73,8 +79,12 @@ export function drawEffect(g: CanvasRenderingContext2D, index: number, frame: Fr
   else {
     g.fillStyle = bg;
     g.fillRect(x, y, w, h);
-    if (title === "Bars") bars(g, frame, box, fg, mem);
-    else if (frame) scope(g, frame, box, fg);
+    // The picture covers the area, centred, as WMP's Album Art did.
+    if (index === ALBUM_ART && art) {
+      const s = Math.max(w / art.width, h / art.height);
+      g.drawImage(art, x + (w - art.width * s) / 2, y + (h - art.height * s) / 2, art.width * s, art.height * s);
+    } else if (title === "Bars") bars(g, frame, box, fg, mem);
+    else if (title === "Scope" && frame) scope(g, frame, box, fg);
   }
   g.restore();
 }

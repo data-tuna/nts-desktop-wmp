@@ -203,8 +203,8 @@ test("effects: bars are log-spaced spectrum peaks, the wave is evenly sampled, a
       assert.ok(bands(one, rate, 32).filter((v) => v).length <= 1, `bin ${k} at ${rate} Hz lights more than one bar`);
     }
   assert.deepEqual(samples(Uint8Array.from({ length: 8 }, (_, i) => i), 4), [0, 2, 4, 6]);
-  assert.equal(effectIndex("Bars and Waves", 1), 1);
-  assert.equal(effectIndex("ambience", 7), 2, "unknown preset: the type's first");
+  assert.equal(effectIndex("Bars and Waves", 1), 2);
+  assert.equal(effectIndex("ambience", 7), 3, "unknown preset: the type's first");
   assert.equal(effectIndex("", 0), 0);
   assert.equal(effectIndex("{some-clsid}", 3), 0);
 });
@@ -217,7 +217,7 @@ test("effects: Milkdrop has one entry per preset in the pack the protocol serves
   assert.deepEqual(Object.keys(pack.getPresets()), PRESETS);
   const milk = EFFECTS.flatMap((e, i) => (e.type === "Milkdrop" ? [i] : []));
   assert.deepEqual(milk.map((i) => EFFECTS[i].preset), [...PRESETS.keys()]);
-  assert.equal(milk.at(-1), EFFECTS.length - 1, "next() from the last preset goes round to Bars");
+  assert.equal(milk.at(-1), EFFECTS.length - 1, "next() from the last preset goes round to Album Art");
   assert.equal(effectIndex("milkdrop", 5), milk[5]);
 });
 
@@ -242,17 +242,18 @@ test("overlay: a visualisation redrawn under its mask and cover matches the skin
   }
 });
 
-test("effects menu: Bars, Scope and Ambience, then every Milkdrop preset by name, the current one checked", async () => {
+test("effects menu: Album Art first, Bars, Scope and Ambience, then every Milkdrop preset by name, the current one checked", async () => {
   const { EFFECTS, effectsMenu } = await import("../src/skin/effects.ts");
   const { PRESETS } = await import("../src/skin/milkdrop.ts");
   const { effects, milkdrop } = effectsMenu(5);
   assert.deepEqual(effects, [
-    { index: 0, text: "Bars", checked: false },
-    { index: 1, text: "Scope", checked: false },
-    { index: 2, text: "Ambience", checked: false },
+    { index: 0, text: "Album Art", checked: false },
+    { index: 1, text: "Bars", checked: false },
+    { index: 2, text: "Scope", checked: false },
+    { index: 3, text: "Ambience", checked: false },
   ]);
   assert.equal(milkdrop.length, PRESETS.length);
-  assert.deepEqual(milkdrop.map((e) => e.index), [...PRESETS.keys()].map((i) => i + 3));
+  assert.deepEqual(milkdrop.map((e) => e.index), [...PRESETS.keys()].map((i) => i + 4));
   assert.deepEqual(milkdrop.filter((e) => e.checked).map((e) => e.index), [5]);
   assert.equal(milkdrop[0].text, "$$$ Royal - Mashup (197)");
   assert.equal(milkdrop[25].text, "Unchained && Rovastar - Wormhole Pillars (Hall of Shadows mix)", "a lone & would be a mnemonic");

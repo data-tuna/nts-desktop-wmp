@@ -85,6 +85,8 @@ function onSkin(m: FromSkin) {
   else if (m.type === "effects") {
     effectsOn = m.on;
     startVis();
+    // A skin sends this on its first paint: a new skin needs the picture too.
+    sendArt();
   } else if (m.type === "effectsMenu") void openEffectsMenu(m.effect);
   else if (m.type === "select") player.select(m.index);
   else if (m.type === "seek") player.seek(m.seconds);
@@ -131,6 +133,45 @@ function info(i: number) {
   if (pick) return { title: item.title, url, author: "", location: "", link: episodePage(pick), artwork: pick.artwork };
   return { title: item.title, url, author: "", location: "", link: "", artwork: undefined };
 }
+
+// Album Art (ATA-200): the show's picture, alone, in the skin's
+// visualisation area. The skin has no network, so this page fetches the
+// picture and hands it over as a data: URL, once per change. With none, the
+// skin draws its background colour.
+let art: string | undefined;
+let artMsg: { type: "art"; image: string | null } | null = null;
+function sendArt() {
+  if (artMsg) void invoke("skin_send", { msg: artMsg }).catch(() => {});
+}
+async function updateArt(i: number) {
+  // A mixtape's picture is on its playlist row.
+  const artwork = info(i).artwork ?? items[i].artwork;
+  if (artwork === art) return;
+  art = artwork;
+  let image: string | null = null;
+  try {
+    const response = artwork ? await fetch(artwork, { signal: AbortSignal.timeout(10_000) }) : null;
+    const blob = response?.ok ? await response.blob() : null;
+    if (blob?.type.startsWith("image/")) image = await dataUrl(blob);
+  } catch (error: unknown) {
+    console.warn("show picture failed", error);
+  }
+  // Another item or show came along while this one loaded.
+  if (artwork !== art) return;
+  // A picture that failed is fetched again in a minute: the URL stays the same for the whole show.
+  if (artwork && !image) setTimeout(() => {
+      if (art === artwork) art = undefined;
+    }, 60_000);
+  artMsg = { type: "art", image };
+  sendArt();
+}
+const dataUrl = (blob: Blob) =>
+  new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(blob);
+  });
 
 // The visualisation menu (ATA-190): a right click on a skin's effects area
 // lists every effect and Milkdrop preset, as WMP's did. Built here, not in
@@ -199,6 +240,7 @@ setInterval(() => {
   const now = player.state();
   const { artwork: _, ...shown } = info(now.channel);
   updateOverlay(now.channel);
+  void updateArt(now.channel);
   updateTray(shown.title, now.channel);
   const state = { type: "state", ...now, ...shown, items: items.map((_, i) => info(i).title), ...settings, level: level(), covered };
   void invoke("skin_send", { msg: state }).catch(() => {});
