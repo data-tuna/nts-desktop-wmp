@@ -345,6 +345,11 @@ run its own desktop name (`hidden-run.ps1 <exe> <name>`), DevTools port and
 `WEBVIEW2_USER_DATA_FOLDER`, and check which process a port belongs to
 before you poke it: another agent's copy may be listening on 9355.
 
+**Local builds never update themselves.** The updater's endpoint is only
+in `src-tauri/tauri.release.conf.json`, which the release workflow passes.
+Don't pass that file to a local build you run: it would install the latest
+release over the installed copy, and close it (ATA-204).
+
 **Testing reconnect.** Add `--proxy-server=http://127.0.0.1:8899` to the
 browser arguments, run `node tools/proxy.mjs 8899`, and cut it with
 `curl "http://127.0.0.1:8899/cut?seconds=30"`. Its log shows each tunnel

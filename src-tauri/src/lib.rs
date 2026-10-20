@@ -1216,6 +1216,8 @@ pub fn run() {
             .on_new_window(|_, _| NewWindowResponse::Deny);
             window.add_child(skin, LogicalPosition::new(0.0, 0.0), size)?;
             // A dev build would otherwise replace itself with the release.
+            // A local release build has no endpoint, which only
+            // tauri.release.conf.json adds, so its check fails at once.
             if !cfg!(debug_assertions) {
                 let app = app.handle().clone();
                 tauri::async_runtime::spawn(async move {
