@@ -364,14 +364,14 @@ test("now playing: the media's name and item info, the playlist, and a pick's li
   listeners.mouseup(title);
   listeners.dblclick(title);
   assert.deepEqual(sent.filter((m) => m.type === "drag").length, 1);
-  set({ channel: 3, title: items[3], url: "https://soundcloud.com/a/b", author: "", location: "", link: "https://soundcloud.com/a/b" });
+  set({ channel: 3, title: items[3], url: "https://www.nts.live/shows/a/episodes/b", author: "", location: "", link: "https://www.nts.live/shows/a/episodes/b" });
   // During a pick a press still drags; only a double click on the title opens the page, not on another currentMedia text.
   listeners.mousedown(title);
   listeners.dblclick(len);
   assert.deepEqual(sent.filter((m) => m.type === "launchUrl"), []);
   listeners.dblclick(title);
-  assert.deepEqual(sent.filter((m) => m.type === "launchUrl"), [{ type: "launchUrl", url: "https://soundcloud.com/a/b" }]);
-  assert.equal(js("player.currentMedia.sourceURL"), "https://soundcloud.com/a/b");
+  assert.deepEqual(sent.filter((m) => m.type === "launchUrl"), [{ type: "launchUrl", url: "https://www.nts.live/shows/a/episodes/b" }]);
+  assert.equal(js("player.currentMedia.sourceURL"), "https://www.nts.live/shows/a/episodes/b");
   // Painting scrolls the current item (3) into sight: the first row is no longer NTS 1.
   skin.paint();
   const row = { button: 0, clientX: 5, clientY: 25 };
@@ -388,14 +388,14 @@ test("a double click that starts a pick from its row does not open its page", ()
   const { sent, set } = load(`<theme><view width="100" height="200">
        <playlist id="pl" left="0" top="0" width="100" height="200" fontSize="6"/>
      </view></theme>`);
-  set({ channel: 2, title: items[2], link: "https://soundcloud.com/a", items });
+  set({ channel: 2, title: items[2], link: "https://www.nts.live/shows/a/episodes/a", items });
   // Rows are 16 px: 6 pt is 8 px, doubled.
   const rowB = (detail) => ({ button: 0, clientX: 5, clientY: 3 * 16 + 8, detail });
   const at = sent.length;
   listeners.mousedown(rowB(1));
   listeners.mouseup(rowB(1));
   // The host's state lands between the two presses, as it does every 250 ms.
-  set({ channel: 3, title: items[3], link: "https://soundcloud.com/b" });
+  set({ channel: 3, title: items[3], link: "https://www.nts.live/shows/b/episodes/b" });
   listeners.mousedown(rowB(2));
   listeners.mouseup(rowB(2));
   listeners.dblclick(rowB(2));
@@ -403,7 +403,7 @@ test("a double click that starts a pick from its row does not open its page", ()
   // Now that B is current, a double click on its row opens it.
   listeners.mousedown(rowB(1));
   listeners.dblclick(rowB(2));
-  assert.deepEqual(sent.slice(at).filter((m) => m.type === "launchUrl"), [{ type: "launchUrl", url: "https://soundcloud.com/b" }]);
+  assert.deepEqual(sent.slice(at).filter((m) => m.type === "launchUrl"), [{ type: "launchUrl", url: "https://www.nts.live/shows/b/episodes/b" }]);
 });
 
 test("the playlist marks the current row in the skin's playing colours, or WMP's green on #222222", () => {
@@ -412,7 +412,7 @@ test("the playlist marks the current row in the skin's playing colours, or WMP's
   const rows = (skin) => {
     drawn.length = 0;
     skin.paint();
-    return drawn.filter(([k, , a]) => k === "fillText" ? items.includes(a) : k === "fillRect" && a === 0).map(([k, style, a, y]) => (k === "fillText" ? [a, style] : [`row at ${y}`, style]));
+    return drawn.filter(([k, style, a]) => k === "fillText" ? items.includes(a) : k === "fillRect" && a === 0 && style).map(([k, style, a, y]) => (k === "fillText" ? [a, style] : [`row at ${y}`, style]));
   };
   const plain = load(`<theme><view width="100" height="60">
        <playlist id="pl" left="0" top="0" width="100" height="48" fontSize="6" backgroundColor="#000000" foregroundColor="#FFFFFF"/>
@@ -424,8 +424,9 @@ test("the playlist marks the current row in the skin's playing colours, or WMP's
   const coloured = load(`<theme><view width="100" height="60">
        <playlist id="pl" left="0" top="0" width="100" height="48" fontSize="6" foregroundColor="#FFFFFF" itemPlayingColor="#FF0000"/>
      </view></theme>`, {}, { ...STATE, items, channel: 1 });
-  // A skin's own playing colour wins; the row behind it is WMP's.
-  assert.deepEqual(rows(coloured.skin), [["NTS 1: A show", "#ffffff"], ["row at 16", "#222222"], ["NTS 2", "#ff0000"], ["Poolside", "#ffffff"]]);
+  // A skin's own playing colour wins; the row behind it is WMP's. With no
+  // backgroundColor, black goes only where no image lies under the list.
+  assert.deepEqual(rows(coloured.skin), [["row at 0", "#000000"], ["NTS 1: A show", "#ffffff"], ["row at 16", "#222222"], ["NTS 2", "#ff0000"], ["Poolside", "#ffffff"]]);
 });
 
 test("the playlist's scroll bar: dragging the thumb and clicking the track scroll the list", () => {
@@ -485,7 +486,7 @@ test("a double click on the scroll bar never opens a pick's page", () => {
   const items = Array.from({ length: 20 }, (_, i) => `Pick ${i}`);
   const { sent } = load(`<theme><view width="100" height="48">
        <playlist id="pl" left="0" top="0" width="100" height="48" fontSize="6"/>
-     </view></theme>`, {}, { ...STATE, items, channel: 19, title: items[19], link: "https://soundcloud.com/a" });
+     </view></theme>`, {}, { ...STATE, items, channel: 19, title: items[19], link: "https://www.nts.live/shows/a/episodes/a" });
   // The pick is on the bottom row of the last page: one press on it arms the link.
   const at = (x, detail) => ({ button: 0, clientX: x, clientY: 44, detail });
   listeners.mousedown(at(40, 1));
@@ -598,4 +599,132 @@ test("a seek slider whose onMouseUp seeks (anime's) seeks once, not again from t
   listeners.mousedown(at);
   listeners.mouseup(at);
   assert.deepEqual(sent.filter((m) => m.type === "seek"), [{ type: "seek", seconds: 500 }]);
+});
+
+test("the playlist lies over every image in the view, whatever its zIndex or place, and takes the pointer there (ATA-198)", () => {
+  const items = ["NTS 1", "NTS 2"];
+  // A subview drawn all over, after the list in the markup, and a list behind its parent's background.
+  const data = new Uint8ClampedArray(100 * 60 * 4).fill(200);
+  const { skin, sent } = load(
+    `<theme><view width="100" height="60">
+       <subview id="box" width="100" height="60">
+         <playlist id="pl" zIndex="-2" left="0" top="0" width="100" height="40" fontSize="6"/>
+       </subview>
+       <subview id="over" width="100" height="60" backgroundColor="#FF0000" backgroundImage="body.bmp"/>
+     </view></theme>`,
+    {},
+    { ...STATE, items },
+    new Map([["body.bmp", { width: 100, height: 60, data, bitmap: {} }]]),
+  );
+  drawn.length = 0;
+  skin.paint();
+  const red = drawn.findIndex(([k, style]) => k === "fillRect" && style === "#ff0000");
+  const text = drawn.findIndex(([k, , a]) => k === "fillText" && a === "NTS 2");
+  assert.ok(red >= 0 && text > red, "the list's rows are drawn after the subview over it");
+  const row = { button: 0, clientX: 5, clientY: 16 + 8 };
+  listeners.mousedown(row);
+  listeners.mouseup(row);
+  assert.deepEqual(sent.filter((m) => m.type === "select"), [{ type: "select", index: 1 }]);
+  assert.equal(sent.filter((m) => m.type === "drag").length, 0, "the press is on the list, not the body over it");
+});
+
+test("a boolean attribute that starts with false is false, whatever follows (The_Doobie_Brothers' playlist button)", () => {
+  const { js } = load(`<theme><view width="10" height="10">
+       <button id="b" sticky="true" down="false; jscript:pl.visible='true';"/>
+       <button id="c" down="true"/>
+     </view></theme>`);
+  assert.deepEqual(js("[b.down, c.down]"), [false, true]);
+});
+
+test("a shown playlist is part of the window shape, even over a hole in a subview (TEDDY's list)", () => {
+  const { skin, js } = load(`<theme><view width="100" height="60">
+       <subview id="drawer" left="10" top="5" width="80" height="50" clippingColor="#B3ABAB">
+         <playlist id="pl" left="3" top="4" width="60" height="30" fontSize="6"/>
+       </subview>
+     </view></theme>`);
+  // The shape pass fills the list's place on the canvas; painting the list fills its own box.
+  const shaped = () => {
+    drawn.length = 0;
+    skin.changed();
+    skin.paint();
+    return drawn.some(([k, , ...a]) => k === "fillRect" && a.join() === "13,9,60,30");
+  };
+  assert.equal(shaped(), true);
+  js("pl.visible = false");
+  assert.equal(shaped(), false, "a hidden list leaves the shape alone");
+});
+
+test("a playlist that names a light background and no text colour draws its rows in black (Primitive)", () => {
+  const items = ["NTS 1", "NTS 2"];
+  const { skin } = load(`<theme><view width="100" height="60">
+       <playlist id="pl" left="0" top="0" width="100" height="48" fontSize="6" backgroundColor="#F7C473"/>
+     </view></theme>`, {}, { ...STATE, items, channel: 0 });
+  drawn.length = 0;
+  skin.paint();
+  assert.deepEqual(drawn.filter(([k, , a]) => k === "fillText" && a === "NTS 2").map(([, style]) => style), ["#000000"]);
+});
+
+test("a button group with no image takes clicks only on its elements (Cablemusic's playlist tab under its close buttons)", () => {
+  // 20×20 map: the left half the close button's colour, the right half nothing mapped.
+  const data = new Uint8ClampedArray(20 * 20 * 4);
+  for (let i = 0; i < 400; i++) data.set(i % 20 < 10 ? [255, 0, 0, 255] : [0, 0, 0, 255], i * 4);
+  const { js } = load(
+    `<theme><view width="20" height="20">
+       <button id="tab" width="20" height="20" onClick="tabs++;"/>
+       <buttongroup mappingImage="map.bmp"><buttonelement mappingColor="#FF0000" onClick="closes++;"/></buttongroup>
+     </view></theme>`,
+    {},
+    STATE,
+    new Map([["map.bmp", { width: 20, height: 20, data, bitmap: {} }]]),
+  );
+  js("tabs = 0, closes = 0");
+  for (const x of [5, 15]) {
+    listeners.mousedown({ button: 0, clientX: x, clientY: 5 });
+    listeners.mouseup({ button: 0, clientX: x, clientY: 5 });
+  }
+  assert.deepEqual(js("[closes, tabs]"), [1, 1]);
+});
+
+test("a button whose image is all transparencyColor is a hotspot over its box (holiday_skin, Grinch's playlist button)", () => {
+  // A 2×2 tile of the transparency colour on a 16×12 button, as holiday_skin's are.
+  const clear = new Uint8ClampedArray(2 * 2 * 4);
+  for (let i = 0; i < 4; i++) clear.set([51, 51, 51, 255], i * 4);
+  const { js } = load(
+    `<theme><view width="20" height="20">
+       <button id="b" image="clear.gif" tiled="true" width="16" height="12" transparencyColor="#333333" onClick="presses++;"/>
+     </view></theme>`,
+    {},
+    STATE,
+    new Map([["clear.gif", { width: 2, height: 2, data: clear, bitmap: {} }]]),
+  );
+  js("presses = 0");
+  for (const [x, y] of [[10, 8], [18, 18]]) {
+    listeners.mousedown({ button: 0, clientX: x, clientY: y });
+    listeners.mouseup({ button: 0, clientX: x, clientY: y });
+  }
+  assert.equal(js("presses"), 1, "inside the box, not outside it");
+});
+
+test("playlist.setColumnWidth does nothing, so the code after it runs (TwinBlade's playlist drawer)", () => {
+  const { js } = load(`<theme><view width="10" height="10">
+       <playlist id="pl" visible="false"/>
+     </view></theme>`);
+  js("(pl.setColumnWidth(0, 110), pl.visible = true)");
+  assert.equal(js("pl.visible"), true);
+});
+
+test("a list that names no colours, over light art, gets black text and a scroll bar mixed from the art (Beck)", () => {
+  const items = Array.from({ length: 20 }, (_, i) => `Item ${i}`);
+  const { skin } = load(`<theme><view width="100" height="60">
+       <playlist id="pl" left="0" top="0" width="100" height="48" fontSize="6"/>
+     </view></theme>`, {}, { ...STATE, items, channel: 0 });
+  // Light art under the list, as the full paint reads it back.
+  skin.probe.getImageData = (x, y, w, h) => ({ width: w, height: h, data: new Uint8ClampedArray(w * h * 4).fill(230) });
+  drawn.length = 0;
+  skin.paint();
+  assert.deepEqual([...new Set(drawn.filter(([k, , a]) => k === "fillText" && a === "Item 1").map(([, style]) => style))], ["#000000"]);
+  // The bar is the last two fills at x 84 (100 - 16): its track, then its thumb.
+  const [track, thumb] = drawn.filter(([k, , x]) => k === "fillRect" && x >= 84).slice(-2).map(([, style]) => style);
+  assert.notEqual(track, thumb);
+  assert.notEqual(thumb, "#000000");
 });

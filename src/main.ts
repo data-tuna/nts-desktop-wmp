@@ -6,7 +6,7 @@ import { listen } from "@tauri-apps/api/event";
 import { CheckMenuItem, Menu, Submenu } from "@tauri-apps/api/menu";
 import { fetchLive, mergeOnAir, nextPollDelay, type OnAir } from "./live";
 import { MIXTAPES_API, parseMixtapes } from "./mixtapes";
-import { PICKS_API, parsePicks, type Pick } from "./picks";
+import { episodePage, PICKS_API, parsePicks, type Pick } from "./picks";
 import { CHANNELS, channelTitle, createPlayer, playlist, type Item } from "./player";
 import { BANDS, clamp, loadSettings } from "./settings";
 import { createWidget } from "./widget";
@@ -120,14 +120,14 @@ function level() {
 
 /** What a skin shows for item `i`: `title` is `player.currentMedia.name`,
  * `author` and `location` its item info, `link` the page a double click on the
- * title opens: a pick's own page. */
+ * title opens: a pick's episode page on nts.live, never SoundCloud (ATA-198). */
 function info(i: number) {
   const item = items[i];
   const url = item.url;
   const show = i < CHANNELS.length ? onAir[i] : undefined;
   if (show) return { title: channelTitle(item.title, show.title), url, author: show.show, location: show.location ?? "", link: "", artwork: show.artwork };
   const pick = picks.get(item.url);
-  if (pick) return { title: item.title, url, author: "", location: "", link: pick.url, artwork: pick.artwork };
+  if (pick) return { title: item.title, url, author: "", location: "", link: episodePage(pick), artwork: pick.artwork };
   return { title: item.title, url, author: "", location: "", link: "", artwork: undefined };
 }
 

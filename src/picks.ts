@@ -3,7 +3,7 @@
 // docs/decisions.md).
 // Copied from nts-desktop-winamp's src/picks.ts at bdc0f10, parsing only:
 // the Webamp playback stays behind. Fix a bug in both copies. This copy also
-// keeps the episode's aliases, for the tray's link to its page (ATA-172).
+// keeps the episode's aliases, for the link to its page (ATA-172, ATA-198).
 
 // The .ts extension lets `node --test` load this file directly.
 import { text } from "./live.ts";
@@ -47,4 +47,11 @@ export function parsePicks(body: unknown): Pick[] {
       },
     ];
   });
+}
+
+/** The pick's episode page on nts.live, the one the tray's "Show on nts.live"
+ * opens (`show_page` in lib.rs), or "" without plain-slug aliases. */
+export function episodePage(pick: Pick): string {
+  const slug = /^[\w-]{1,200}$/;
+  return slug.test(pick.showAlias ?? "") && slug.test(pick.episodeAlias ?? "") ? `https://www.nts.live/shows/${pick.showAlias}/episodes/${pick.episodeAlias}` : "";
 }

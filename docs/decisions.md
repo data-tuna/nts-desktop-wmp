@@ -6,6 +6,48 @@ the evidence.
 
 ## Stack
 
+### Playlists over the skin; a pick links to nts.live (ATA-198, 2026-10-20)
+
+Ata (ATA-163): "a lot of the cases the playlist doesn't really work. I
+can't see it." An audit rendered every listed skin with a `<playlist>` in
+headless Edge through `tools/skin-preview.mjs`, from the local skin cache,
+clicked the skin's own playlist buttons through DevTools input, and
+compared the list's pixels with and without its rows. The full table and
+screenshots are on ATA-198.
+
+- **The list lies over everything.** WMP's playlist is a window of its
+  own, so it sits above every image in the view, whatever its `zIndex` or
+  place in the markup. Skins rely on this: 9SeriesDefault's panel bitmaps
+  come after its list, HOB's list has `zIndex="-2"`, Plus! Hard Boiled's
+  drawer frame covers its list, and 9SeriesDefault hides the list while
+  its drawer slides (`onEndMove`). The engine now draws playlists after the
+  rest of the view and hit-tests them first. A shown list is part of the
+  window shape too: TEDDY's sits in a hole of its drawer.
+- **Text colour.** Microsoft's reference gives `foregroundColor` a default
+  of the Windows text colour, black, and `backgroundColor` the window
+  colour, white. Skins show the second is not what WMP drew: Rusty and
+  Science name only white text over dark art. So with no background named
+  the art shows through, black where there is none, and with no text
+  colour named the engine picks black or white, whichever reads on the
+  list's background or the average of the art under it (`textOn` in
+  `pixels.ts`). Primitive, Beck, Zengarden and springflower now read.
+- **Buttons that could not be clicked.** A button group with no `image`
+  took clicks over its whole box, so Cablemusic's close buttons covered
+  its drawer tabs; now only its elements do. A button whose image is all
+  transparency colour is an invisible hotspot over its box: every control
+  of holiday_skin, and Grinch's and Josie's playlist buttons, are drawn
+  that way. `playlist.setColumnWidth` now
+  does nothing instead of throwing, which stopped TwinBlade's drawer
+  script. A boolean that starts with `false` is false:
+  The_Doobie_Brothers' button has `down="false; jscript:…"`.
+- **Not fixed here.** 47 of the 136 listed skins with a playlist have it
+  only in a view the engine never opens; view switching is Mika's call.
+  The rest are in `AGENTS.md`, Known gaps.
+- **A pick links to nts.live** (Mika, from ATA-197). A double click on a
+  pick's title or playlist row opens its episode page on nts.live, the
+  page the tray's "Show on nts.live" opens, not SoundCloud (`episodePage`
+  in `picks.ts`). A pick without plain-slug aliases has no link.
+
 ### Picks before mixtapes; no SoundCloud credit or name (ATA-197, 2026-10-20)
 
 Reverses the pick credit of ATA-115 and the playlist order and pick titles
@@ -25,7 +67,8 @@ of ATA-113, below.
   <location> (<genres and moods>)`, with no uploader and no "on
   SoundCloud". Its Author is empty. SoundCloud's widget still plays it,
   hidden, and the tray's "Show on nts.live" still links to the episode.
-  A double click on the title still opens the track's page, as before;
+  A double click on the title still opens the track's page, as before
+  (ATA-198 points it at the episode on nts.live);
   that link shows no SoundCloud text in the app.
 - **The playlist is NTS 1, NTS 2, the picks, then the mixtapes** (Ata,
   ATA-163). The picks keep the API's order, newest first. `playlist()` in

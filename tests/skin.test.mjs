@@ -6,7 +6,7 @@ import assert from "node:assert/strict";
 import { deflateRawSync } from "node:zlib";
 import { unzip } from "../src/skin/wmz.ts";
 import { constants, decode, parse } from "../src/skin/wms.ts";
-import { firstAt, keyed, mappedElement, mix, overlay, parseColor, playingColors, runs, thumb, tiles } from "../src/skin/pixels.ts";
+import { average, firstAt, keyed, mappedElement, mix, overlay, parseColor, playingColors, runs, textOn, thumb, tiles } from "../src/skin/pixels.ts";
 
 /** A zip with one entry per [name, bytes, deflate?], as skin tools write them. */
 function zip(entries) {
@@ -257,4 +257,16 @@ test("effects menu: Bars, Scope and Ambience, then every Milkdrop preset by name
   assert.equal(milkdrop[0].text, "$$$ Royal - Mashup (197)");
   assert.equal(milkdrop[25].text, "Unchained && Rovastar - Wormhole Pillars (Hall of Shadows mix)", "a lone & would be a mnemonic");
   assert.equal(effects.length + milkdrop.length, EFFECTS.length);
+});
+
+test("playlist: with no text colour named, black or white, whichever reads on what lies under it (ATA-198)", () => {
+  // Primitive's paper and springflower's green take black; Melvin's dark blue and an unknown backdrop, white.
+  assert.equal(textOn(0xf7c473), 0x000000);
+  assert.equal(textOn(0x3dc22d), 0x000000);
+  assert.equal(textOn(0x4848a4), 0xffffff);
+  assert.equal(textOn(null), 0xffffff);
+  // The average skips transparent pixels: Beck's lime art under its list.
+  const data = new Uint8ClampedArray([175, 229, 2, 255, 175, 229, 4, 255, 0, 0, 0, 0]);
+  assert.equal(average(data), 0xafe503);
+  assert.equal(average(new Uint8ClampedArray(8)), null);
 });

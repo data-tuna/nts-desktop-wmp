@@ -7,7 +7,7 @@
 // skin reference (learn.microsoft.com/windows/win32/wmp/skin-programming-reference).
 import { CHANNELS } from "../player.ts";
 import { constants, type Node } from "./wms.ts";
-import { css, firstAt, keyed, mappedElement, mix, overlay, parseColor, playingColors, rgbAt, runs, thumb, tiles, type Pixels } from "./pixels.ts";
+import { average, css, firstAt, keyed, mappedElement, mix, overlay, parseColor, playingColors, rgbAt, runs, textOn, thumb, tiles, type Pixels } from "./pixels.ts";
 import { drawEffect, EFFECTS, effectIndex, type Frame, type Memory } from "./effects.ts";
 import { clock, CONSTANTS, OS_MEDIA_CHANGING, OS_MEDIA_OPEN, objects, playState, resImage, resScript, resString, wmpObject, type Host } from "./runtime.ts";
 
@@ -24,7 +24,7 @@ export type State = {
   /** player.currentMedia's item info: the show and where it comes from. */
   author: string;
   location: string;
-  /** The page a click on the title opens: a pick's track page, or "". */
+  /** The page a double click on the title opens: a pick's episode page on nts.live, or "". */
   link: string;
   /** The playlist's titles; `channel` is the current one's index. */
   items: string[];
@@ -93,6 +93,8 @@ class El {
   /** An effects element's peaks and trails. */
   readonly memory: Memory = { peaks: [], trail: null, milk: null };
   move: ReturnType<typeof setTimeout> | null = null;
+  /** A playlist's average colour under it, when it names no background (Skin.draw). */
+  under: number | null = null;
 
   readonly node: Node;
   readonly parent: El | null;
@@ -317,8 +319,8 @@ class El {
   // Painting. `g` has its origin at the parent's top-left.
   paint(g: CanvasRenderingContext2D) {
     if (!this.visible || this.kind === "none" || this.kind === "element") return;
-    // Visualisations, text and the playlist are drawn inside the window's shape, not part of it.
-    if (this.skin.shaping && (this.kind === "effects" || this.kind === "text" || this.kind === "playlist")) return;
+    // Visualisations and text are drawn inside the window's shape, not part of it.
+    if (this.skin.shaping && (this.kind === "effects" || this.kind === "text")) return;
     const alpha = this.skin.num(this, "alphablend");
     g.save();
     if (alpha !== null) g.globalAlpha = Math.min(1, Math.max(0, alpha / 255));
@@ -329,7 +331,10 @@ class El {
     else if (this.kind === "custom") this.paintCustom(g);
     else if (this.kind === "progress") this.paintProgress(g);
     else if (this.kind === "text") this.paintText(g);
-    else if (this.kind === "playlist") this.paintPlaylist(g);
+    else if (this.kind === "playlist") {
+      if (this.skin.lists) this.skin.lists.push(this);
+      else this.paintPlaylist(g);
+    }
     else if (this.kind === "effects") this.paintEffects(g);
     g.restore();
   }
@@ -623,10 +628,11 @@ class El {
   private paintPlaylist(g: CanvasRenderingContext2D) {
     const { x, y, w, h } = this;
     const bg = this.color("backgroundcolor");
-    if (bg !== null) {
-      g.fillStyle = css(bg);
-      g.fillRect(x, y, w, h);
-    }
+    // With none, the skin's images show through, and black where there are none.
+    g.fillStyle = css(bg ?? 0);
+    if (bg === null) g.globalCompositeOperation = "destination-over";
+    g.fillRect(x, y, w, h);
+    g.globalCompositeOperation = "source-over";
     g.beginPath();
     g.rect(x, y, w, h);
     g.clip();
@@ -635,7 +641,9 @@ class El {
     const row = this.rowHeight();
     const { items, channel } = this.skin.state;
     const rows = this.rows();
-    const fg = this.color("foregroundcolor") ?? 0xffffff;
+    // With no text colour named, black or white, whichever reads: WMP's
+    // default is Windows' text colour, black, which is lost on dark skins.
+    const fg = this.color("foregroundcolor") ?? textOn(bg ?? this.under);
     const [playingFg, playingBg] = playingColors(this.color("itemplayingcolor"), this.color("itemplayingbackgroundcolor"));
     if (`${channel}\n${items[channel]}` !== this.rolling) {
       this.rolling = `${channel}\n${items[channel]}`;
@@ -671,7 +679,7 @@ class El {
     });
     if (!t) return;
     // No images of WMP's: a track and a thumb in the list's own colours.
-    const back = bg ?? 0;
+    const back = bg ?? this.under ?? 0;
     g.fillStyle = css(mix(back, fg, 0.15));
     g.fillRect(x + inner, y, BAR, h);
     g.fillStyle = css(mix(back, fg, 0.55));
@@ -702,9 +710,17 @@ class El {
       const els = this.kids.filter((e) => e.kind === "element" && e.visible);
       const i = map ? mappedElement(map, lx, ly, els.map((e) => e.color("mappingcolor"))) : -1;
       if (i >= 0) return els[i];
-      return this.solid(this.img("image"), lx, ly) ? this : null;
+      // A group with no image of its own draws nothing outside its elements:
+      // Cablemusic's close buttons span the drawer tabs under them.
+      const img = this.img("image");
+      return img && this.solid(img, lx, ly) ? this : null;
     }
-    if (this.kind === "button") return this.solid(this.img("image"), lx, ly) ? this : null;
+    if (this.kind === "button") {
+      // An image that is all transparencyColor makes the button an invisible
+      // hotspot over its box: holiday_skin's controls, Grinch's playlist button.
+      const img = this.img("image");
+      return this.solid(img, lx, ly) || (img !== undefined && this.skin.blank(img, this.color("transparencycolor"))) ? this : null;
+    }
     if (this.kind === "custom") {
       const pos = this.img("positionimage");
       return pos && this.gray(pos, lx, ly) !== null ? this : null;
@@ -780,8 +796,9 @@ const COMMON = new Set(["left", "top", "width", "height", "visible", "enabled", 
 const EFFECT_MEMBERS = ["next", "previous", "currenteffecttype", "currentpreset", "currenteffecttitle"];
 // Methods by tag, for what the engine does not draw yet.
 const IDLE_METHODS: Record<string, string[]> = {
-  playlist: ["setcolumnresizemode", "getcolumnresizemode"],
-  itemsplaylist: ["setcolumnresizemode", "getcolumnresizemode"],
+  // TwinBlade sets column widths before it opens its playlist drawer.
+  playlist: ["setcolumnresizemode", "getcolumnresizemode", "setcolumnwidth"],
+  itemsplaylist: ["setcolumnresizemode", "getcolumnresizemode", "setcolumnwidth"],
   popup: ["appenditem", "deleteitem", "show"],
 };
 
@@ -834,6 +851,7 @@ export class Skin {
   private players: El[] = [];
   private compiled = new Map<string, (...args: unknown[]) => unknown>();
   private keyCache = new WeakMap<Img, Map<string, HTMLCanvasElement>>();
+  private blanks = new WeakMap<Img, Map<number, boolean>>();
   private resImages = new Map<string, Img | undefined>();
   private logged = new Set<string>();
   private pressed: El | null = null;
@@ -849,6 +867,10 @@ export class Skin {
   private timer: ReturnType<typeof setInterval> | null = null;
   /** True while painting the window shape. */
   shaping = false;
+  /** The playlists a paint reached, to draw over the rest; null outside a paint. */
+  lists: El[] | null = null;
+  /** The playlists drawn at the last paint, for the pointer. */
+  private shown: El[] = [];
   private shapeMask: HTMLCanvasElement | null = null;
   private lastShape = "";
 
@@ -1237,12 +1259,28 @@ export class Skin {
   bool(e: El, name: string, fallback: boolean): boolean {
     const { ok, v } = this.value(e, name);
     if (!ok) return fallback;
-    return typeof v === "string" ? v.trim().toLowerCase() !== "false" : Boolean(v);
+    // A leading "false" is false, whatever follows: The_Doobie_Brothers'
+    // playlist button has `down="false; jscript:pl.visible='true';"`.
+    return typeof v === "string" ? !/^\s*false\b/i.test(v) : Boolean(v);
   }
 
   str(e: El, name: string): string {
     const { ok, v } = this.value(e, name);
     return ok && v !== undefined && v !== null ? String(v) : "";
+  }
+
+  /** Whether every pixel of `img` is `rgb`, cached. */
+  blank(img: Img, rgb: number | null): boolean {
+    if (rgb === null) return false;
+    let byColor = this.blanks.get(img);
+    if (!byColor) this.blanks.set(img, (byColor = new Map()));
+    let all = byColor.get(rgb);
+    if (all === undefined) {
+      all = true;
+      for (let y = 0; y < img.height && all; y++) for (let x = 0; x < img.width && all; x++) all = rgbAt(img, x, y) === rgb;
+      byColor.set(rgb, all);
+    }
+    return all;
   }
 
   /** `img` with the given colour made transparent, cached. */
@@ -1428,8 +1466,37 @@ export class Skin {
     // The view's own position is the window's, not a place on the canvas.
     g.save();
     g.translate(-this.view.x, -this.view.y);
+    this.lists = [];
     this.view.paint(g);
     g.restore();
+    // WMP's playlist is a window of its own, so it lies over every image in
+    // the view, whatever its zIndex or place in the markup: 9SeriesDefault's
+    // panel bitmaps come after its list, HOB's list has zIndex -2, and Hard
+    // Boiled's drawer frame covers its list. Skins hide the list while a
+    // drawer slides for this reason (9SeriesDefault's onEndMove).
+    const lists = this.lists;
+    this.lists = null;
+    // What lies under a list with no background, for its text colour, read
+    // where reading is cheap: the full paint's probe canvas.
+    if (c === this.probe.canvas)
+      for (const list of lists) {
+        const [x, y] = this.origin(list);
+        const [x0, y0, x1, y1] = [Math.max(0, x), Math.max(0, y), Math.min(w, x + list.w), Math.min(h, y + list.h)];
+        if (list.color("backgroundcolor") === null && x1 > x0 && y1 > y0) list.under = average(g.getImageData(x0, y0, x1 - x0, y1 - y0).data);
+      }
+    // A window is part of the shape, even over a subview's clippingColor:
+    // TEDDY's list sits in a hole in its drawer.
+    for (const list of lists) {
+      const [x, y] = this.origin(list);
+      g.save();
+      if (this.shaping) g.fillRect(x, y, list.w, list.h);
+      else {
+        g.translate(x - list.x, y - list.y);
+        list.paint(g);
+      }
+      g.restore();
+    }
+    this.shown = lists;
     return g;
   }
 
@@ -1525,6 +1592,11 @@ export class Skin {
 
   private at(ev: MouseEvent): El | null {
     const [x, y] = this.point(ev);
+    // The playlists first, since they lie over everything (draw).
+    for (const list of [...this.shown].reverse()) {
+      const [lx, ly] = this.origin(list);
+      if (x >= lx && y >= ly && x < lx + list.w && y < ly + list.h) return list;
+    }
     return this.view.hit(x + this.view.x, y + this.view.y);
   }
 
@@ -1581,7 +1653,7 @@ export class Skin {
     c.addEventListener("dblclick", (ev) => {
       const found = this.at(ev);
       if (found?.interactive() && found.enabled) this.byUser(() => this.fire(found, "ondblclick"));
-      // A pick links to its track page: a double click on
+      // A pick links to its episode page on nts.live: a double click on
       // the title, or on the pick's playlist row. A press still drags the window.
       else if (this.state.link && (found?.kind === "playlist" ? found.rowAt(this.point(ev)[1] - found.origin()[1]) === this.linkRow : found?.kind === "text" && TITLE.test(found.attr("value") ?? "")))
         this.send({ type: "launchUrl", url: this.state.link });
