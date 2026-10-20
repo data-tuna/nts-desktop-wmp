@@ -24,7 +24,7 @@ export type State = {
   /** player.currentMedia's item info: the show and where it comes from. */
   author: string;
   location: string;
-  /** The page a click on the title opens: a pick's track page, or "". */
+  /** The page a double click on the title opens: a pick's episode page on nts.live, or "". */
   link: string;
   /** The playlist's titles; `channel` is the current one's index. */
   items: string[];
@@ -317,8 +317,8 @@ class El {
   // Painting. `g` has its origin at the parent's top-left.
   paint(g: CanvasRenderingContext2D) {
     if (!this.visible || this.kind === "none" || this.kind === "element") return;
-    // Visualisations, text and the playlist are drawn inside the window's shape, not part of it.
-    if (this.skin.shaping && (this.kind === "effects" || this.kind === "text" || this.kind === "playlist")) return;
+    // Visualisations and text are drawn inside the window's shape, not part of it.
+    if (this.skin.shaping && (this.kind === "effects" || this.kind === "text")) return;
     const alpha = this.skin.num(this, "alphablend");
     g.save();
     if (alpha !== null) g.globalAlpha = Math.min(1, Math.max(0, alpha / 255));
@@ -329,7 +329,10 @@ class El {
     else if (this.kind === "custom") this.paintCustom(g);
     else if (this.kind === "progress") this.paintProgress(g);
     else if (this.kind === "text") this.paintText(g);
-    else if (this.kind === "playlist") this.paintPlaylist(g);
+    else if (this.kind === "playlist") {
+      if (this.skin.lists) this.skin.lists.push(this);
+      else this.paintPlaylist(g);
+    }
     else if (this.kind === "effects") this.paintEffects(g);
     g.restore();
   }
@@ -623,10 +626,11 @@ class El {
   private paintPlaylist(g: CanvasRenderingContext2D) {
     const { x, y, w, h } = this;
     const bg = this.color("backgroundcolor");
-    if (bg !== null) {
-      g.fillStyle = css(bg);
-      g.fillRect(x, y, w, h);
-    }
+    // With none, the skin's images show through, and black where there are none.
+    g.fillStyle = css(bg ?? 0);
+    if (bg === null) g.globalCompositeOperation = "destination-over";
+    g.fillRect(x, y, w, h);
+    g.globalCompositeOperation = "source-over";
     g.beginPath();
     g.rect(x, y, w, h);
     g.clip();
@@ -849,6 +853,10 @@ export class Skin {
   private timer: ReturnType<typeof setInterval> | null = null;
   /** True while painting the window shape. */
   shaping = false;
+  /** The playlists a paint reached, to draw over the rest; null outside a paint. */
+  lists: El[] | null = null;
+  /** The playlists drawn at the last paint, for the pointer. */
+  private shown: El[] = [];
   private shapeMask: HTMLCanvasElement | null = null;
   private lastShape = "";
 
@@ -1237,7 +1245,9 @@ export class Skin {
   bool(e: El, name: string, fallback: boolean): boolean {
     const { ok, v } = this.value(e, name);
     if (!ok) return fallback;
-    return typeof v === "string" ? v.trim().toLowerCase() !== "false" : Boolean(v);
+    // A leading "false" is false, whatever follows: The_Doobie_Brothers'
+    // playlist button has `down="false; jscript:pl.visible='true';"`.
+    return typeof v === "string" ? !/^\s*false\b/i.test(v) : Boolean(v);
   }
 
   str(e: El, name: string): string {
@@ -1428,8 +1438,29 @@ export class Skin {
     // The view's own position is the window's, not a place on the canvas.
     g.save();
     g.translate(-this.view.x, -this.view.y);
+    this.lists = [];
     this.view.paint(g);
     g.restore();
+    // WMP's playlist is a window of its own, so it lies over every image in
+    // the view, whatever its zIndex or place in the markup: 9SeriesDefault's
+    // panel bitmaps come after its list, HOB's list has zIndex -2, and Hard
+    // Boiled's drawer frame covers its list. Skins hide the list while a
+    // drawer slides for this reason (9SeriesDefault's onEndMove).
+    const lists = this.lists;
+    this.lists = null;
+    // A window is part of the shape, even over a subview's clippingColor:
+    // TEDDY's list sits in a hole in its drawer.
+    for (const list of lists) {
+      const [x, y] = this.origin(list);
+      g.save();
+      if (this.shaping) g.fillRect(x, y, list.w, list.h);
+      else {
+        g.translate(x - list.x, y - list.y);
+        list.paint(g);
+      }
+      g.restore();
+    }
+    this.shown = lists;
     return g;
   }
 
@@ -1525,6 +1556,11 @@ export class Skin {
 
   private at(ev: MouseEvent): El | null {
     const [x, y] = this.point(ev);
+    // The playlists first, since they lie over everything (draw).
+    for (const list of [...this.shown].reverse()) {
+      const [lx, ly] = this.origin(list);
+      if (x >= lx && y >= ly && x < lx + list.w && y < ly + list.h) return list;
+    }
     return this.view.hit(x + this.view.x, y + this.view.y);
   }
 

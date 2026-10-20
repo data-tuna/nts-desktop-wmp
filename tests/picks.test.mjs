@@ -4,7 +4,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
-import { parsePicks } from "../src/picks.ts";
+import { episodePage, parsePicks } from "../src/picks.ts";
 
 // A real /api/v2/collections/nts-picks response from 2026-10-09, trimmed to two picks and the fields read.
 const fixture = JSON.parse(readFileSync(new URL("picks-fixture.json", import.meta.url), "utf8"));
@@ -39,4 +39,13 @@ test("anything not shaped like the API gives no picks", () => {
   for (const body of [null, "", [], {}, { results: {} }, { results: [null, 3, { audio_sources: {} }] }]) {
     assert.deepEqual(parsePicks(body), []);
   }
+});
+
+test("a pick links to its episode page on nts.live, never SoundCloud (ATA-198)", () => {
+  const [first, second] = parsePicks(fixture);
+  assert.equal(episodePage(first), "https://www.nts.live/shows/ashtrejinkins/episodes/ashtrejinkins-7th-october-2026");
+  // No aliases, or ones that are not plain slugs, give no link, as the tray's does.
+  assert.equal(episodePage(second), "");
+  assert.equal(episodePage({ url: "", title: "", showAlias: "a/../b", episodeAlias: "c" }), "");
+  assert.equal(episodePage({ url: "", title: "", showAlias: "a", episodeAlias: "c?x" }), "");
 });
