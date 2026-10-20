@@ -129,3 +129,24 @@ export function tiles(length: number, size: number, border: number): [number, nu
   for (let at = b; at < length - b; at += size - 2 * b) out.push([b, at, Math.min(size - 2 * b, length - b - at)]);
   return out;
 }
+
+/** The average colour of the opaque pixels in RGBA `data`, or null if none. */
+export function average(data: Uint8ClampedArray): number | null {
+  const sum = [0, 0, 0];
+  let n = 0;
+  for (let i = 0; i < data.length; i += 4) {
+    if (!data[i + 3]) continue;
+    for (let c = 0; c < 3; c++) sum[c] += data[i + c];
+    n++;
+  }
+  return n ? sum.reduce((rgb, v) => (rgb << 8) | Math.round(v / n), 0) : null;
+}
+
+/** Black or white, whichever reads better on `rgb` (WCAG contrast); white on nothing. */
+export function textOn(rgb: number | null): number {
+  if (rgb === null) return 0xffffff;
+  const lin = (v: number) => ((v /= 255) <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4);
+  const l = 0.2126 * lin(rgb >> 16) + 0.7152 * lin((rgb >> 8) & 255) + 0.0722 * lin(rgb & 255);
+  // Contrast with black, (l + 0.05) / 0.05, beats contrast with white, 1.05 / (l + 0.05).
+  return l > 0.179 ? 0x000000 : 0xffffff;
+}

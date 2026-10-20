@@ -7,7 +7,7 @@
 // skin reference (learn.microsoft.com/windows/win32/wmp/skin-programming-reference).
 import { CHANNELS } from "../player.ts";
 import { constants, type Node } from "./wms.ts";
-import { css, firstAt, keyed, mappedElement, mix, overlay, parseColor, playingColors, rgbAt, runs, thumb, tiles, type Pixels } from "./pixels.ts";
+import { average, css, firstAt, keyed, mappedElement, mix, overlay, parseColor, playingColors, rgbAt, runs, textOn, thumb, tiles, type Pixels } from "./pixels.ts";
 import { drawEffect, EFFECTS, effectIndex, type Frame, type Memory } from "./effects.ts";
 import { clock, CONSTANTS, OS_MEDIA_CHANGING, OS_MEDIA_OPEN, objects, playState, resImage, resScript, resString, wmpObject, type Host } from "./runtime.ts";
 
@@ -93,6 +93,8 @@ class El {
   /** An effects element's peaks and trails. */
   readonly memory: Memory = { peaks: [], trail: null, milk: null };
   move: ReturnType<typeof setTimeout> | null = null;
+  /** A playlist's average colour under it, when it names no background (Skin.draw). */
+  under: number | null = null;
 
   readonly node: Node;
   readonly parent: El | null;
@@ -639,7 +641,9 @@ class El {
     const row = this.rowHeight();
     const { items, channel } = this.skin.state;
     const rows = this.rows();
-    const fg = this.color("foregroundcolor") ?? 0xffffff;
+    // With no text colour named, black or white, whichever reads: WMP's
+    // default is Windows' text colour, black, which is lost on dark skins.
+    const fg = this.color("foregroundcolor") ?? textOn(bg ?? this.under);
     const [playingFg, playingBg] = playingColors(this.color("itemplayingcolor"), this.color("itemplayingbackgroundcolor"));
     if (`${channel}\n${items[channel]}` !== this.rolling) {
       this.rolling = `${channel}\n${items[channel]}`;
@@ -706,9 +710,14 @@ class El {
       const els = this.kids.filter((e) => e.kind === "element" && e.visible);
       const i = map ? mappedElement(map, lx, ly, els.map((e) => e.color("mappingcolor"))) : -1;
       if (i >= 0) return els[i];
-      return this.solid(this.img("image"), lx, ly) ? this : null;
+      // A group with no image of its own draws nothing outside its elements:
+      // Cablemusic's close buttons span the drawer tabs under them.
+      const img = this.img("image");
+      return img && this.solid(img, lx, ly) ? this : null;
     }
-    if (this.kind === "button") return this.solid(this.img("image"), lx, ly) ? this : null;
+    // Where its image or its hover image is drawn: Grinch's playlist button
+    // is all transparencyColor until the pointer is over it.
+    if (this.kind === "button") return this.solid(this.img("image"), lx, ly) || (this.has("hoverimage") && this.solid(this.img("hoverimage"), lx, ly)) ? this : null;
     if (this.kind === "custom") {
       const pos = this.img("positionimage");
       return pos && this.gray(pos, lx, ly) !== null ? this : null;
@@ -784,8 +793,9 @@ const COMMON = new Set(["left", "top", "width", "height", "visible", "enabled", 
 const EFFECT_MEMBERS = ["next", "previous", "currenteffecttype", "currentpreset", "currenteffecttitle"];
 // Methods by tag, for what the engine does not draw yet.
 const IDLE_METHODS: Record<string, string[]> = {
-  playlist: ["setcolumnresizemode", "getcolumnresizemode"],
-  itemsplaylist: ["setcolumnresizemode", "getcolumnresizemode"],
+  // TwinBlade sets column widths before it opens its playlist drawer.
+  playlist: ["setcolumnresizemode", "getcolumnresizemode", "setcolumnwidth"],
+  itemsplaylist: ["setcolumnresizemode", "getcolumnresizemode", "setcolumnwidth"],
   popup: ["appenditem", "deleteitem", "show"],
 };
 
@@ -1448,6 +1458,14 @@ export class Skin {
     // drawer slides for this reason (9SeriesDefault's onEndMove).
     const lists = this.lists;
     this.lists = null;
+    // What lies under a list with no background, for its text colour, read
+    // where reading is cheap: the full paint's probe canvas.
+    if (c === this.probe.canvas)
+      for (const list of lists) {
+        const [x, y] = this.origin(list);
+        const [x0, y0, x1, y1] = [Math.max(0, x), Math.max(0, y), Math.min(w, x + list.w), Math.min(h, y + list.h)];
+        if (list.color("backgroundcolor") === null && x1 > x0 && y1 > y0) list.under = average(g.getImageData(x0, y0, x1 - x0, y1 - y0).data);
+      }
     // A window is part of the shape, even over a subview's clippingColor:
     // TEDDY's list sits in a hole in its drawer.
     for (const list of lists) {

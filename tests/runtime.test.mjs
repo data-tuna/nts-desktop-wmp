@@ -653,3 +653,60 @@ test("a shown playlist is part of the window shape, even over a hole in a subvie
   js("pl.visible = false");
   assert.equal(shaped(), false, "a hidden list leaves the shape alone");
 });
+
+test("a playlist that names a light background and no text colour draws its rows in black (Primitive)", () => {
+  const items = ["NTS 1", "NTS 2"];
+  const { skin } = load(`<theme><view width="100" height="60">
+       <playlist id="pl" left="0" top="0" width="100" height="48" fontSize="6" backgroundColor="#F7C473"/>
+     </view></theme>`, {}, { ...STATE, items, channel: 0 });
+  drawn.length = 0;
+  skin.paint();
+  assert.deepEqual(drawn.filter(([k, , a]) => k === "fillText" && a === "NTS 2").map(([, style]) => style), ["#000000"]);
+});
+
+test("a button group with no image takes clicks only on its elements (Cablemusic's playlist tab under its close buttons)", () => {
+  // 20×20 map: the left half the close button's colour, the right half nothing mapped.
+  const data = new Uint8ClampedArray(20 * 20 * 4);
+  for (let i = 0; i < 400; i++) data.set(i % 20 < 10 ? [255, 0, 0, 255] : [0, 0, 0, 255], i * 4);
+  const { js } = load(
+    `<theme><view width="20" height="20">
+       <button id="tab" width="20" height="20" onClick="tabs++;"/>
+       <buttongroup mappingImage="map.bmp"><buttonelement mappingColor="#FF0000" onClick="closes++;"/></buttongroup>
+     </view></theme>`,
+    {},
+    STATE,
+    new Map([["map.bmp", { width: 20, height: 20, data, bitmap: {} }]]),
+  );
+  js("tabs = 0, closes = 0");
+  for (const x of [5, 15]) {
+    listeners.mousedown({ button: 0, clientX: x, clientY: 5 });
+    listeners.mouseup({ button: 0, clientX: x, clientY: 5 });
+  }
+  assert.deepEqual(js("[closes, tabs]"), [1, 1]);
+});
+
+test("a button whose image is all transparencyColor is clicked where its hover image is drawn (Grinch's playlist button)", () => {
+  const clear = new Uint8ClampedArray(10 * 10 * 4);
+  for (let i = 0; i < 100; i++) clear.set([255, 51, 204, 255], i * 4);
+  const lit = new Uint8ClampedArray(10 * 10 * 4).fill(255);
+  const { js } = load(
+    `<theme><view width="10" height="10">
+       <button id="b" image="clear.bmp" hoverImage="lit.bmp" transparencyColor="#FF33CC" onClick="presses++;"/>
+     </view></theme>`,
+    {},
+    STATE,
+    new Map([["clear.bmp", { width: 10, height: 10, data: clear, bitmap: {} }], ["lit.bmp", { width: 10, height: 10, data: lit, bitmap: {} }]]),
+  );
+  js("presses = 0");
+  listeners.mousedown({ button: 0, clientX: 5, clientY: 5 });
+  listeners.mouseup({ button: 0, clientX: 5, clientY: 5 });
+  assert.equal(js("presses"), 1);
+});
+
+test("playlist.setColumnWidth does nothing, so the code after it runs (TwinBlade's playlist drawer)", () => {
+  const { js } = load(`<theme><view width="10" height="10">
+       <playlist id="pl" visible="false"/>
+     </view></theme>`);
+  js("(pl.setColumnWidth(0, 110), pl.visible = true)");
+  assert.equal(js("pl.visible"), true);
+});
