@@ -20,8 +20,6 @@ type Events = {
   /** The widget paused or played by itself (Windows' media overlay reaches it directly). */
   paused(): void;
   resumed(): void;
-  /** The uploader's SoundCloud name, once the pick has loaded. */
-  uploader(url: string, name: string): void;
 };
 
 export function createWidget(on: Events): Widget & { setVolume(volume: number): void } {
@@ -81,15 +79,9 @@ export function createWidget(on: Events): Widget & { setVolume(volume: number): 
         ready = true;
         for (const name of ["playProgress", "play", "pause", "finish", "error"]) send("addEventListener", name);
         send("setVolume", volume);
-        send("getCurrentSound");
         send("getDuration");
         if (wanted) send("play");
         break;
-      case "getCurrentSound": {
-        const user = (value?.user as { username?: unknown } | undefined)?.username;
-        if (typeof user === "string" && user.trim()) on.uploader(url, user.trim());
-        break;
-      }
       case "getDuration":
         duration = Number(value) / 1000 || 0;
         break;

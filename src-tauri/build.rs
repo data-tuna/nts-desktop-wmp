@@ -11,9 +11,6 @@ fn main() {
             "preview_area",
             "open_link",
             "now_playing",
-            "credit",
-            "credit_size",
-            "open_credit",
         ]),
     ))
     .expect("failed to run tauri-build");

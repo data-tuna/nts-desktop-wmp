@@ -80,11 +80,8 @@ const ATTACKS = {
   "__TAURI_INTERNALS__.invoke open_link": invoke("open_link", { url: "https://www.nts.live/supporters" }),
   "__TAURI_INTERNALS__.invoke preview_skin": invoke("preview_skin", { path: "microsoft/Classic.wmz" }),
   "__TAURI_INTERNALS__.invoke preview_area": invoke("preview_area", { x: 0, y: 0, width: 4096, height: 4096 }),
-  // The trusted page's and the credit's commands (ATA-115).
-  "__TAURI_INTERNALS__.invoke now_playing": invoke("now_playing", { title: "escaped", mute: false, credit: null }),
-  "__TAURI_INTERNALS__.invoke credit": invoke("credit", {}),
-  "__TAURI_INTERNALS__.invoke credit_size": invoke("credit_size", { width: 4096 }),
-  "__TAURI_INTERNALS__.invoke open_credit": invoke("open_credit", {}),
+  // The trusted page's command (ATA-115).
+  "__TAURI_INTERNALS__.invoke now_playing": invoke("now_playing", { title: "escaped", mute: false }),
   // The trusted page builds the visualisation menu (ATA-190); the skin may not.
   "__TAURI_INTERNALS__.invoke plugin:menu|new": invoke("plugin:menu|new", { kind: "Menu", options: {} }),
   "forced postMessage fallback": (m) => `(async () => {
