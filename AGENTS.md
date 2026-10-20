@@ -36,7 +36,8 @@ Written in English.
                           mixtapes.ts parse the NTS Picks and Infinite
                           Mixtapes APIs. All three are copied from
                           nts-desktop-winamp; see Gotchas. widget.ts plays
-                          a pick through SoundCloud's hidden widget.
+                          a pick through SoundCloud's hidden widget;
+                          analyser.ts analyses its captured audio.
                           picker.ts is the skin picker (picker.html), a
                           trusted page of its own; the selected skin's
                           preview is a skin-engine webview over its pane.
@@ -59,8 +60,10 @@ Written in English.
                           engine logged. Built by tools/compat.mjs; the app
                           wears only "works". Never the skins themselves.
     src-tauri/            The Rust shell (Tauri 2). skins.rs picks, downloads
-                          and caches the skin. Window config in tauri.conf.json,
-                          permissions in capabilities/.
+                          and caches the skin; loopback.rs captures what the
+                          app plays, for a pick's visualisation. Window
+                          config in tauri.conf.json, permissions in
+                          capabilities/.
     src-tauri/icons/      App icons. For now the Winamp app's pixel-art radio.
     docs/decisions.md     Decisions, research findings, and why.
     tests/                `node --test` tests and their fixtures.
@@ -188,7 +191,11 @@ HTML-escaped (`&amp;`).
 `w.soundcloud.com` frame in the trusted page, as in the Winamp app, never
 `/api/v2/resolve-stream`. Its audio never reaches our Web Audio graph, so
 during a pick the volume and mute follow (through the widget's
-`setVolume`) but the EQ, balance and the visualiser's level do not. Tauri
+`setVolume`) but the EQ, balance and the visualiser's level do not. The
+visualisation follows the pick through process loopback instead: Rust
+captures what the app's own processes play (ATA-199). Loopback hears
+silence from a hidden desktop, so a pick's visualisation stays still
+there; it can only be checked on a real desktop. Tauri
 injects its internals into that frame too; the ACL refuses it (`Command
 skin_send not allowed by ACL`, checked on a release build), because no
 capability names a remote origin. Keep it that way.
@@ -345,6 +352,13 @@ run its own desktop name (`hidden-run.ps1 <exe> <name>`), DevTools port and
 `WEBVIEW2_USER_DATA_FOLDER`, and check which process a port belongs to
 before you poke it: another agent's copy may be listening on 9355.
 
+**A release build older than the latest release updates itself.** On
+launch it installs that release over the installed copy, which closes any
+running copy of the app, and restarts into the installed one, with your
+environment. On a branch whose `package.json` version is behind the
+latest tag, raise the version for the local build only, and don't commit
+it.
+
 **Testing reconnect.** Add `--proxy-server=http://127.0.0.1:8899` to the
 browser arguments, run `node tools/proxy.mjs 8899`, and cut it with
 `curl "http://127.0.0.1:8899/cut?seconds=30"`. Its log shows each tunnel
@@ -454,6 +468,10 @@ mouse yet.
 session with its title and show (`NTS 1: <show> - <location>`), and plays,
 pauses and stops it, through the same API the overlay uses (ATA-115). The
 flyout has not been seen on screen.
+
+**Nobody has seen a pick's visualisation move** (ATA-199). The capture
+reads silence on a hidden desktop, so the frames were checked there only
+for their rate and cost.
 
 **Fast forward and rewind are drawn disabled,** and so are seek sliders
 except during a pick: a live stream has no length.

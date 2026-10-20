@@ -6,6 +6,47 @@ the evidence.
 
 ## Stack
 
+### The visualisation during a pick: the app's own output (ATA-199, 2026-10-20)
+
+Ata (ATA-163): "why doesn't the visualiser, Milkdrop etc., work when I'm
+playing something from NTS Picks?" A pick plays in SoundCloud's widget, a
+cross-origin frame, so its audio never reaches our Web Audio graph.
+
+- **Process loopback.** Rust captures what the app's own process tree
+  plays, with Windows' process loopback (include tree, Windows 10 2004 or
+  later), through the `wasapi` crate (MIT, on the `windows` 0.62 crate
+  Tauri already builds). `loopback.rs` keeps the newest 8192 mono samples
+  in memory. The trusted page asks for them with `pick_audio` at each
+  frame, and gets raw bytes back. The capture starts at the first ask and
+  stops a second after the last, so it runs only while a pick plays, a
+  visualisation shows, and the player is neither covered nor minimised
+  (ATA-122). Nothing is recorded, written or sent. It needs no SoundCloud
+  API, client ID or network access.
+- **The same frames.** `analyser.ts` does to the samples what the
+  AnalyserNode does to a stream (Blackman window, FFT, 0.8 smoothing, the
+  same dB range), so Bars, Scope, Ambience and Milkdrop get their frames
+  the same way on both. The capture comes after the widget's volume, so
+  the samples are divided by it: the visualisation moves at any volume,
+  as on a stream, and is still when muted. NTS 1 and 2 still use the Web
+  Audio analyser.
+- **WebView2's audio is in the tree.** WebView2 plays from a sandboxed
+  audio-service process under its browser process, which runs under ours.
+  On this machine, include-tree capture of headless Edge 155 (the same
+  engine and process layout) read a 0.01 oscillator back at a peak of
+  0.00999994, and a test tone at 0.0100.
+- **Not on a hidden desktop.** Loopback hears silence from a process on a
+  hidden desktop: the same tone read 0 there and 0.0100 on the real one,
+  in the same run. So on a hidden desktop a pick's visualisation stays
+  still, and the moving one can only be checked on a real desktop.
+- **Where there is no process loopback** (older Windows, macOS),
+  `pick_audio` returns nothing and a pick shows a still visualisation, as
+  before.
+
+CPU, % of one core over the whole tree, release build, hidden desktop,
+muted, 30 s each: Bars 18.9 on NTS 1 and 23.5 during a pick; Milkdrop
+14.8 and 14.7. The pick figures include the widget's own playback. The
+capture costs the Rust process 0.5 to 1.2 points.
+
 ### Playlists over the skin; a pick links to nts.live (ATA-198, 2026-10-20)
 
 Ata (ATA-163): "a lot of the cases the playlist doesn't really work. I
