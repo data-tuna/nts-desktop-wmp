@@ -8,10 +8,10 @@ import { fetchLive, mergeOnAir, nextPollDelay, type OnAir } from "./live";
 import { MIXTAPES_API, parseMixtapes } from "./mixtapes";
 import { PICKS_API, parsePicks, type Pick } from "./picks";
 import { CHANNELS, channelTitle, createPlayer, type Item } from "./player";
+import { BANDS, clamp, loadSettings } from "./settings";
 import { createWidget } from "./widget";
 import { bands, effectsMenu, samples } from "./skin/effects";
 
-const BANDS = [31, 62, 125, 250, 500, 1000, 2000, 4000, 8000, 16000];
 const SETTINGS_KEY = "player";
 
 const audio = new Audio();
@@ -62,26 +62,7 @@ type FromSkin =
   | { type: "effects"; on: boolean }
   | { type: "effectsMenu"; effect: number };
 
-const clamp = (v: unknown, lo: number, hi: number, fallback: number) =>
-  typeof v === "number" && Number.isFinite(v) ? Math.min(hi, Math.max(lo, v)) : fallback;
-
-// Volume, mute, balance and EQ survive a restart. The channel does not: the
-// app always opens on NTS 1.
-const settings = (() => {
-  let saved: Record<string, unknown> = {};
-  try {
-    saved = JSON.parse(localStorage.getItem(SETTINGS_KEY) ?? "{}") ?? {};
-  } catch {
-    // A broken entry falls back to the defaults.
-  }
-  const savedEq = Array.isArray(saved.eq) ? saved.eq : [];
-  return {
-    volume: clamp(saved.volume, 0, 1, 0.8),
-    mute: saved.mute === true,
-    balance: clamp(saved.balance, -1, 1, 0),
-    eq: BANDS.map((_, i) => clamp(savedEq[i], -15, 15, 0)),
-  };
-})();
+const settings = loadSettings(localStorage.getItem(SETTINGS_KEY));
 
 /** Whether the skin shows a visualisation, which wants analyser frames. */
 let effectsOn = false;
