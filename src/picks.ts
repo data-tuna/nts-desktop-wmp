@@ -1,6 +1,6 @@
-// NTS Picks: the latest hand-picked episodes, each a SoundCloud track.
-// SoundCloud's API terms ask for credit to the uploader and to SoundCloud,
-// with a link back, wherever a pick plays.
+// NTS Picks: the latest hand-picked episodes, each a SoundCloud track. The
+// app shows no SoundCloud credit or name: Ata's call, 2026-10-20 (ATA-197,
+// docs/decisions.md).
 // Copied from nts-desktop-winamp's src/picks.ts at bdc0f10, parsing only:
 // the Webamp playback stays behind. Fix a bug in both copies. This copy also
 // keeps the episode's aliases, for the tray's link to its page (ATA-172).

@@ -348,7 +348,7 @@ test("a click on a subview's drawn pixels stays there; through its transparency 
 });
 
 test("now playing: the media's name and item info, the playlist, and a pick's link on a double click", () => {
-  const items = ["NTS 1: A show - London", "NTS 2", "Poolside", "someone on SoundCloud - A pick"];
+  const items = ["NTS 1: A show - London", "NTS 2", "Poolside", "A pick - London"];
   const { skin, js, sent, set } = load(`<theme><view width="100" height="60">
        <text id="name" left="0" top="0" width="100" height="10" value="wmpprop:player.currentMedia.name"/>
        <text id="len" left="0" top="10" width="100" height="10" value="wmpprop:player.currentMedia.durationString"/>
@@ -364,7 +364,7 @@ test("now playing: the media's name and item info, the playlist, and a pick's li
   listeners.mouseup(title);
   listeners.dblclick(title);
   assert.deepEqual(sent.filter((m) => m.type === "drag").length, 1);
-  set({ channel: 3, title: items[3], url: "https://soundcloud.com/a/b", author: "someone on SoundCloud", location: "", link: "https://soundcloud.com/a/b" });
+  set({ channel: 3, title: items[3], url: "https://soundcloud.com/a/b", author: "", location: "", link: "https://soundcloud.com/a/b" });
   // During a pick a press still drags; only a double click on the title opens the page, not on another currentMedia text.
   listeners.mousedown(title);
   listeners.dblclick(len);

@@ -6,6 +6,33 @@ the evidence.
 
 ## Stack
 
+### Picks before mixtapes; no SoundCloud credit or name (ATA-197, 2026-10-20)
+
+Reverses the pick credit of ATA-115 and the playlist order and pick titles
+of ATA-113, below.
+
+- **Ata drops the SoundCloud credit** (ATA-163): "I don't want to see
+  SoundCloud… I take the risk if SoundCloud sues me or sends me an angry
+  email." SoundCloud's API terms ask for the uploader and SoundCloud to be
+  credited with a link back. Ata owns the project and accepts that risk.
+  The standing rule to credit SoundCloud uploaders is withdrawn.
+- **Gone:** the `credit` webview (`credit.html`, `src/credit.ts`, its
+  capability), the `credit`, `credit_size` and `open_credit` commands, the
+  credit's rectangle in the window's shape, the tray's credit entry, and
+  the widget's `getCurrentSound` call, which only fetched the uploader's
+  name. `now_playing` no longer takes a `credit`.
+- **A pick's title is the episode's,** from the picks API: `<name> -
+  <location> (<genres and moods>)`, with no uploader and no "on
+  SoundCloud". Its Author is empty. SoundCloud's widget still plays it,
+  hidden, and the tray's "Show on nts.live" still links to the episode.
+  A double click on the title still opens the track's page, as before;
+  that link shows no SoundCloud text in the app.
+- **The playlist is NTS 1, NTS 2, the picks, then the mixtapes** (Ata,
+  ATA-163). The picks keep the API's order, newest first. `playlist()` in
+  `player.ts` builds it, once both APIs have answered or failed; next,
+  previous, the tray, the media keys and the playlist all index that one
+  list, and the channels keep indexes 0 and 1.
+
 ### Previews in the skin picker (ATA-193, 2026-10-19)
 
 Reverses ATA-112's "No preview images" below. Ata asked for a preview of
@@ -240,7 +267,7 @@ from there. Back on NTS 1 the slider was disabled and `duration` 0.
   monitor, at launch and whenever a skin changes the window's size (not on
   every shape message, so a window parked partly off screen stays put). `pull_on_screen`,
   `fully_visible` and `fit_into` come from the Winamp app (ATA-71).
-- **A pick's credit belongs to the app.** While a pick plays and is not
+- **A pick's credit belongs to the app** (removed by ATA-197, above). While a pick plays and is not
   stopped, a `credit` webview (our `credit.html`, whose capability allows
   only `credit`, `credit_size` and `open_credit`) shows "<uploader> on
   SoundCloud ↗" over the skin's top-left corner, at 16 px, white on
@@ -280,6 +307,7 @@ from there. Back on NTS 1 the slider was disabled and `duration` 0.
 
 - **One playlist:** NTS 1, NTS 2, then the Infinite Mixtapes, then the
   12 latest NTS Picks, appended once per launch when their APIs answer.
+  (ATA-197 puts the picks before the mixtapes.)
   Next and previous walk the whole list and wrap; a playlist row sends the
   new `select` message rather than a run of `next`s, which would reload a
   stream at every step. The app still opens on NTS 1.
@@ -300,7 +328,7 @@ from there. Back on NTS 1 the slider was disabled and `duration` 0.
   (`widget.ts`, adapted from the Winamp app). SoundCloud's terms want the
   uploader and SoundCloud credited, with a link back: a pick's title starts
   `<uploader> on SoundCloud - `, so skins that cut long titles still show
-  it, and that credit is also its Author. A double click on a text showing
+  it, and that credit is also its Author. (Reversed by ATA-197: no credit.) A double click on a text showing
   `currentMedia.name` (or its title or author item info), or on the pick's
   own playlist row, opens the track page through `launchUrl`. A double
   click, not a press, so pressing the title still drags the window. A pick that does not start within 15 s, or that the

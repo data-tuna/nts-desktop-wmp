@@ -27,12 +27,11 @@ function setup() {
     error: (reason) => events.push(`error ${reason}`),
     paused: () => events.push("paused"),
     resumed: () => events.push("resumed"),
-    uploader: (url, name) => events.push(`uploader ${name}`),
   });
   return { widget, events };
 }
 
-test("a pick loads, plays once ready, and reports its uploader, clock and finish", () => {
+test("a pick loads, plays once ready, and reports its clock and finish", () => {
   const { widget, events } = setup();
   widget.play("https://soundcloud.com/a/b");
   assert.match(frame.src, /^https:\/\/w\.soundcloud\.com\/player\/\?url=https%3A%2F%2Fsoundcloud\.com%2Fa%2Fb/);
@@ -45,7 +44,6 @@ test("a pick loads, plays once ready, and reports its uploader, clock and finish
   assert.deepEqual(frame.posted, []);
   from("ready");
   assert.equal(frame.posted.at(-1), "play");
-  from("getCurrentSound", { user: { username: " NTS Latest " } });
   from("play");
   from("playProgress", { currentPosition: 12_500 });
   assert.deepEqual([widget.playing, widget.time], [true, 12.5]);
@@ -54,7 +52,7 @@ test("a pick loads, plays once ready, and reports its uploader, clock and finish
   widget.play("https://soundcloud.com/a/b");
   assert.deepEqual(frame.posted, []);
   from("finish");
-  assert.deepEqual(events, ["uploader NTS Latest", "finish"]);
+  assert.deepEqual(events, ["finish"]);
 });
 
 test("our pause is not reported back; a pause the widget makes itself is", () => {

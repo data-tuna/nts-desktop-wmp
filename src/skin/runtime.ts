@@ -239,8 +239,8 @@ export function objects(host: Host) {
   return { player, theme, mediacenter, eq, vs, network };
 }
 
-/** `currentMedia.getItemInfo(attr)`: the title, the show (or a pick's
- * credit) as its author, and the show's location. */
+/** `currentMedia.getItemInfo(attr)`: the title, the show as its author, and
+ * the show's location. */
 export function itemInfo(state: State, attr: string): string {
   const a = attr.toLowerCase();
   if (a === "title" || a === "#title") return state.title;

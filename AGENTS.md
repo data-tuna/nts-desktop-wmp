@@ -40,8 +40,6 @@ Written in English.
                           picker.ts is the skin picker (picker.html), a
                           trusted page of its own; the selected skin's
                           preview is a skin-engine webview over its pane.
-                          credit.ts (credit.html) is the SoundCloud credit
-                          drawn over the skin while a pick plays.
     src/skin/             The skin engine, which runs in the skin webview:
                           wmz.ts unzips, wms.ts decodes and parses the .wms,
                           engine.ts lays out and paints the view, runs the
@@ -126,12 +124,13 @@ mute are not (ATA-196).
 The skin picked in the picker is remembered too (`skin.json` beside the skin
 cache); with none picked, every launch wears a random working skin.
 
-**A pick's credit is the app's, not the skin's.** While a pick plays, the
-app draws "<uploader> on SoundCloud" over the skin's top-left corner in a
-webview of its own (`credit`), adds it to the window's shape, and lists it in
-the tray; one click opens the track's page. A skin's code cannot hide it, and
-a skin with no title text still shows it. SoundCloud's terms want that
-credit and link wherever a pick plays.
+**The playlist is NTS 1, NTS 2, the picks, then the mixtapes** (ATA-197).
+`playlist()` in `player.ts` builds it; everything else indexes that list.
+
+**No SoundCloud credit or name.** Ata dropped the credit SoundCloud's terms
+ask for and accepts the risk (ATA-197, 2026-10-20). A pick's title is the
+episode's, from the picks API. Do not add "SoundCloud" or the uploader back
+to the skin, the tray or the media overlay.
 
 **Skins are fetched at runtime and never committed.** `.wmz` skins are
 third-party works, and many of the classic ones are Microsoft's own. They
@@ -370,7 +369,7 @@ on the real one.
 primary button is down (`win32::drag` in `lib.rs`), because `start_dragging`
 did nothing under the skin webview. Nobody has dragged it with a real mouse
 yet, nor clicked the tray menu (its "Show on nts.live" and Mute entries
-included) or the credit, nor moved the window to a monitor with another
+included), nor moved the window to a monitor with another
 scale (the shape is redone on `ScaleFactorChanged`).
 ATA-115 has the list of checks for a person.
 

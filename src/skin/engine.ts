@@ -21,10 +21,10 @@ export type State = {
   title: string;
   /** The current item's stream or page (player.URL). */
   url: string;
-  /** player.currentMedia's item info: the show (or a pick's credit) and where it comes from. */
+  /** player.currentMedia's item info: the show and where it comes from. */
   author: string;
   location: string;
-  /** The page a click on the title opens: a pick's SoundCloud page, or "". */
+  /** The page a click on the title opens: a pick's track page, or "". */
   link: string;
   /** The playlist's titles; `channel` is the current one's index. */
   items: string[];
@@ -1581,7 +1581,7 @@ export class Skin {
     c.addEventListener("dblclick", (ev) => {
       const found = this.at(ev);
       if (found?.interactive() && found.enabled) this.byUser(() => this.fire(found, "ondblclick"));
-      // A pick links back to SoundCloud, as its terms ask: a double click on
+      // A pick links to its track page: a double click on
       // the title, or on the pick's playlist row. A press still drags the window.
       else if (this.state.link && (found?.kind === "playlist" ? found.rowAt(this.point(ev)[1] - found.origin()[1]) === this.linkRow : found?.kind === "text" && TITLE.test(found.attr("value") ?? "")))
         this.send({ type: "launchUrl", url: this.state.link });

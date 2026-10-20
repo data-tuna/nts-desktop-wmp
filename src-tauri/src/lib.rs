@@ -693,13 +693,6 @@ fn fit_into(
     )
 }
 
-/// The SoundCloud credit for the pick playing: its uploader and track page.
-#[derive(Deserialize, Clone, PartialEq)]
-struct Credit {
-    name: String,
-    url: String,
-}
-
 /// The current show's or pick's aliases on nts.live (ATA-172).
 #[derive(Deserialize)]
 struct Page {
@@ -728,14 +721,12 @@ fn show_page(page: &Page) -> Option<Url> {
 
 /// The tray menu, its Mute, checked while muted, its two channels, checked
 /// while current, its "Show on nts.live" entry, in the menu only while the
-/// current show has a page, and its credit entry, in the menu only while a
-/// pick plays.
+/// current show has a page.
 struct Tray {
     menu: Menu<Wry>,
     mute: CheckMenuItem<Wry>,
     channels: [CheckMenuItem<Wry>; 2],
     show: MenuItem<Wry>,
-    credit: MenuItem<Wry>,
 }
 
 impl Tray {
@@ -747,27 +738,7 @@ impl Tray {
     }
 }
 
-static CREDIT: Mutex<Option<Credit>> = Mutex::new(None);
 static SHOW_PAGE: Mutex<Option<Url>> = Mutex::new(None);
-
-/// The credit's height, in CSS pixels.
-const CREDIT_HEIGHT: u32 = 16;
-
-/// What a pick's credit shows: "<uploader> on SoundCloud".
-fn credit_text(credit: &Credit) -> String {
-    if credit.name.is_empty() {
-        "SoundCloud".into()
-    } else {
-        format!("{} on SoundCloud", credit.name)
-    }
-}
-
-/// A pick's page is a soundcloud.com track page, and nothing else.
-fn soundcloud_page(url: &str) -> bool {
-    Url::parse(url).is_ok_and(|u| {
-        u.scheme() == "https" && u.host_str() == Some("soundcloud.com") && u.path().len() > 1
-    })
-}
 
 /// Windows keeps 127 UTF-16 units of a tray tooltip, and tray-icon copies a
 /// longer one without its terminator. Cut on a character boundary. From the
@@ -795,17 +766,13 @@ fn tooltip(title: &str, mute: bool) -> String {
 
 /// The trusted page, whenever what plays or the mute changes: its title for
 /// the tray's tooltip, the mute and the channel to check in the tray, the
-/// show's or pick's aliases on nts.live, and a pick's credit, or none.
-/// While a pick plays the app draws the credit itself, above the skin, in a
-/// webview of its own: a skin's code cannot hide it, and a skin with no title
-/// text still shows it.
+/// show's or pick's aliases on nts.live.
 #[tauri::command]
 async fn now_playing(
     app: AppHandle,
     title: String,
     mute: bool,
     channel: Option<usize>,
-    credit: Option<Credit>,
     page: Option<Page>,
 ) -> Result<(), String> {
     if let Some(tray) = app.tray_by_id("main") {
@@ -823,100 +790,11 @@ async fn now_playing(
     } else if had_page && !shown {
         let _ = tray.menu.remove(&tray.show);
     }
-    if credit.as_ref().is_some_and(|c| !soundcloud_page(&c.url)) {
-        return Err("not a SoundCloud page".into());
-    }
-    // Swapped before any UI work, which waits on the UI thread, where
-    // credit() may be waiting on this lock.
-    let had = {
-        let mut current = CREDIT.lock().unwrap();
-        if *current == credit {
-            return Ok(());
-        }
-        std::mem::replace(&mut *current, credit.clone()).is_some()
-    };
-    let window = app.get_window("main").ok_or("no main window")?;
-    match &credit {
-        Some(c) => {
-            tray.credit
-                // A lone & in a menu item marks a mnemonic: "Rhythm & Sound" needs &&.
-                .set_text(credit_text(c).replace('&', "&&"))
-                .map_err(|e| e.to_string())?;
-            if !had {
-                let _ = tray.menu.insert(&tray.credit, 6 + shown as usize);
-            }
-            // As wide as the window while it lays out; credit_size narrows it.
-            let width = window
-                .inner_size()
-                .map_err(|e| e.to_string())?
-                .to_logical::<f64>(window.scale_factor().map_err(|e| e.to_string())?)
-                .width;
-            let size = LogicalSize::new(width, CREDIT_HEIGHT as f64);
-            match app.get_webview("credit") {
-                Some(webview) => {
-                    let _ = webview.set_size(size);
-                    let _ = webview.eval("render()");
-                }
-                None => {
-                    let builder =
-                        WebviewBuilder::new("credit", WebviewUrl::App("credit.html".into()))
-                            .additional_browser_args(BROWSER_ARGS)
-                            .on_navigation(|url| url.path() == "/credit.html")
-                            .on_new_window(|_, _| NewWindowResponse::Deny);
-                    window
-                        .add_child(builder, LogicalPosition::new(0.0, 0.0), size)
-                        .map_err(|e| e.to_string())?;
-                }
-            }
-        }
-        None => {
-            let _ = tray.menu.remove(&tray.credit);
-            if let Some(webview) = app.get_webview("credit") {
-                let _ = webview.close();
-            }
-            #[cfg(windows)]
-            win32::set_credit(&window, None);
-        }
-    }
     Ok(())
-}
-
-/// The credit page asks what to show.
-#[tauri::command]
-fn credit() -> Option<String> {
-    CREDIT.lock().unwrap().as_ref().map(credit_text)
-}
-
-/// The credit page's width once laid out, in CSS pixels: the credit webview
-/// takes that size, and the window's shape gains its rectangle.
-#[tauri::command]
-fn credit_size(app: AppHandle, width: u32) -> Result<(), String> {
-    let window = app.get_window("main").ok_or("no main window")?;
-    let webview = app.get_webview("credit").ok_or("no credit")?;
-    let width = width.clamp(1, 4096);
-    webview
-        .set_size(LogicalSize::new(width, CREDIT_HEIGHT))
-        .map_err(|e| e.to_string())?;
-    #[cfg(windows)]
-    win32::set_credit(&window, Some([0, 0, width, CREDIT_HEIGHT]));
-    #[cfg(not(windows))]
-    let _ = window;
-    Ok(())
-}
-
-/// A click on the credit, or on its tray entry: the pick's SoundCloud page.
-#[tauri::command]
-fn open_credit() {
-    if let Some(credit) = CREDIT.lock().unwrap().as_ref() {
-        if let Ok(url) = Url::parse(&credit.url) {
-            open_url(&url);
-        }
-    }
 }
 
 /// The tray icon: play, stop, mute, the two channels, the show's page while
-/// it has one, the pick's credit while one plays, and quit. A left click
-/// brings the player forward.
+/// it has one, and quit. A left click brings the player forward.
 fn build_tray(app: &AppHandle) -> tauri::Result<()> {
     let item = |id: &str, text: &str| MenuItem::with_id(app, id, text, true, None::<&str>);
     let channel = |id: &str, text: &str| {
@@ -935,20 +813,17 @@ fn build_tray(app: &AppHandle) -> tauri::Result<()> {
             &sep()?,
             &channels[0],
             &channels[1],
-            // "Show on nts.live" goes here, at 6, while the show has a page,
-            // then the credit while a pick plays.
+            // "Show on nts.live" goes here, at 6, while the show has a page.
             &sep()?,
             &item("quit", "Quit")?,
         ],
     )?;
     let show = item("show", "Show on nts.live")?;
-    let credit = item("credit", "SoundCloud")?;
     app.manage(Tray {
         menu: menu.clone(),
         mute,
         channels,
         show,
-        credit,
     });
     let mut tray = TrayIconBuilder::with_id("main")
         .tooltip("NTS Radio Bootleg Media Player")
@@ -975,7 +850,6 @@ fn build_tray(app: &AppHandle) -> tauri::Result<()> {
 fn on_tray_menu(app: &AppHandle, event: MenuEvent) {
     match event.id().as_ref() {
         "quit" => app.exit(0),
-        "credit" => open_credit(),
         "show" => {
             // Cloned so the lock is not held while the browser starts.
             let page = SHOW_PAGE.lock().unwrap().clone();
@@ -1219,18 +1093,9 @@ mod win32 {
         });
     }
 
-    /// The credit's rectangle while a pick plays, kept in the shape.
-    static CREDIT: Mutex<Option<[u32; 4]>> = Mutex::new(None);
-
     /// Clips the window to the skin's opaque runs, given in CSS pixels.
     pub fn apply(window: &tauri::Window, rects: Vec<[u32; 4]>) {
         *SHAPE.lock().unwrap() = rects;
-        reapply(window);
-    }
-
-    /// Adds the credit's rectangle to the shape, or with none takes it out.
-    pub fn set_credit(window: &tauri::Window, rect: Option<[u32; 4]>) {
-        *CREDIT.lock().unwrap() = rect;
         reapply(window);
     }
 
@@ -1246,7 +1111,7 @@ mod win32 {
         let px = |v: u32| (v as f64 * scale).round() as i32;
         unsafe {
             let rgn = CreateRectRgn(0, 0, 0, 0);
-            for &[x, y, w, h] in rects.iter().chain(CREDIT.lock().unwrap().iter()) {
+            for &[x, y, w, h] in rects.iter() {
                 let r = CreateRectRgn(px(x), px(y), px(x + w), px(y + h));
                 CombineRgn(rgn, rgn, r, RGN_OR);
                 DeleteObject(r);
@@ -1284,9 +1149,6 @@ pub fn run() {
             preview_area,
             open_link,
             now_playing,
-            credit,
-            credit_size,
-            open_credit
         ])
         .register_asynchronous_uri_scheme_protocol("skin", |ctx, req, responder| {
             let (app, from) = (ctx.app_handle().clone(), ctx.webview_label().to_owned());
@@ -1535,24 +1397,6 @@ mod tests {
             assert_eq!(page("milkweed", Some(bad)), None, "{bad}");
         }
         assert_eq!(page(&"a".repeat(201), None), None);
-    }
-
-    #[test]
-    fn credit_opens_only_soundcloud_pages() {
-        assert!(soundcloud_page("https://soundcloud.com/user-1/a-mix"));
-        assert!(!soundcloud_page("https://soundcloud.com/"));
-        assert!(!soundcloud_page("http://soundcloud.com/user-1/a-mix"));
-        assert!(!soundcloud_page("https://soundcloud.com.evil.example/a"));
-        assert!(!soundcloud_page("file:///C:/Windows/System32/calc.exe"));
-        let credit = |name: &str| Credit {
-            name: name.into(),
-            url: String::new(),
-        };
-        assert_eq!(
-            credit_text(&credit("NTS Latest")),
-            "NTS Latest on SoundCloud"
-        );
-        assert_eq!(credit_text(&credit("")), "SoundCloud");
     }
 
     #[test]

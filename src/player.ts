@@ -2,6 +2,8 @@
 // stream reloads the same item with backoff; it never skips to the next one.
 // Pause and stop cancel a pending retry. See AGENTS.md, Invariants.
 
+import type { Pick as NtsPick } from "./picks.ts";
+
 /** A playlist row. A pick plays through `Widget`, everything else through the <audio> element. */
 export type Item = { title: string; url: string; pick?: boolean };
 
@@ -27,6 +29,14 @@ export type Widget = {
 export const CHANNELS: Item[] = [
   { title: "NTS 1", url: "https://streams.radiomast.io/nts1" },
   { title: "NTS 2", url: "https://streams.radiomast.io/nts2" },
+];
+
+/** The playlist: the channels, the picks (newest first, as the API gives
+ * them), then the mixtapes (ATA-197). A pick's title is the episode's. */
+export const playlist = (picks: NtsPick[], mixtapes: Item[]): Item[] => [
+  ...CHANNELS,
+  ...picks.map(({ title, url }) => ({ title, url, pick: true })),
+  ...mixtapes,
 ];
 
 /** A channel's title while the live API names its show: "NTS 1: <show> - <location>".

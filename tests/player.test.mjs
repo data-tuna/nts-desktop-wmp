@@ -2,7 +2,9 @@
 // a stand-in for the <audio> element and mocked timers.
 import assert from "node:assert/strict";
 import { afterEach, beforeEach, mock, test } from "node:test";
-import { CHANNELS, channelTitle, createPlayer, silence } from "../src/player.ts";
+import { readFileSync } from "node:fs";
+import { parsePicks } from "../src/picks.ts";
+import { CHANNELS, channelTitle, createPlayer, playlist, silence } from "../src/player.ts";
 
 beforeEach(() => mock.timers.enable({ apis: ["setTimeout", "setInterval", "Date"] }));
 afterEach(() => mock.timers.reset());
@@ -235,4 +237,23 @@ test("a paused pick's clock and seeking stay with it when the playlist moves to 
   assert.deepEqual([player.state().time, player.state().duration], [2712, 7080]);
   player.play();
   assert.deepEqual(widget.calls.filter((c) => c.startsWith("play")), [`play ${a}`, `play ${a}`]);
+});
+
+test("the playlist is NTS 1, NTS 2, the picks in the API's order, then the mixtapes; a pick's title is the episode's (ATA-197)", () => {
+  const picks = parsePicks(JSON.parse(readFileSync(new URL("picks-fixture.json", import.meta.url), "utf8")));
+  const mixtape = { title: "Poolside", url: "https://streams.radiomast.io/poolside" };
+  const items = playlist(picks, [mixtape]);
+  assert.deepEqual(
+    items.map((item) => item.title),
+    [
+      "NTS 1",
+      "NTS 2",
+      "Buried Light - 100% AshTreJinkins - Los Angeles (Experimental, Minimal, Beats, Minimal Talkin)",
+      "POST-SUMMER DANCE RITUALS W/ JEAN-BAPTISTE DOMINICI - Paris (Electronica, Reggaeton, Arabic Pop)",
+      "Poolside",
+    ],
+  );
+  assert.deepEqual(items.map((item) => !!item.pick), [false, false, true, true, false]);
+  assert.equal(items[2].url, picks[0].url);
+  assert.deepEqual(playlist([], []), CHANNELS);
 });

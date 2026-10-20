@@ -7,7 +7,7 @@ import { CheckMenuItem, Menu, Submenu } from "@tauri-apps/api/menu";
 import { fetchLive, mergeOnAir, nextPollDelay, type OnAir } from "./live";
 import { MIXTAPES_API, parseMixtapes } from "./mixtapes";
 import { PICKS_API, parsePicks, type Pick } from "./picks";
-import { CHANNELS, channelTitle, createPlayer, type Item } from "./player";
+import { CHANNELS, channelTitle, createPlayer, playlist, type Item } from "./player";
 import { BANDS, clamp, loadSettings } from "./settings";
 import { createWidget } from "./widget";
 import { bands, effectsMenu, samples } from "./skin/effects";
@@ -32,9 +32,9 @@ analyser.connect(ctx.destination);
 const visAnalyser = new AnalyserNode(ctx, { fftSize: 8192, minDecibels: -90, maxDecibels: -15 });
 source.connect(visAnalyser);
 
-// The channels, then the Infinite Mixtapes, then the NTS Picks, once their APIs answer.
+// The channels, then the NTS Picks and the Infinite Mixtapes once their APIs answer.
 const items: Item[] = [...CHANNELS];
-const picks = new Map<string, Pick & { uploader?: string }>();
+const picks = new Map<string, Pick>();
 const widget = createWidget({
   finish() {
     player.step(1);
@@ -43,10 +43,6 @@ const widget = createWidget({
   error: () => player.stop(),
   paused: () => player.pause(),
   resumed: () => player.play(),
-  uploader: (url, name) => {
-    const pick = picks.get(url);
-    if (pick) pick.uploader = name;
-  },
 });
 const player = createPlayer(audio, items, widget);
 // The show on each channel; undefined where the live API gave none.
@@ -124,19 +120,14 @@ function level() {
 
 /** What a skin shows for item `i`: `title` is `player.currentMedia.name`,
  * `author` and `location` its item info, `link` the page a double click on the
- * title opens. SoundCloud's terms want the uploader and SoundCloud credited,
- * with a link back, wherever a pick plays, so a pick's title carries both. */
+ * title opens: a pick's own page. */
 function info(i: number) {
   const item = items[i];
   const url = item.url;
   const show = i < CHANNELS.length ? onAir[i] : undefined;
   if (show) return { title: channelTitle(item.title, show.title), url, author: show.show, location: show.location ?? "", link: "", artwork: show.artwork };
   const pick = picks.get(item.url);
-  if (pick) {
-    const credit = pick.uploader ? `${pick.uploader} on SoundCloud` : "SoundCloud";
-    // Credit first, so a skin that cuts long titles still shows it.
-    return { title: `${credit} - ${pick.title}`, url, author: credit, location: "", link: pick.url, artwork: pick.artwork };
-  }
+  if (pick) return { title: item.title, url, author: "", location: "", link: pick.url, artwork: pick.artwork };
   return { title: item.title, url, author: "", location: "", link: "", artwork: undefined };
 }
 
@@ -182,12 +173,10 @@ if ("mediaSession" in navigator) {
   for (const [action, type] of actions) navigator.mediaSession.setActionHandler(action, () => onSkin({ type } as FromSkin));
 }
 
-// The tray's tooltip, which says when muted, its check marks, its link to the show's page on nts.live, and while a pick
-// plays its credit, which the app draws over the skin and lists in the tray (lib.rs, now_playing).
+// The tray's tooltip, which says when muted, its check marks, and its link to the show's page on nts.live (lib.rs, now_playing).
 let tray = "";
-function updateTray(title: string, i: number, playState: string) {
+function updateTray(title: string, i: number) {
   const pick = picks.get(items[i].url);
-  const credit = pick && playState !== "stopped" ? { name: pick.uploader ?? "", url: pick.url } : null;
   // The tray checks the channel that is current; a mixtape or pick checks neither.
   const channel = i < CHANNELS.length ? i : null;
   // A channel links to its show, a pick to its episode, a mixtape to nothing (ATA-172).
@@ -198,9 +187,9 @@ function updateTray(title: string, i: number, playState: string) {
       ? { show: pick.showAlias, episode: pick.episodeAlias }
       : null;
   const { mute } = settings;
-  if (tray === JSON.stringify([title, mute, credit, channel, page])) return;
-  tray = JSON.stringify([title, mute, credit, channel, page]);
-  void invoke("now_playing", { title, mute, credit, channel, page }).catch((e: unknown) => console.warn("now_playing", e));
+  if (tray === JSON.stringify([title, mute, channel, page])) return;
+  tray = JSON.stringify([title, mute, channel, page]);
+  void invoke("now_playing", { title, mute, channel, page }).catch((e: unknown) => console.warn("now_playing", e));
 }
 
 // 4 updates a second covers the clock and title. The visualisation gets its
@@ -209,7 +198,7 @@ setInterval(() => {
   const now = player.state();
   const { artwork: _, ...shown } = info(now.channel);
   updateOverlay(now.channel);
-  updateTray(shown.title, now.channel, now.playState);
+  updateTray(shown.title, now.channel);
   const state = { type: "state", ...now, ...shown, items: items.map((_, i) => info(i).title), ...settings, level: level(), covered };
   void invoke("skin_send", { msg: state }).catch(() => {});
   startVis();
@@ -279,13 +268,12 @@ async function list<T>(api: string, parse: (body: unknown) => T[]): Promise<T[]>
   return parse(await response.json());
 }
 void Promise.allSettled([list(MIXTAPES_API, parseMixtapes), list(PICKS_API, parsePicks)]).then(([mixtapes, picked]) => {
-  if (mixtapes.status === "fulfilled") items.push(...mixtapes.value);
-  else console.warn("No Infinite Mixtapes this launch", mixtapes.reason);
-  if (picked.status === "rejected") return console.warn("No NTS Picks this launch", picked.reason);
-  for (const pick of picked.value) {
-    picks.set(pick.url, pick);
-    items.push({ title: pick.title, url: pick.url, pick: true });
-  }
+  if (mixtapes.status === "rejected") console.warn("No Infinite Mixtapes this launch", mixtapes.reason);
+  if (picked.status === "rejected") console.warn("No NTS Picks this launch", picked.reason);
+  const newPicks = picked.status === "fulfilled" ? picked.value : [];
+  for (const pick of newPicks) picks.set(pick.url, pick);
+  // In place: the player holds this array. The channels keep their indexes.
+  items.splice(0, items.length, ...playlist(newPicks, mixtapes.status === "fulfilled" ? mixtapes.value : []));
 });
 
 if (import.meta.env.DEV) {
