@@ -10,6 +10,7 @@ import { episodePage, PICKS_API, parsePicks, type Pick } from "./picks";
 import { CHANNELS, channelTitle, createPlayer, playlist, type Item } from "./player";
 import { BANDS, clamp, loadSettings } from "./settings";
 import { createWidget } from "./widget";
+import { createAnalyser } from "./analyser";
 import { bands, effectsMenu, samples } from "./skin/effects";
 
 const SETTINGS_KEY = "player";
@@ -205,13 +206,18 @@ setInterval(() => {
 }, 250);
 
 // Analyser frames for the skin's visualisation, 20 a second (ATA-122), only
-// while one is on screen, no other window covers the player and the stream
+// while one is on screen, no other window covers the player and something
 // plays. The loop asks for display frames only then: idle, it cost about 4 %
 // of a core (ATA-116). The state tick above starts it again. Rust hides the
 // webviews while the window is minimised, so requestAnimationFrame, and the
 // frames, stop then.
 const spectrum = new Uint8Array(visAnalyser.frequencyBinCount);
 const wave = new Uint8Array(visAnalyser.fftSize);
+// A pick plays outside our Web Audio graph. Rust captures what the app plays
+// instead (ATA-199), and this analyses it as visAnalyser would.
+const pickAnalyser = createAnalyser(visAnalyser.fftSize, visAnalyser.minDecibels, visAnalyser.maxDecibels);
+/** False where Rust has no loopback: a pick then shows silence. */
+let loopback = true;
 let lastFrame = 0;
 let flatSent = false;
 let visLooping = false;
@@ -224,11 +230,12 @@ function visFrame(now: number) {
   visLooping = false;
   const { playState, channel } = player.state();
   if (!effectsOn || covered || playState !== "playing") return;
-  // A pick plays outside our Web Audio graph: one flat frame clears the last
-  // stream frame, then nothing until a stream plays. Silence, not the
-  // analyser's data, which still holds the stream's last moments.
-  if (items[channel]?.pick) {
-    if (!flatSent) void invoke("skin_send", { msg: { type: "vis", bars: Array(32).fill(0), wave: Array(96).fill(128) } }).catch(() => {});
+  const pick = !!items[channel]?.pick;
+  // Without loopback, one flat frame clears the last stream frame, then
+  // nothing until a stream plays. Silence, not the analyser's data, which
+  // still holds the stream's last moments.
+  if (pick && !loopback) {
+    if (!flatSent) sendVis(Array(32).fill(0), Array(96).fill(128));
     flatSent = true;
     return;
   }
@@ -237,13 +244,46 @@ function visFrame(now: number) {
   if (now - lastFrame < 45) return;
   flatSent = false;
   lastFrame = now;
+  if (pick) {
+    void pickFrame();
+    return;
+  }
   visAnalyser.getByteFrequencyData(spectrum);
   // The scope shows the newest 2048 samples (43 ms at 48 kHz): all 8192
   // would alias at 96 points, and a shorter buffer gets the oldest ones.
   visAnalyser.getByteTimeDomainData(wave);
+  sendFrame();
+}
+let pickAsked = false;
+async function pickFrame() {
+  if (pickAsked) return;
+  pickAsked = true;
+  try {
+    const pcm = new Float32Array(await invoke<ArrayBuffer>("pick_audio", { rate: ctx.sampleRate }));
+    if (pcm.length !== wave.length) {
+      loopback = false;
+      return;
+    }
+    // The capture comes after the widget's volume, which it rounds to whole
+    // percent; undo it, so the visualisation moves at any volume. Muted, it is still.
+    const volume = settings.mute ? 0 : Math.round(settings.volume * 100) / 100;
+    if (volume > 0) pcm.forEach((v, i) => (pcm[i] = v / volume));
+    pickAnalyser.frequency(pcm, spectrum);
+    pickAnalyser.time(pcm, wave);
+    sendFrame();
+  } catch (error: unknown) {
+    console.warn("pick_audio", error);
+    loopback = false;
+  } finally {
+    pickAsked = false;
+  }
+}
+function sendFrame() {
   // Milkdrop gets the newest 1024 as they are: Butterchurn reads its levels from them (ATA-167).
-  const msg = { type: "vis", bars: bands(spectrum, ctx.sampleRate, 32), wave: samples(wave.subarray(-2048), 96), pcm: Array.from(wave.subarray(-1024)) };
-  void invoke("skin_send", { msg }).catch(() => {});
+  sendVis(bands(spectrum, ctx.sampleRate, 32), samples(wave.subarray(-2048), 96), Array.from(wave.subarray(-1024)));
+}
+function sendVis(bars: number[], wave: number[], pcm?: number[]) {
+  void invoke("skin_send", { msg: { type: "vis", bars, wave, pcm } }).catch(() => {});
 }
 
 // The show on air. Nothing here touches playback: when the API fails the

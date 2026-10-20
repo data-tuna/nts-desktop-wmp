@@ -3,6 +3,8 @@
 // the skin webview, so Tauri refuses every command from it, ours included
 // (see build.rs). The two pages talk only through the `skin` protocol below;
 // docs/decisions.md (ATA-107) has the message list.
+#[cfg(windows)]
+mod loopback;
 mod skins;
 
 use serde::Deserialize;
@@ -113,6 +115,25 @@ fn skin_send(app: AppHandle, msg: serde_json::Value) -> Result<(), String> {
         "window.dispatchEvent(new MessageEvent('message', {{ data: {msg} }}))"
     ))
     .map_err(|e| e.to_string())
+}
+
+/// The newest samples the app itself played, as little-endian f32, for the
+/// visualisation during a pick (ATA-199). Empty where there is no loopback.
+#[tauri::command]
+fn pick_audio(rate: u32) -> tauri::ipc::Response {
+    #[cfg(windows)]
+    let samples = loopback::latest(rate.clamp(8_000, 192_000));
+    #[cfg(not(windows))]
+    let samples: Vec<f32> = {
+        let _ = rate;
+        Vec::new()
+    };
+    tauri::ipc::Response::new(
+        samples
+            .iter()
+            .flat_map(|v| v.to_le_bytes())
+            .collect::<Vec<u8>>(),
+    )
 }
 
 fn is_skin_url(url: &Url) -> bool {
@@ -1149,6 +1170,7 @@ pub fn run() {
             preview_area,
             open_link,
             now_playing,
+            pick_audio,
         ])
         .register_asynchronous_uri_scheme_protocol("skin", |ctx, req, responder| {
             let (app, from) = (ctx.app_handle().clone(), ctx.webview_label().to_owned());

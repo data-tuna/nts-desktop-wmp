@@ -11,6 +11,7 @@ fn main() {
             "preview_area",
             "open_link",
             "now_playing",
+            "pick_audio",
         ]),
     ))
     .expect("failed to run tauri-build");
