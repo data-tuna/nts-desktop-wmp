@@ -682,6 +682,13 @@ As in the Winamp app (its `docs/decisions.md`, ATA-72), with this app's names.
   it downloads, installs in passive mode (a small progress window) and
   restarts. The stream drops for a few seconds. Offline or with no release,
   it plays on and tries next launch. Debug builds never check.
+- **Only release builds know where to look** (ATA-204). The updater's
+  endpoint is in `tauri.release.conf.json`, which only the release
+  workflow passes, so a local `npm run tauri build` has none: its check
+  fails at once with "Updater does not have any endpoints set", and it
+  never installs over the installed copy. Before this, a local 0.2.3
+  build updated itself to v0.2.4 over Ata's installed copy and closed it
+  (ATA-199).
 - **The update signing key** was made with `npx tauri signer generate`,
   with a password. Both are the repository secrets
   `TAURI_SIGNING_PRIVATE_KEY` and `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`; the

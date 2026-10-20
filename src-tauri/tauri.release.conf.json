@@ -1,5 +1,12 @@
 {
   "bundle": {
     "createUpdaterArtifacts": true
+  },
+  "plugins": {
+    "updater": {
+      "endpoints": [
+        "https://github.com/data-tuna/nts-desktop-wmp/releases/latest/download/latest.json"
+      ]
+    }
   }
 }
