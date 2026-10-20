@@ -679,7 +679,7 @@ class El {
     });
     if (!t) return;
     // No images of WMP's: a track and a thumb in the list's own colours.
-    const back = bg ?? 0;
+    const back = bg ?? this.under ?? 0;
     g.fillStyle = css(mix(back, fg, 0.15));
     g.fillRect(x + inner, y, BAR, h);
     g.fillStyle = css(mix(back, fg, 0.55));
@@ -1653,7 +1653,7 @@ export class Skin {
     c.addEventListener("dblclick", (ev) => {
       const found = this.at(ev);
       if (found?.interactive() && found.enabled) this.byUser(() => this.fire(found, "ondblclick"));
-      // A pick links to its track page: a double click on
+      // A pick links to its episode page on nts.live: a double click on
       // the title, or on the pick's playlist row. A press still drags the window.
       else if (this.state.link && (found?.kind === "playlist" ? found.rowAt(this.point(ev)[1] - found.origin()[1]) === this.linkRow : found?.kind === "text" && TITLE.test(found.attr("value") ?? "")))
         this.send({ type: "launchUrl", url: this.state.link });

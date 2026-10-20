@@ -712,3 +712,19 @@ test("playlist.setColumnWidth does nothing, so the code after it runs (TwinBlade
   js("(pl.setColumnWidth(0, 110), pl.visible = true)");
   assert.equal(js("pl.visible"), true);
 });
+
+test("a list that names no colours, over light art, gets black text and a scroll bar mixed from the art (Beck)", () => {
+  const items = Array.from({ length: 20 }, (_, i) => `Item ${i}`);
+  const { skin } = load(`<theme><view width="100" height="60">
+       <playlist id="pl" left="0" top="0" width="100" height="48" fontSize="6"/>
+     </view></theme>`, {}, { ...STATE, items, channel: 0 });
+  // Light art under the list, as the full paint reads it back.
+  skin.probe.getImageData = (x, y, w, h) => ({ width: w, height: h, data: new Uint8ClampedArray(w * h * 4).fill(230) });
+  drawn.length = 0;
+  skin.paint();
+  assert.deepEqual([...new Set(drawn.filter(([k, , a]) => k === "fillText" && a === "Item 1").map(([, style]) => style))], ["#000000"]);
+  // The bar is the last two fills at x 84 (100 - 16): its track, then its thumb.
+  const [track, thumb] = drawn.filter(([k, , x]) => k === "fillRect" && x >= 84).slice(-2).map(([, style]) => style);
+  assert.notEqual(track, thumb);
+  assert.notEqual(thumb, "#000000");
+});
