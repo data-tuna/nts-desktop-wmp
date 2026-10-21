@@ -412,6 +412,22 @@ test("a double click that starts a pick from its row does not open its page", ()
   assert.deepEqual(sent.slice(at).filter((m) => m.type === "launchUrl"), [{ type: "launchUrl", url: "https://www.nts.live/shows/b/episodes/b" }]);
 });
 
+test("a press on a header row sends nothing and leaves the current row alone (ATA-208)", () => {
+  const items = ["NTS 1", "NTS 2", "— NTS Picks —", "Pick A"];
+  const { skin, sent, set } = load(`<theme><view width="100" height="200">
+       <playlist id="pl" left="0" top="0" width="100" height="200" fontSize="6"/>
+     </view></theme>`);
+  set({ channel: 0, items, headers: [2] });
+  const row = (n) => ({ button: 0, clientX: 5, clientY: n * 16 + 8 });
+  listeners.mousedown(row(2));
+  listeners.mouseup(row(2));
+  assert.deepEqual(sent.filter((m) => m.type === "select"), []);
+  assert.equal(skin.state.channel, 0);
+  listeners.mousedown(row(3));
+  listeners.mouseup(row(3));
+  assert.deepEqual(sent.filter((m) => m.type === "select"), [{ type: "select", index: 3 }]);
+});
+
 test("the playlist marks the current row in the skin's playing colours, or WMP's green on #222222", () => {
   const items = ["NTS 1: A show", "NTS 2", "Poolside"];
   // The rows a paint draws: each row's text and the colour it is drawn in, and the row backgrounds.
