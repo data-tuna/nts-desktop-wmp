@@ -31,13 +31,14 @@ and WMP 12 refuses third-party skins. Every finding is read from code.
 ## Differences worth fixing, ranked
 
 Ranked by how many working skins they touch, how sure we are, and how
-cheap the fix looks. The sections below have the evidence. Nothing here
-was changed in the engine; Mika turns these into issues.
+cheap the fix looks. The sections below have the evidence. Mika turns
+these into issues; ATA-215 fixed rows 1, 2 and 10, and "Ours" there says
+what the engine did before.
 
 | # | Difference | WMP 7.1 | Ours | Skins | Confidence |
 |---|---|---|---|---|---|
-| 1 | Slider thumb position | Thumb centre on the value edge; track not shortened by the thumb; thumb aligned to the track's top (or left), not centred | Track shortened by the thumb; thumb centred across | 51 | high |
-| 2 | Slider images are always tiled | The middle of a slider image is always repeated, never stretched | Stretched unless `tiled="true"` | 51 (33 without `tiled`) | medium |
+| 1 | Slider thumb position | Thumb centre on the value edge; track not shortened by the thumb; thumb aligned to the track's top (or left), not centred | Track shortened by the thumb; thumb centred across (fixed in ATA-215) | 51 | high |
+| 2 | Slider images are always tiled | The middle of a slider image is always repeated, never stretched | Stretched unless `tiled="true"` (fixed in ATA-215; `tiled="false"` still stretches) | 51 (33 without `tiled`) | medium |
 | 3 | Text scrolling defaults | `scrollingAmount` 6 px, `scrollingDelay` 85 ms (min 30), 25 px gap, scrolls even when the text fits, `scrollingDirection` left or right | 1 px, 100 ms (min 16), half-box gap, only when too wide, left only | 17 | high |
 | 4 | Colour values | `#RRGGBB` only; 140 named colours; `auto` = the image's top-left pixel; system colours; `none` | Also bare `RRGGBB`; 19 names; no `auto`, no system colours | up to 55 | high |
 | 5 | `jscript:` attributes | Evaluated once, after the scripts run, in document order; never again | Re-evaluated after every change | all | high (WMP side); fix needs care, see 2c |
@@ -45,7 +46,7 @@ was changed in the engine; Mika turns these into issues.
 | 7 | Play state 11 | 7.1 has no `psReconnecting`; its states stop at 10 | Host reports 11 on reconnect | all that switch on play state | high |
 | 8 | Unknown attributes | Dropped with a warning; scripts cannot read them | Stored and readable from script | few | high |
 | 9 | Boolean values | OLE conversion: `0`/`false` false, `-1`/`true` true; anything else leaves the default | Anything not starting with "false" is true | few | medium |
-| 10 | Slider foreground's far cap | Drawn when the foreground fills the track | Never drawn: the foreground is clipped at the thumb's middle, short of the cap | tiled sliders with `borderSize` | high |
+| 10 | Slider foreground's far cap | Drawn when the foreground fills the track | Never drawn: the foreground is clipped at the thumb's middle, short of the cap (fixed in ATA-215) | tiled sliders with `borderSize` | high |
 | 11 | `view.minWidth`/`minHeight`, `resizable` default | Present; `resizable` defaults to whether the view has a title bar | Missing | 12 / 35 | high |
 
 Not ranked: our `wmpenabled:`/`wmpdisabled:` accept only `player.controls.*`
@@ -290,7 +291,9 @@ Constructor `FUN_5256829b`, layout `FUN_5256bdbe`, value mapping
 **Confidence:** high, except which flag is `tiled` (low-medium), and
 therefore whether `tiled="false"` changes anything.
 
-**How we differ.**
+**How we differ.** Ranks 1, 2 and 10 were fixed in ATA-215: the engine now
+does what WMP does above, except that `tiled="false"` still stretches. The
+notes below are what it did before.
 - **Thumb (rank 1).** We shorten the track by the thumb and centre the
   thumb across it. WMP does neither. At the ends of the range our thumb
   sits half a thumb further in than WMP's, and a thumb that is thinner or

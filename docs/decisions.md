@@ -6,6 +6,37 @@ the evidence.
 
 ## Stack
 
+### Sliders like WMP 7.1: thumb on the value edge, images tiled (ATA-215, 2026-10-21)
+
+Rows 1, 2 and 10 of the ranked table in `docs/research/wmp-skin-engine.md`.
+This reverses ATA-192's "Not changed": `tiled` now defaults to true.
+
+- **Thumb.** The track is the slider inset by `borderSize` at each end,
+  and the thumb is no longer taken off it. The value's edge is
+  `borderSize + round(t × track)`; the thumb's centre sits on it, so at
+  either end it overhangs by half its width. Across the slider it lines up
+  with the top (or the left, for a vertical slider) instead of being
+  centred. A click or drag puts the edge under the pointer. `sliderAt()` in
+  `pixels.ts`, tested at the minimum, middle and maximum.
+- **Tiling.** A slider without `tiled` now repeats its image's middle
+  between ATA-192's end caps, as WMP does, instead of stretching it. It
+  repeats along the slider only: across it, one copy at the image's own
+  size. Repeating across too left a stray strip on Beck's volume slider,
+  17 px wide (its thumb's width) with a 16 px foreground.
+  `tiled="false"` still stretches: which of WMP's three flags is `tiled`,
+  and so whether `tiled="false"` does anything there, is still open.
+- **The foreground's far cap.** The foreground runs from the start to the
+  value's edge, so it is empty at the minimum. When it fills the track, the
+  far cap is drawn too. Before, it stopped at the thumb's middle and never
+  reached the cap.
+- **Seen.** Before/after screenshots in headless Edge (`skin-preview.mjs`)
+  of Classic, Headspace with its EQ open, 9SeriesDefault, bluegrid and
+  iconic, at a seek of 40 %, volume 0.8 and EQ gains from -12 to +12 dB.
+  Thumbs at the ends now overhang the track. Classic's seek groove is now a
+  flat white bar with 7 px caps, where the stretched cap made a grey
+  gradient. They are on ATA-215.
+- Not tried: the app itself, or a drag with a real mouse.
+
 ### A local skin library for development, never committed (ATA-220, 2026-10-21)
 
 Ata (ATA-220) downloaded 90 `.wmz` skins and asked to copy them into the

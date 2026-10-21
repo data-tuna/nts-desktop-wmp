@@ -6,7 +6,7 @@ import assert from "node:assert/strict";
 import { deflateRawSync } from "node:zlib";
 import { unzip } from "../src/skin/wmz.ts";
 import { constants, decode, parse } from "../src/skin/wms.ts";
-import { average, firstAt, keyed, mappedElement, mix, overlay, parseColor, playingColors, runs, textOn, thumb, tiles } from "../src/skin/pixels.ts";
+import { average, firstAt, keyed, mappedElement, mix, overlay, parseColor, playingColors, runs, sliderAt, textOn, thumb, tiles } from "../src/skin/pixels.ts";
 
 /** A zip with one entry per [name, bytes, deflate?], as skin tools write them. */
 function zip(entries) {
@@ -170,6 +170,17 @@ test("playlist: the scroll bar's thumb shows how much is in sight, and dragging 
   for (const first of [0, 1, 6, 12, 13]) assert.equal(firstAt(thumb(20, 7, first, 140).at, 20, 7, 140, 49), first);
   assert.equal(firstAt(-30, 20, 7, 140, 49), 0, "dragged above the track");
   assert.equal(firstAt(500, 20, 7, 140, 49), 13, "dragged below it");
+});
+
+test("slider: the thumb's centre sits on the value's edge, and the track keeps its length", () => {
+  // A 100 px slider, a 10 px thumb, no border: the thumb overhangs each end by half.
+  assert.deepEqual(sliderAt(100, 0, 10, 0), { edge: 0, thumb: -5 }, "minimum");
+  assert.deepEqual(sliderAt(100, 0, 10, 0.5), { edge: 50, thumb: 45 }, "middle");
+  assert.deepEqual(sliderAt(100, 0, 10, 1), { edge: 100, thumb: 95 }, "maximum");
+  // borderSize 7 on 76 px (Headspace's EQ), a 9 px thumb: the track runs 7..69.
+  assert.deepEqual(sliderAt(76, 7, 9, 0), { edge: 7, thumb: 3 });
+  assert.deepEqual(sliderAt(76, 7, 9, 0.5), { edge: 38, thumb: 34 });
+  assert.deepEqual(sliderAt(76, 7, 9, 1), { edge: 69, thumb: 65 });
 });
 
 test("slider: a tiled image keeps borderSize px at each end as caps and repeats only the middle", () => {

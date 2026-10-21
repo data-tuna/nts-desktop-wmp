@@ -119,6 +119,15 @@ export function firstAt(at: number, count: number, shown: number, track: number,
   return Math.max(0, Math.min(count - shown, first));
 }
 
+/** A slider `length` px long, inset `border` px at each end, at `t` (0..1)
+ * along its track: the value's edge, and where a `size` px thumb starts. As
+ * in WMP 7.1, the thumb is not taken off the track and its centre sits on
+ * the edge, so at either end it overhangs by half its size. */
+export function sliderAt(length: number, border: number, size: number, t: number): { edge: number; thumb: number } {
+  const edge = border + Math.round(t * Math.max(0, length - 2 * border));
+  return { edge, thumb: edge - Math.floor(size / 2) };
+}
+
 /** A tiled slider image of `size` px laid along a `length` px slider, as
  * [from in the image, to on the slider, px] copies. The first and last
  * `border` px are end caps drawn once; only the middle repeats. An image too
