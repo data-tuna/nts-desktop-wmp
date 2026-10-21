@@ -231,7 +231,7 @@ fn prune(dir: &Path, cap: u64, keep: &Path) -> std::io::Result<()> {
             files.push((meta.modified()?, meta.len(), entry.path()));
         }
     }
-    files.sort_by(|a, b| b.0.cmp(&a.0));
+    files.sort_by_key(|f| std::cmp::Reverse(f.0));
     let mut total = 0;
     for (_, len, path) in files {
         total += len;

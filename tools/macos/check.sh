@@ -12,8 +12,12 @@ swiftc -O -o "$out/mac" "$here/mac.swift" || exit 1
 mac=$out/mac
 log() { echo "$*" | tee -a "$out/results.txt"; }
 export NTS_WMP_SKIN=$PWD/skins/house/house.wmz
-state="$HOME/Library/Application Support/com.datatuna.ntswmp/.window-state.json"
+data="$HOME/Library/Application Support/com.datatuna.ntswmp"
+state=$data/.window-state.json
 rm -f "$state"
+# A remembered skin not on the list: no launch downloads from archive.org.
+mkdir -p "$data"
+echo '{"skin":"ci/none"}' > "$data/skin.json"
 
 launch() { "$app" >>"$out/app.log" 2>&1 & sleep "${1:-20}"; }
 running() { pgrep -x nts-desktop-wmp | wc -l | tr -d ' '; }
