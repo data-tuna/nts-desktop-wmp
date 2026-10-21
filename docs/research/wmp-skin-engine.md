@@ -196,8 +196,8 @@ the window has a `horizontalAlignment` or `verticalAlignment` beside its
 `jscript:` value. Since
 ATA-219 we work each value out once and let the alignment move it, with
 the same pixels on Classic, Headspace, Canvas and iconic as they resize.
-A sticky button with a `jscript:` `down` still goes back to it after a
-click (decisions.md, ATA-219).
+A sticky loop or shuffle button whose `jscript:` `down` calls `getMode`
+still goes back to it after a click (decisions.md, ATA-219).
 
 ### 2d. `wmpprop:`, `wmpenabled:`, `wmpdisabled:`
 

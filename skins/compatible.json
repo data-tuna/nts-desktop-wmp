@@ -156,6 +156,7 @@
   "size": 551283,
   "status": "partial",
   "notes": [
+   "value=\"jscript: if(eq.bypass == true)'Off';else'On';\" could not be worked out, ignored",
    "value=\"jscript: if(eq.enhancedAudio){'On'}else{'Off'}\" could not be worked out, ignored",
    "<player>: OnOpenStateChange(); failed: ReferenceError: OnOpenStateChange is not defined",
    "<player>: OnURLChange(); failed: ReferenceError: OnURLChange is not defined",
@@ -336,6 +337,8 @@
   "size": 184959,
   "status": "partial",
   "notes": [
+   "maxwidth=\"jscript:event.screenWidth - rightMove\" could not be worked out, ignored",
+   "maxheight=\"jscript:event.screenHeight - bottomMove\" could not be worked out, ignored",
    "missing image WMPImage_AdBanner"
   ]
  },
@@ -345,6 +348,8 @@
   "size": 185722,
   "status": "partial",
   "notes": [
+   "maxwidth=\"jscript:event.screenWidth - rightMove\" could not be worked out, ignored",
+   "maxheight=\"jscript:event.screenHeight - bottomMove\" could not be worked out, ignored",
    "missing image WMPImage_AdBanner"
   ]
  },
@@ -644,7 +649,8 @@
   "size": 114104,
   "status": "partial",
   "notes": [
-   "value=\"jscript: if(eq.bypass == true)'Off';else'On';\" could not be worked out, ignored"
+   "value=\"jscript: if(eq.bypass == true)'Off';else'On';\" could not be worked out, ignored",
+   "value=\"jscript: if(eq.enhancedAudio){'On'}else{'Off'}\" could not be worked out, ignored"
   ]
  },
  {
@@ -753,8 +759,8 @@
   "status": "partial",
   "notes": [
    "unknown element <visualization>, skipped",
-   "drawer_video: toggleEqVis() failed: ReferenceError: toggleEqVis is not defined",
-   "drawer_visualization: toggleEqVis() failed: ReferenceError: toggleEqVis is not defined"
+   "drawer_visualization: toggleEqVis() failed: ReferenceError: toggleEqVis is not defined",
+   "drawer_video: toggleEqVis() failed: ReferenceError: toggleEqVis is not defined"
   ]
  },
  {
@@ -807,7 +813,9 @@
   "size": 44941,
   "status": "broken",
   "notes": [
-   "drew nothing"
+   "drew nothing",
+   "down=\"jscript:player.settings.getMode('loop');\" could not be worked out, ignored",
+   "down=\"jscript:player.settings.getMode('shuffle');\" could not be worked out, ignored"
   ]
  },
  {
@@ -825,7 +833,7 @@
   "size": 202768,
   "status": "partial",
   "notes": [
-   "shows 36144 pixels of key colour #FF00FF"
+   "shows 36135 pixels of key colour #FF00FF"
   ]
  },
  {
@@ -949,6 +957,8 @@
   "status": "partial",
   "notes": [
    "shows 16899 pixels of key colour #FF00FF",
+   "currenteffecttype=\"jscript:mediacenter.effectType();\" could not be worked out, ignored",
+   "currentpreset=\"jscript:mediacenter.effectPreset();\" could not be worked out, ignored",
    "<player>: checkPlayerMediaGlobal() failed: ReferenceError: checkPlayerMediaGlobal is not defined"
   ]
  },
@@ -1018,7 +1028,9 @@
   "size": 1285806,
   "status": "partial",
   "notes": [
-   "shows 507 pixels of key colour #FF00FF"
+   "shows 507 pixels of key colour #FF00FF",
+   "currenteffecttype=\"jscript:mediacenter.effectType();\" could not be worked out, ignored",
+   "currentpreset=\"jscript:mediacenter.effectPreset();\" could not be worked out, ignored"
   ]
  },
  {
@@ -1055,6 +1067,8 @@
   "size": 1025425,
   "status": "partial",
   "notes": [
+   "currenteffecttype=\"jscript:mediacenter.effectType();\" could not be worked out, ignored",
+   "currentpreset=\"jscript:mediacenter.effectPreset();\" could not be worked out, ignored",
    "<player>: checkPlayerState() failed: ReferenceError: shutterOn is not defined"
   ]
  },
@@ -1064,6 +1078,8 @@
   "size": 1047709,
   "status": "partial",
   "notes": [
+   "currenteffecttype=\"jscript:mediacenter.effectType();\" could not be worked out, ignored",
+   "currentpreset=\"jscript:mediacenter.effectPreset();\" could not be worked out, ignored",
    "missing image screen_glare.png",
    "<player>: checkPlayerState() failed: ReferenceError: shutterOn is not defined"
   ]
@@ -1248,7 +1264,11 @@
   "path": "theskinsfactory/Kenwood_MP7.wmz",
   "md5": "eca0a2463a37a80e680873978b092460",
   "size": 1245871,
-  "status": "works"
+  "status": "partial",
+  "notes": [
+   "currenteffecttype=\"jscript:mediacenter.effectType();\" could not be worked out, ignored",
+   "currentpreset=\"jscript:mediacenter.effectPreset();\" could not be worked out, ignored"
+  ]
  },
  {
   "path": "theskinsfactory/Kenwood_MPXP.wmz",
@@ -1298,7 +1318,9 @@
   "size": 1421853,
   "status": "partial",
   "notes": [
-   "shows 507 pixels of key colour #FF00FF"
+   "shows 507 pixels of key colour #FF00FF",
+   "currenteffecttype=\"jscript:mediacenter.effectType();\" could not be worked out, ignored",
+   "currentpreset=\"jscript:mediacenter.effectPreset();\" could not be worked out, ignored"
   ]
  },
  {
@@ -1334,7 +1356,9 @@
   "size": 1324887,
   "status": "partial",
   "notes": [
-   "shows 507 pixels of key colour #FF00FF"
+   "shows 507 pixels of key colour #FF00FF",
+   "currenteffecttype=\"jscript:mediacenter.effectType();\" could not be worked out, ignored",
+   "currentpreset=\"jscript:mediacenter.effectPreset();\" could not be worked out, ignored"
   ]
  },
  {
@@ -1352,6 +1376,8 @@
   "size": 973285,
   "status": "partial",
   "notes": [
+   "currenteffecttype=\"jscript:mediacenter.effectType();\" could not be worked out, ignored",
+   "currentpreset=\"jscript:mediacenter.effectPreset();\" could not be worked out, ignored",
    "mainBox: mainLoader(); failed: ReferenceError: videoWin is not defined",
    "mainBox: resetCode() failed: TypeError: Cannot set properties of undefined (setting 'keycode')",
    "animTrigger: pullAnimation(); failed: ReferenceError: mainIntro is not defined"
@@ -1594,6 +1620,8 @@
   "status": "partial",
   "notes": [
    "missing image yes_on.gif",
+   "currenteffecttype=\"jscript:mediacenter.effectType();\" could not be worked out, ignored",
+   "currentpreset=\"jscript:mediacenter.effectPreset();\" could not be worked out, ignored",
    "mainModule: init(); failed: ReferenceError: PlaylistFrame is not defined"
   ]
  },
@@ -1613,6 +1641,8 @@
   "status": "partial",
   "notes": [
    "missing image yes_on.gif",
+   "currenteffecttype=\"jscript:mediacenter.effectType();\" could not be worked out, ignored",
+   "currentpreset=\"jscript:mediacenter.effectPreset();\" could not be worked out, ignored",
    "mainModule: init(); failed: ReferenceError: PlaylistFrame is not defined"
   ]
  },
@@ -1620,13 +1650,21 @@
   "path": "theskinsfactory/The_Unit_v3.wmz",
   "md5": "5750db0f05be28c1862f9fa83073cad6",
   "size": 1073598,
-  "status": "works"
+  "status": "partial",
+  "notes": [
+   "currenteffecttype=\"jscript:mediacenter.effectType();\" could not be worked out, ignored",
+   "currentpreset=\"jscript:mediacenter.effectPreset();\" could not be worked out, ignored"
+  ]
  },
  {
   "path": "theskinsfactory/TheUnit.wmz",
   "md5": "ec97efb5abd0f18fd99814b80d8dd0b8",
   "size": 1068277,
-  "status": "works"
+  "status": "partial",
+  "notes": [
+   "currenteffecttype=\"jscript:mediacenter.effectType();\" could not be worked out, ignored",
+   "currentpreset=\"jscript:mediacenter.effectPreset();\" could not be worked out, ignored"
+  ]
  },
  {
   "path": "theskinsfactory/TripleX for 7.1.wmz",

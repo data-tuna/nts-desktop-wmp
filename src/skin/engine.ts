@@ -1054,11 +1054,13 @@ export class Skin {
         for (const [name, v] of constants([code])) (globalThis as Record<string, unknown>)[name] ??= v;
       }
     }
-    // Geometry as it is at load, for alignment. Its `jscript:` values are
-    // kept from here, in document order, as WMP works them out (ATA-219);
-    // any other `jscript:` value is kept from its first read.
+    // Geometry as it is at load, for alignment, and every `jscript:` value,
+    // worked out once here, in document order, as WMP does (ATA-219).
     this.loaded = true;
-    for (const e of this.view.all()) for (const name of ["left", "top", "width", "height"] as const) if (e.kind !== "none") e.geo(name);
+    for (const e of this.view.all()) {
+      if (e.kind !== "none") for (const name of ["left", "top", "width", "height"] as const) e.geo(name);
+      for (const [name, raw] of Object.entries(e.node.attrs)) if (!HANDLER.test(name) && /^\s*jscript:/i.test(raw)) this.value(e, name);
+    }
     this.players = [...this.view.all()].filter((e) => e.node.tag === "player");
     this.started = true;
     this.openState = this.state.title ? OS_MEDIA_OPEN : 0;
@@ -1791,10 +1793,11 @@ export class Skin {
         // A sticky button toggles its down property on a click, before its
         // onClick reads it. One whose down follows the player (a `wmpprop:`
         // binding, or a mute button's own) goes back to it after the
-        // handler, which has set what it shows. So does one whose down came
-        // from `jscript:`, unlike WMP: the loop and shuffle buttons read
-        // getMode, and a radio has neither (ATA-219).
-        const bound = BINDING.test(e.attr("down") ?? "") || (e.role === "mute" && !e.has("down"));
+        // handler, which has set what it shows. So does a loop or shuffle
+        // button whose `jscript:` down reads getMode, unlike WMP: a radio
+        // has neither (ATA-219).
+        const down = e.attr("down") ?? "";
+        const bound = FOLLOWS.test(down) || /^\s*jscript:.*getmode\s*\(/i.test(down) || (e.role === "mute" && !e.has("down"));
         if (inside && this.bool(e, "sticky", false)) this.setProp(e, "down", !this.wasDown);
         if (inside) this.click(e);
         if (bound) e.props.delete("down");

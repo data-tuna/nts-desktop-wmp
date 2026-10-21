@@ -19,28 +19,41 @@ Row 5 of the ranked table in `docs/research/wmp-skin-engine.md`.
   stereo icon move right. WMP works each expression out once at load and
   lets the alignment move it after. The info texts (`show`, `clip`) have
   no alignment and keep their load width, in WMP as here.
-- **So we do the same.** A `jscript:` geometry value is worked out after
-  the scripts run, in document order, kept, and moved by its alignment
-  when the parent grows, as a plain number is. Any other `jscript:` value
-  (`down`, `visible`, a colour) is worked out on its first read and kept.
-  `wmpprop:`, `wmpenabled:` and `wmpdisabled:` still follow their target.
+- **So we do the same.** Every `jscript:` value (geometry, `down`,
+  `visible`, a colour), on every element, hidden or not, is worked out
+  after the scripts run and before `onLoad`, in document order, and kept.
+  Geometry then moves by its alignment when the parent grows, as a plain
+  number does. `wmpprop:`, `wmpenabled:` and `wmpdisabled:` still follow
+  their target. A sticky button whose `down` came from `jscript:` keeps
+  its click, and keeps what its script sets: 9SeriesDefault's EQ switch
+  (`down="JScript:!eq.bypass"`, `onClick="eq.bypass=!eq.bypass"`) and
+  Halloween's visualisation button (`toggleVis()` sets `visButton.down`).
+  Halloween's `down="jscript:visMask.alphaBlend=255"` used to run on every
+  paint, and its first click hung the skin; it now runs once, at load.
 - **One difference kept on purpose.** In 12 `works` skins a sticky loop
   or shuffle button takes its `down` from
   `jscript:player.settings.getMode(…)`. In WMP a click would leave it down.
-  Here it goes back to its load value, as before: a radio has no loop or
-  shuffle, and `setMode` does nothing, so a button left down would claim a
-  mode that isn't on.
+  Here only these buttons, the ones whose `jscript:` `down` calls
+  `getMode`, go back to their load value after a click, as before. A radio
+  has no loop or shuffle, and `setMode` does nothing, so a button left down
+  would claim a mode that isn't on.
 - **Checked** in headless Edge, old engine against new: all 59 `works`
   skins, stopped and playing, match pixel for pixel apart from the clock
-  and timing (Classic shrinks to 176 px while playing under both). Each
-  skin's own resize code, driven step by step, gives the same window
-  sizes and the same pixels: Classic grown to 400×450 and back to 176,
-  Headspace's playlist drawer, Canvas's playlist and EQ drawers, and
-  iconic's tiny mode.
-- `tools/compat.mjs` afterwards: no skin changed status but QuickSilver
-  (2), which came out `works`. It draws nothing (a bare 300×150 canvas)
-  on the old engine and the new alike, and passed only on timing, so the
-  list keeps it `broken`.
+  and scrolling text, which differ between two runs of the same engine
+  too (Classic shrinks to 176 px while playing under both). Each skin's
+  own resize code, driven step by step, gives the same window sizes and
+  the same pixels: Classic grown to 400×450 and back to 176, Headspace's
+  playlist drawer, Canvas's playlist and EQ drawers, and iconic's tiny
+  mode. Halloween's visualisation button, clicked twice with DevTools
+  input, shows down and then up, with no exception.
+- **`tools/compat.mjs` afterwards: works 56, partial 100, broken 60.**
+  Kenwood_MP7, TheUnit and The_Unit_v3 go from `works` to `partial`.
+  Their `currentEffectType="jscript:mediacenter.effectType();"` fails, as
+  it did before whenever their effects panel opened, but now it fails at
+  load, where the check sees it. They draw as before. Other skins gained
+  notes for the same reason. QuickSilver (2) came out `works`, but it
+  draws nothing (a bare 300×150 canvas) on the old engine and the new
+  alike, and passed only on timing, so the list keeps it `broken`.
 
 ### Object-model gaps: downloadProgress, play state 11, attributes, booleans, view sizes (ATA-218, 2026-10-21)
 
