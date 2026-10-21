@@ -989,7 +989,7 @@ and on `main`.
     Milkdrop were not switched to: the runner has no DevTools into WebKit.
   - **The menu bar** shows Tauri's default menu (File, Edit, View, Window,
     Help) and the tray icon; the app also has a Dock icon.
-  - Each run held two connections to edges at once; WebKit's, not explained yet.
+  - Each run held two connections to edges at once. Why is not known yet.
 - **Not seen on the runner:** dragging, clicks, media keys, sound, Retina
   scale, and the updater (a local build has no endpoint and says so).
   ATA-230 and ATA-232 work from the list above.
