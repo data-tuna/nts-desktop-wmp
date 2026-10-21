@@ -821,6 +821,50 @@ class El {
 
 // Members every element has, beyond its attributes.
 const COMMON = new Set(["left", "top", "width", "height", "visible", "enabled", "value", "down", "id", "textwidth", "moveto", "alphablendto", "setfocus"]);
+// Every member of WMP's skin elements, from the type library in wmp.dll
+// (ATA-218). WMP drops an attribute that is none of these, so scripts cannot
+// read it. ponytail: one list for all elements, where WMP has one per element.
+const KNOWN = new Set(
+  `
+  abortcopy accdescription acckeyboardshortcut accname addselectedtoplaylist allowall
+  allowcolumnsorting allowitemediting alphablend alphablendto appenditem appendseparator
+  backgroundcolor backgroundendcolor backgroundhoverimage backgroundimage backgroundimagehueshift
+  backgroundimagesaturation backgroundsplitcolor backgroundtiled bands border bordersize bottom
+  brightness buttoncount bypass category checkboxesvisible checkitem checkradioitem click
+  clippingcolor clippingimage close columncount columnorder columns columnsvisible contrast copy
+  copying createbutton crossfade crossfadewindow currenteffect currenteffectpresetcount
+  currenteffecttitle currenteffecttype currentpreset currentpresettitle currentspeakername cursor
+  deleteall deleteallitems deleteitem deleteselected deleteselectedfromlibrary direction
+  disabledbackgroundcolor disabledcolor disabledfontstyle disabledforegroundcolor disabledimage
+  disableditemcolor disableglassblurbackground dismiss down downimage downtooltip
+  dropdownbackgroundimage dropdownimage dropdownlist dropdowntooltip dropdownvisible
+  editbuttonvisible effectcangofullscreen effectcount effecthaspropertypage effecttitle effecttype
+  elementtype enabled enableitem enablesplinetension enhancedaudio finditem firstvisibleitem
+  focusitem focusobjectid fontface fontsize fontsmoothing fontstyle foregroundcolor
+  foregroundendcolor foregroundhoverimage foregroundimage foregroundprogress fullscreen gainlevel1
+  gainlevel10 gainlevel2 gainlevel3 gainlevel4 gainlevel5 gainlevel6 gainlevel7 gainlevel8
+  gainlevel9 gainlevels getbutton getitem getnextcheckeditem getnextcheckeditem2
+  getnextselecteditem getnextselecteditem2 height horizontalalignment hoverbackgroundcolor
+  hoverdownimage hoverfontstyle hoverforegroundcolor hoverhoverimage hoverimage hue hueshift id
+  image index insertitem itemcount itemerrorcolor itemmedia itemplayingbackgroundcolor
+  itemplayingcolor itemplaylist itemselectedbackgroundcolor itemselectedbackgroundfocuslostcolor
+  itemselectedcolor itemselectedfocuslostcolor justification left leftstatus maintainaspectratio
+  mappingcolor mappingimage max maxheight maximize maximized maxwidth min minheight minimize
+  minimized minwidth moveselecteddown moveselectedup movesizeto moveto multiselect next nexteffect
+  nextpreset ninegridmargins normalization normalizationaverage normalizationpeak onglass
+  passthrough playlist playlistitemsvisible popup positionimage presetcount presettitle previous
+  previouseffect previouspreset radio readonly replaceitem reset resizable resizebackgroundimage
+  resizeimages resizeoptimize restore returntomediacenter right rightstatus rotation saturation
+  scrolling scrollingamount scrollingdelay scrollingdirection selecteditem setcheckedstate
+  setcheckedstate2 setcolumnresizemode setcolumnwidth setselectedstate setselectedstate2 settings
+  show showbackground showex showflags shrinktofit size slide slideto sortcolumn sorted
+  speakersize splinetension statuscolor statustextcolor sticky stretchtofit tabstop textwidth
+  thumbdisabledimage thumbdownimage thumbhoverimage thumbimage tiled timerinterval title titlebar
+  toolbarvisible tooltip top transparencycolor trubasslevel updatewindow uptooltip
+  useforegroundprogress value verticalalignment visible width windowed windowless wordwrap
+  wowlevel zindex zoom
+`.split(/\s+/),
+);
 // An effects element's own members.
 const EFFECT_MEMBERS = ["next", "previous", "currenteffecttype", "currentpreset", "currenteffecttitle"];
 // Methods by tag, for what the engine does not draw yet.
@@ -1027,8 +1071,8 @@ export class Skin {
       if (methods.includes(lk) || COMMON.has(lk) || e.props.has(lk) || (e.kind === "effects" && EFFECT_MEMBERS.includes(lk))) return lk;
       // Handlers are not properties: `onLoad="OnLoad();"` must find the
       // skin's function, not the attribute.
-      if (e.attr(lk) !== undefined && !HANDLER.test(lk)) return lk;
-      if (e === this.view && ["close", "minimize", "returntomediacenter", "size", "title", "timerinterval"].includes(lk)) return lk;
+      if (e.attr(lk) !== undefined && !HANDLER.test(lk) && KNOWN.has(lk)) return lk;
+      if (e === this.view && ["close", "minimize", "returntomediacenter", "size", "title", "timerinterval", "minwidth", "minheight", "resizable"].includes(lk)) return lk;
       return null;
     };
     const api = new Proxy(Object.create(null), {
@@ -1080,6 +1124,9 @@ export class Skin {
       case "minimize": return () => this.send({ type: "minimize" });
       case "returntomediacenter": return () => this.log("view.returnToMediaCenter: there is no full mode");
       case "size": return () => this.log("view.size: resizing by hand is not supported");
+      case "minwidth": case "minheight": return this.num(e, name) ?? 0;
+      // With no resizable, a view with a title bar is resizable (ATA-218).
+      case "resizable": return this.bool(e, name, this.bool(e, "titlebar", true));
     }
     if (e.kind === "effects") {
       const i = this.effect(e);
@@ -1291,9 +1338,12 @@ export class Skin {
   bool(e: El, name: string, fallback: boolean): boolean {
     const { ok, v } = this.value(e, name);
     if (!ok) return fallback;
-    // A leading "false" is false, whatever follows: The_Doobie_Brothers'
-    // playlist button has `down="false; jscript:pl.visible='true';"`.
-    return typeof v === "string" ? !/^\s*false\b/i.test(v) : Boolean(v);
+    if (typeof v !== "string") return Boolean(v);
+    // As WMP's OLE conversion: true or false, or a number, non-zero being
+    // true. Anything else keeps the default (ATA-218).
+    const t = v.trim().toLowerCase();
+    if (t === "true" || t === "false") return t === "true";
+    return t && Number.isFinite(Number(t)) ? Number(t) !== 0 : fallback;
   }
 
   str(e: El, name: string): string {
