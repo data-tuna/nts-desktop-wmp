@@ -333,11 +333,12 @@ Constructor `FUN_525724c8`; setters `FUN_5257374f`, `FUN_5257383b`,
 **Confidence:** high, except the font size and the anti-aliasing flag
 (low).
 
-**How we differ.** Our defaults are 1 px every 100 ms with a half-box gap,
-we scroll only text wider than its box, and we ignore
-`scrollingDirection`. A skin that sets `scrolling="true"` without the
-other attributes scrolls six times slower with us, and a short title that
-WMP would scroll stands still.
+**How we differ.** Fixed in ATA-216: the engine now does what WMP does
+above. Before, our defaults were 1 px every 100 ms with a half-box gap,
+we scrolled only text wider than its box, and we ignored
+`scrollingDirection`. A skin that set `scrolling="true"` without the
+other attributes scrolled six times slower with us, and a short title that
+WMP would scroll stood still.
 
 ### Effects
 

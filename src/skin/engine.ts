@@ -530,25 +530,32 @@ class El {
     const width = g.measureText(text).width;
     const justify = (this.skin.str(this, "justification") || "left").toLowerCase();
     let left = justify === "center" ? x + (w - width) / 2 : justify === "right" ? x + w - width : x;
-    if (this.skin.bool(this, "scrolling", false) && width > w) left = this.marquee(g, text, x, y + 1, w, width);
+    // WMP scrolls the text even when it fits (ATA-216).
+    if (this.skin.bool(this, "scrolling", false)) left = this.marquee(g, text, x, y + 1, w, width, left);
     else g.fillText(text, left, y + 1);
     if (this.skin.str(this, "fontstyle").toLowerCase().includes("underline")) g.fillRect(left, y + this.fontPx() + 1, width, 1);
   }
 
-  /** Draws `text` (`width` px) scrolling right to left through a box `w` px
-   * wide at x, by scrollingAmount px every scrollingDelay ms, with a gap, and
-   * asks for the next step. Starts at `since` on the paint clock. Returns
-   * where the text starts. */
-  private marquee(g: CanvasRenderingContext2D, text: string, x: number, y: number, w: number, width: number, since = 0): number {
-    const step = this.skin.num(this, "scrollingamount") ?? 1;
-    const delay = Math.max(16, this.skin.num(this, "scrollingdelay") ?? 100);
-    const loop = width + w / 2;
+  /** Draws `text` (`width` px) scrolling through a box `w` px wide at x,
+   * from `start`, by scrollingAmount px every scrollingDelay ms towards
+   * scrollingDirection, repeating after a 25 px gap, and asks for the next
+   * step. WMP's defaults are 6 px, 85 ms and left; it keeps them for an
+   * amount under 1, a delay under 30 or another direction (ATA-216).
+   * Starts at `since` on the paint clock. Returns where the text is. */
+  private marquee(g: CanvasRenderingContext2D, text: string, x: number, y: number, w: number, width: number, start: number, since = 0): number {
+    const amount = this.skin.num(this, "scrollingamount");
+    const step = amount !== null && amount >= 1 ? amount : 6;
+    const ms = this.skin.num(this, "scrollingdelay");
+    const delay = ms !== null && ms >= 30 ? ms : 85;
+    const right = this.skin.str(this, "scrollingdirection").toLowerCase() === "right";
+    const loop = width + 25;
     const t = this.skin.clock - since;
-    const left = x - ((Math.floor(t / delay) * step) % loop);
-    g.fillText(text, left + loop, y);
-    g.fillText(text, left, y);
+    const moved = (Math.floor(t / delay) * step) % loop;
+    const at = right ? start + moved : start - moved;
+    // Copies a loop apart, enough to fill the box, from the first in sight.
+    for (let p = x + ((((at - x) % loop) + loop) % loop) - loop; p < x + w; p += loop) if (p + width > x) g.fillText(text, p, y);
     this.skin.later(delay - (t % delay), this.skin.overFx(this));
-    return left;
+    return at;
   }
 
   /** A solid box where the visualisation goes: Skin.paint works out from
@@ -675,7 +682,7 @@ class El {
       g.rect(x + 6, top, inner - 12, row);
       g.clip();
       const width = g.measureText(title).width;
-      if (playing && width > inner - 12) this.marquee(g, title, x + 6, top + row / 2, inner - 12, width, this.rollingSince);
+      if (playing && width > inner - 12) this.marquee(g, title, x + 6, top + row / 2, inner - 12, width, x + 6, this.rollingSince);
       else g.fillText(title, x + 6, top + row / 2);
       g.restore();
     });

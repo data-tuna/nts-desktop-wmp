@@ -6,6 +6,30 @@ the evidence.
 
 ## Stack
 
+### Scrolling text like WMP 7.1: 6 px every 85 ms, a 25 px gap (ATA-216, 2026-10-21)
+
+Row 3 of the ranked table in `docs/research/wmp-skin-engine.md`.
+
+- **Defaults:** `scrollingAmount` 6 px and `scrollingDelay` 85 ms, as in
+  WMP. Before, 1 px every 100 ms. An amount under 1 or a delay under 30 is
+  ignored and the default kept, since WMP rejects them. Before, delays went
+  down to 16 ms.
+- **The repeat** follows the text after 25 px, not half the box. As many
+  copies are drawn as fill the box.
+- **Text that fits scrolls too** when `scrolling` is true, from where its
+  `justification` puts it.
+- **`scrollingDirection`:** `right` moves the text right. Anything else
+  is left, the default.
+- **The playlist's long names** use the same code, so they now move 6 px
+  every 85 ms too, unless the list names other values. They still scroll
+  only when wider than the row.
+
+A scan of the `works` skins finds 15 with a `<text scrolling="true">`. 7 of
+them set a delay under 30 (2 to 25 ms), and now step every 85 ms as in WMP. Checked on a release build on a
+hidden desktop: springflower (`scrollingDelay="10"`, 1 px) moved its title
+12 px in a second, and shows the 25 px gap; Halloween (2 px every 80 ms)
+moved it about 25 px, as before, with the repeat now 25 px behind.
+
 ### Sliders like WMP 7.1: thumb on the value edge, images tiled (ATA-215, 2026-10-21)
 
 Rows 1, 2 and 10 of the ranked table in `docs/research/wmp-skin-engine.md`.
@@ -916,7 +940,7 @@ a scroll bar, its playing row is green, and long show names are cut off.
 - **Long names.** The playing row's name scrolls right to left when it is
   wider than the row, by the same code and timer as a `scrolling` text
   (1 px every 100 ms unless the list names `scrollingAmount` or
-  `scrollingDelay`). It starts from the first word whenever the playing
+  `scrollingDelay`; 6 px every 85 ms since ATA-216). It starts from the first word whenever the playing
   row or its name changes. Other rows are cut off, as before. A press on
   the scroll bar disarms the pick link, so a double click there never
   opens SoundCloud.
