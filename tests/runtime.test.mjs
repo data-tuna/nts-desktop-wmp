@@ -20,6 +20,11 @@ function canvas() {
         if (k in t) return t[k];
         if (k === "measureText") return (s) => ({ width: s.length * 6 });
         if (k === "fillRect" || k === "fillText") return (...a) => drawn.push([k, t.fillStyle, ...a]);
+        // As a browser does: changed() mid-paint once left no shape mask to draw (ATA-216).
+        if (k === "drawImage")
+          return (img) => {
+            if (!img) throw new TypeError("Failed to execute 'drawImage': no image");
+          };
         if (k === "getImageData") return (x, y, w, h) => ({ width: w, height: h, data: new Uint8ClampedArray(w * h * 4) });
         return () => ({});
       },
@@ -542,7 +547,7 @@ test("scrolling text moves like WMP's: 6 px every 85 ms, a 25 px gap, even when 
   }
 });
 
-test("textwidth_onchange runs when the text's width changes, so a skin can scroll only a title too long for its box (TheUnit, the house skin)", () => {
+test("textwidth_onchange runs when the text's width changes, so a skin can scroll only a title too long for its box (TheUnit, the house skin)", async () => {
   const { skin, set } = load(`<theme><view width="100" height="10">
        <text id="t" left="0" top="0" width="100" height="10" value="wmpprop:player.currentMedia.name"
          scrolling="false" textwidth_onchange="JScript:scrolling=(textwidth&gt;width);"/>
@@ -552,11 +557,16 @@ test("textwidth_onchange runs when the text's width changes, so a skin can scrol
     skin.paint();
     return drawn.filter(([k]) => k === "fillText").map(([, , , x]) => x);
   };
+  // The handler runs after the paint, and its change repaints.
+  const settle = () => new Promise((r) => setTimeout(r));
   // "NTS 1" is 30 px: it stands still, and nothing is due.
   xs();
+  await settle();
   assert.deepEqual(xs(), [0]);
   assert.equal(skin.stepAt, Infinity);
   set({ title: "A show with a name far too long" });
+  xs();
+  await settle();
   xs();
   assert.ok(skin.stepAt < Infinity, "the long title scrolls");
 });

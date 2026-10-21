@@ -24,9 +24,12 @@ Row 3 of the ranked table in `docs/research/wmp-skin-engine.md`.
 - **The playlist's long names** use the same code, so they now move 6 px
   every 85 ms too, unless the list names other values. They still scroll
   only when wider than the row.
-- **`textwidth_onchange` runs** when a text's painted width changes, the
-  first paint included. Skins use it to scroll only text too long for its
-  box: TheUnit and The_Unit_v3 set `scrolling=(textwidth>width)` there.
+- **`textwidth_onchange` runs** after a paint in which a text's width
+  changed, the first paint included. Run during the paint, its change
+  dropped the window shape half way and the paint threw. Skins use it to
+  scroll only text too long for its box: `works` TheUnit, The_Unit_v3,
+  Ursula and v2_underworld, and `partial` Gorillaz, robbie, Creed,
+  Mandalay and Utomjording. Atomic (`partial`) moves its text with it.
 - **The house skin** does the same, with `scrolling="false"` in the
   markup. Scrolling a title that fits would repaint the whole skin 25
   times a second for nothing. On a release build on a hidden desktop,
@@ -953,8 +956,8 @@ a scroll bar, its playing row is green, and long show names are cut off.
 - **Long names.** The playing row's name scrolls right to left when it is
   wider than the row, by the same code and timer as a `scrolling` text
   (6 px every 85 ms since ATA-216, unless the list names
-  `scrollingAmount` or `scrollingDelay`). It starts from the first word
-  whenever the playing row or its name changes. Other rows are cut off, as before. A press on
+  `scrollingAmount` or `scrollingDelay`). It starts from the first word whenever the playing
+  row or its name changes. Other rows are cut off, as before. A press on
   the scroll bar disarms the pick link, so a double click there never
   opens SoundCloud.
 - **Covered or minimised.** The state message gains `covered`, Rust's

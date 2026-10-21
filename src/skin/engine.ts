@@ -531,10 +531,12 @@ class El {
     const fgName = !this.enabled && this.has("disabledforegroundcolor") ? "disabledforegroundcolor" : this.hover && this.has("hoverforegroundcolor") ? "hoverforegroundcolor" : "foregroundcolor";
     g.fillStyle = css(this.color(fgName) ?? 0);
     const width = g.measureText(text).width;
-    // Skins scroll only text too long for its box from here (TheUnit, the house skin).
+    // Skins scroll only text too long for its box from here (TheUnit, the
+    // house skin). After the paint: what it changes must not reach a paint
+    // half done.
     if (Math.ceil(width) !== this.shownWidth) {
       this.shownWidth = Math.ceil(width);
-      this.skin.fire(this, "textwidth_onchange");
+      queueMicrotask(() => this.skin.fire(this, "textwidth_onchange"));
     }
     const justify = (this.skin.str(this, "justification") || "left").toLowerCase();
     const left = justify === "center" ? x + (w - width) / 2 : justify === "right" ? x + w - width : x;
