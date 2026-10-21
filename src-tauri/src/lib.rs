@@ -612,7 +612,7 @@ fn handle(app: &AppHandle, msg: FromSkin) {
                 #[cfg(windows)]
                 win32::apply(&window, rects);
                 #[cfg(target_os = "macos")]
-                macos::apply(rects);
+                macos::apply(width, height, rects);
                 // A bigger skin can push a remembered position off screen. Only
                 // on a new size: a mask change must not move a window the
                 // listener parked partly off screen.
@@ -1166,25 +1166,31 @@ mod macos {
     use std::sync::Mutex;
     use std::time::Duration;
 
-    /// The skin's opaque runs, in CSS pixels. The window is transparent, so
-    /// the skin's clear pixels show what is underneath, but WKWebView still
-    /// takes the clicks on them.
-    static SHAPE: Mutex<Vec<[u32; 4]>> = Mutex::new(Vec::new());
+    /// The view's size and its opaque runs, in CSS pixels. The window is
+    /// transparent, so the skin's clear pixels show what is underneath, but
+    /// WKWebView still takes the clicks on them.
+    static SHAPE: Mutex<(u32, u32, Vec<[u32; 4]>)> = Mutex::new((0, 0, Vec::new()));
 
-    pub fn apply(rects: Vec<[u32; 4]>) {
-        *SHAPE.lock().unwrap() = rects;
+    pub fn apply(width: u32, height: u32, rects: Vec<[u32; 4]>) {
+        *SHAPE.lock().unwrap() = (width, height, rects);
     }
 
-    /// Whether the point `(x, y)`, in CSS pixels, is on one of `rects`.
-    fn on(rects: &[[u32; 4]], x: f64, y: f64) -> bool {
-        rects.iter().any(|&[l, t, w, h]| {
-            (l as f64..(l + w) as f64).contains(&x) && (t as f64..(t + h) as f64).contains(&y)
-        })
+    /// Whether `(x, y)`, in CSS pixels, is a clear pixel of the view: inside
+    /// it, on none of its runs.
+    fn clear((width, height, rects): &(u32, u32, Vec<[u32; 4]>), x: f64, y: f64) -> bool {
+        let within = |x: f64, left: u32, w: u32| (left as f64..(left + w) as f64).contains(&x);
+        within(x, 0, *width)
+            && within(y, 0, *height)
+            && !rects
+                .iter()
+                .any(|&[l, t, w, h]| within(x, l, w) && within(y, t, h))
     }
 
     /// Lets clicks on the skin's clear pixels through to the window
     /// underneath, as the Windows region does. macOS says nothing when the
     /// pointer crosses onto a clear pixel, so this looks 20 times a second.
+    /// Off the window it takes clicks, so a quick move onto the skin may
+    /// lose a click on a clear pixel, never one on the skin.
     pub fn watch_pointer(window: tauri::Window) {
         std::thread::spawn(move || {
             let mut ignoring = false;
@@ -1201,12 +1207,10 @@ mod macos {
                     (cursor.x - origin.x as f64) / scale,
                     (cursor.y - origin.y as f64) / scale,
                 );
-                let shape = SHAPE.lock().unwrap();
-                let clear = !shape.is_empty() && !on(&shape, x, y);
-                drop(shape);
-                if clear != ignoring {
-                    ignoring = clear;
-                    let _ = window.set_ignore_cursor_events(clear);
+                let now = clear(&SHAPE.lock().unwrap(), x, y);
+                if now != ignoring {
+                    ignoring = now;
+                    let _ = window.set_ignore_cursor_events(now);
                 }
             }
         });
@@ -1232,14 +1236,17 @@ mod macos {
     }
 
     #[test]
-    fn clear_pixels_are_off_the_runs() {
-        let runs = [[0, 0, 10, 1], [2, 1, 3, 2]];
-        assert!(on(&runs, 0.0, 0.0));
-        assert!(on(&runs, 9.5, 0.5));
-        assert!(!on(&runs, 10.0, 0.0));
-        assert!(on(&runs, 4.9, 2.9));
-        assert!(!on(&runs, 1.0, 1.0));
-        assert!(!on(&runs, -1.0, 0.0));
+    fn clear_pixels_are_in_the_view_off_the_runs() {
+        let shape = (10, 3, vec![[0, 0, 10, 1], [2, 1, 3, 2]]);
+        assert!(!clear(&shape, 0.0, 0.0));
+        assert!(!clear(&shape, 9.5, 0.5));
+        assert!(!clear(&shape, 4.9, 2.9));
+        assert!(clear(&shape, 1.0, 1.0));
+        assert!(clear(&shape, 9.0, 2.0));
+        // Off the window it takes clicks.
+        assert!(!clear(&shape, -1.0, 1.0));
+        assert!(!clear(&shape, 10.0, 1.0));
+        assert!(!clear(&shape, 5.0, 3.0));
     }
 }
 

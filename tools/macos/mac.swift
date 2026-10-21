@@ -28,12 +28,15 @@ case "window":
 case "front":
   print(NSWorkspace.shared.frontmostApplication?.localizedName ?? "none")
 case "click":
+  // The app looks at the pointer 20 times a second (lib.rs, watch_pointer).
   mouse(.mouseMoved, num(1), num(2))
+  usleep(200_000)
   mouse(.leftMouseDown, num(1), num(2))
   mouse(.leftMouseUp, num(1), num(2))
 case "drag":
   let (x1, y1, x2, y2) = (num(1), num(2), num(3), num(4))
   mouse(.mouseMoved, x1, y1)
+  usleep(200_000)
   mouse(.leftMouseDown, x1, y1)
   for i in 1...20 {
     let t = CGFloat(i) / 20
