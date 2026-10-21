@@ -956,8 +956,8 @@ a scroll bar, its playing row is green, and long show names are cut off.
 - **Long names.** The playing row's name scrolls right to left when it is
   wider than the row, by the same code and timer as a `scrolling` text
   (6 px every 85 ms since ATA-216, unless the list names
-  `scrollingAmount` or `scrollingDelay`). It starts from the first word whenever the playing
-  row or its name changes. Other rows are cut off, as before. A press on
+  `scrollingAmount` or `scrollingDelay`). It starts from the first word
+  whenever the playing row or its name changes. Other rows are cut off, as before. A press on
   the scroll bar disarms the pick link, so a double click there never
   opens SoundCloud.
 - **Covered or minimised.** The state message gains `covered`, Rust's
