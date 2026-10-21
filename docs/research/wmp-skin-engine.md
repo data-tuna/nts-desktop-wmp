@@ -37,7 +37,7 @@ was changed in the engine; Mika turns these into issues.
 | # | Difference | WMP 7.1 | Ours | Skins | Confidence |
 |---|---|---|---|---|---|
 | 1 | Slider thumb position | Thumb centre on the value edge; track not shortened by the thumb; thumb aligned to the track's top (or left), not centred | Track shortened by the thumb; thumb centred across | 51 | high |
-| 2 | Slider images are always tiled | The middle of a slider image is always repeated, never stretched | Stretched unless `tiled="true"` | 51 (32 without `tiled`) | medium |
+| 2 | Slider images are always tiled | The middle of a slider image is always repeated, never stretched | Stretched unless `tiled="true"` | 51 (33 without `tiled`) | medium |
 | 3 | Text scrolling defaults | `scrollingAmount` 6 px, `scrollingDelay` 85 ms (min 30), 25 px gap, scrolls even when the text fits, `scrollingDirection` left or right | 1 px, 100 ms (min 16), half-box gap, only when too wide, left only | 17 | high |
 | 4 | Colour values | `#RRGGBB` only; 140 named colours; `auto` = the image's top-left pixel; system colours; `none` | Also bare `RRGGBB`; 19 names; no `auto`, no system colours | up to 55 | high |
 | 5 | `jscript:` attributes | Evaluated once, after the scripts run, in document order; never again | Re-evaluated after every change | all | high (WMP side); fix needs care, see 2c |
@@ -45,9 +45,13 @@ was changed in the engine; Mika turns these into issues.
 | 7 | Play state 11 | 7.1 has no `psReconnecting`; its states stop at 10 | Host reports 11 on reconnect | all that switch on play state | high |
 | 8 | Unknown attributes | Dropped with a warning; scripts cannot read them | Stored and readable from script | few | high |
 | 9 | Boolean values | OLE conversion: `0`/`false` false, `-1`/`true` true; anything else leaves the default | Anything not starting with "false" is true | few | medium |
-| 10 | Slider foreground's far cap | Drawn only when the foreground fills the track | Drawn at every value | tiled sliders with `borderSize` | high |
+| 10 | Slider foreground's far cap | Drawn when the foreground fills the track | Never drawn: the foreground is clipped at the thumb's middle, short of the cap | tiled sliders with `borderSize` | high |
 | 11 | `view.minWidth`/`minHeight`, `resizable` default | Present; `resizable` defaults to whether the view has a title bar | Missing | 12 / 35 | high |
-| 12 | `wmpenabled:`/`wmpdisabled:` targets | Any `object.property` or element property | Only `player.controls.*` | 28 | high |
+
+Not ranked: our `wmpenabled:`/`wmpdisabled:` accept only `player.controls.*`
+targets, where WMP accepts any property, but all 33 `works` skins that use
+them target `player.controls.*` members we handle (2 other skins use
+`player.settings.volume`). See 2d.
 
 ## 1. Parsing the `.wms`
 
@@ -119,8 +123,9 @@ per-element defaults (only partly read).
   the setters convert through the standard dispatch path.
 - We accept leading spaces before `jscript:` and friends; WMP does not.
   Harmless.
-- A non-`<theme>` root: we draw the first element instead of failing.
-  Harmless.
+- A non-`<theme>` root: `parse()` falls back to the first element, but
+  the engine then finds no `<view>` and the app wears the house skin
+  instead. WMP refuses the skin; the listener sees a skin either way.
 
 ## 2. Layout and bindings
 
@@ -150,9 +155,10 @@ evaluated with the element as its first scope (`FUN_525474ab`,
 defaults".
 
 **How we differ.** Our order (scripts, then all geometry, then `onLoad`)
-matches in outline. We evaluate geometry for every element before any
-script sees them; WMP interleaves, element by element. This only matters
-for an expression that reads an element below it.
+matches in outline. Our geometry is worked out lazily, on first read, so
+a script or expression that reads an element further down gets that
+element's computed geometry, where WMP gives its defaults. This only
+matters for an expression that reads an element below it.
 
 ### 2b. Sizes
 
@@ -200,8 +206,10 @@ serves `<property>_onchange`. Evidence: `FUN_52549838`, `FUN_525499ac`,
 `player.settings.volume` is resolved past its first dot is inferred.
 
 **How we differ.** We read bindings again on every paint, which gives the
-same result for what we support. But our `wmpenabled:`/`wmpdisabled:`
-understand only `player.controls.*`; WMP accepts any boolean property.
+same result for what we support. Our `wmpenabled:`/`wmpdisabled:`
+understand only `player.controls.*`, where WMP accepts any boolean
+property, but every `works` skin's target is a `player.controls.*` member
+we handle. No change needed.
 
 ## 3. Hit-testing and window shape
 
@@ -289,9 +297,10 @@ therefore whether `tiled="false"` changes anything.
   thicker than its track sits differently across it.
 - **Tiling (rank 2).** We stretch unless `tiled="true"`. WMP repeats the
   middle in every case we read. Microsoft's page saying `tiled` defaults
-  to true fits this. The ATA-192 end-cap rule is confirmed, including for
-  the foreground, with one refinement: the foreground's far cap appears
-  only at full value (rank 10).
+  to true fits this. The ATA-192 end-cap rule is confirmed for
+  backgrounds. For the foreground, WMP draws the far cap when the
+  foreground fills the track; we never draw it, since we clip the
+  foreground at the thumb's middle, short of the cap (rank 10).
 - Natural size: we use the background, else the thumb. Rarely matters.
 
 ### Text
@@ -339,6 +348,7 @@ saved as `CurrentEffectType` and `CurrentEffectPreset` (referenced at
 
 **How we differ.** We draw our own visualisations and keep the choice in
 `localStorage`. Nothing to fix from this.
+
 ## 5. The shared script, `res://wmploc.dll/RT_TEXT/#132`
 
 **What WMP does.** In WMP 7.1's `wmploc.DLL` (resource type 256, id 132,
@@ -442,4 +452,5 @@ skins that now reads `undefined`) and `view.minWidth`/`minHeight`.
 
 Every finding here is static. A runtime check of the top items needs WMP
 7.1 running on an isolated machine, which is out of scope here: WMP 12
-refuses third-party skins, and the hard rules keep WMP off Ata's desktop.
+refuses third-party skins, and ATA-211 ruled out installing anything that
+replaces or changes the system's WMP.
