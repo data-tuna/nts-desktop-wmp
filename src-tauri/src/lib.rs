@@ -595,6 +595,8 @@ fn handle(app: &AppHandle, msg: FromSkin) {
         FromSkin::Drag {} => {
             #[cfg(windows)]
             win32::drag(&window);
+            #[cfg(target_os = "macos")]
+            macos::drag(&window);
         }
         FromSkin::Shape {
             width,
@@ -609,6 +611,8 @@ fn handle(app: &AppHandle, msg: FromSkin) {
                 let _ = window.set_size(LogicalSize::new(width, height));
                 #[cfg(windows)]
                 win32::apply(&window, rects);
+                #[cfg(target_os = "macos")]
+                macos::apply(width, height, rects);
                 // A bigger skin can push a remembered position off screen. Only
                 // on a new size: a mask change must not move a window the
                 // listener parked partly off screen.
@@ -860,7 +864,9 @@ fn build_tray(app: &AppHandle) -> tauri::Result<()> {
     let mut tray = TrayIconBuilder::with_id("main")
         .tooltip("NTS Radio Bootleg Media Player")
         .menu(&menu)
-        .show_menu_on_left_click(false)
+        // A Mac menu-bar item opens its menu on a click; the Dock icon
+        // brings the player forward there.
+        .show_menu_on_left_click(cfg!(target_os = "macos"))
         .on_menu_event(on_tray_menu)
         .on_tray_icon_event(|tray, event| {
             if let TrayIconEvent::Click {
@@ -889,13 +895,13 @@ fn on_tray_menu(app: &AppHandle, event: MenuEvent) {
                 open_url(&url);
             }
         }
-        // Windows flips a check item's mark on every click; main.ts plays the
-        // clicked channel, so that one is checked, even if it already was.
+        // A click flips a check item's mark (muda does it on macOS too); main.ts
+        // plays the clicked channel, so that one is checked, even if it already was.
         id @ ("nts1" | "nts2") => {
             app.state::<Tray>().check(Some((id == "nts2") as usize));
             let _ = app.emit_to(EventTarget::webview("main"), "tray", id);
         }
-        // main.ts plays, stops, mutes and switches. Windows flips Mute's mark
+        // main.ts plays, stops, mutes and switches. The click flips Mute's mark
         // itself; now_playing then sets it from the setting.
         id => {
             let _ = app.emit_to(EventTarget::webview("main"), "tray", id);
@@ -1154,9 +1160,198 @@ mod win32 {
     }
 }
 
+#[cfg(target_os = "macos")]
+mod macos {
+    use objc2_app_kit::NSEvent;
+    use std::sync::Mutex;
+    use std::time::Duration;
+    use tauri::menu::{Menu, MenuEvent, MenuItem, PredefinedMenuItem, Submenu};
+    use tauri::{AppHandle, Manager, Wry};
+
+    /// The view's size and its opaque runs, in CSS pixels. The window is
+    /// transparent, so the skin's clear pixels show what is underneath, but
+    /// WKWebView still takes the clicks on them.
+    static SHAPE: Mutex<(u32, u32, Vec<[u32; 4]>)> = Mutex::new((0, 0, Vec::new()));
+
+    pub fn apply(width: u32, height: u32, rects: Vec<[u32; 4]>) {
+        *SHAPE.lock().unwrap() = (width, height, rects);
+    }
+
+    /// Whether `(x, y)`, in CSS pixels, is on one of the skin's opaque runs.
+    fn opaque((_, _, rects): &(u32, u32, Vec<[u32; 4]>), x: f64, y: f64) -> bool {
+        rects.iter().any(|&[l, t, w, h]| {
+            (l as f64..(l + w) as f64).contains(&x) && (t as f64..(t + h) as f64).contains(&y)
+        })
+    }
+
+    /// Whether `(x, y)`, in CSS pixels, is a clear pixel of the view: inside
+    /// it, on none of its runs.
+    fn clear(shape: &(u32, u32, Vec<[u32; 4]>), x: f64, y: f64) -> bool {
+        let (width, height, _) = *shape;
+        (0.0..width as f64).contains(&x)
+            && (0.0..height as f64).contains(&y)
+            && !opaque(shape, x, y)
+    }
+
+    /// The pointer in the view's CSS pixels (points). tao gives the cursor
+    /// in the primary monitor's pixels and the window's origin in its own
+    /// monitor's, which differ with a Retina laptop and a plain display.
+    fn in_view(cursor: (f64, f64), primary: f64, origin: (i32, i32), scale: f64) -> (f64, f64) {
+        (
+            cursor.0 / primary - origin.0 as f64 / scale,
+            cursor.1 / primary - origin.1 as f64 / scale,
+        )
+    }
+
+    fn pointer(window: &tauri::Window) -> Option<(f64, f64)> {
+        let cursor = window.cursor_position().ok()?;
+        let primary = window.primary_monitor().ok()??.scale_factor();
+        let origin = window.outer_position().ok()?;
+        let scale = window.scale_factor().ok()?;
+        Some(in_view(
+            (cursor.x, cursor.y),
+            primary,
+            (origin.x, origin.y),
+            scale,
+        ))
+    }
+
+    /// Lets clicks on the skin's clear pixels through to the window
+    /// underneath, as the Windows region does. macOS says nothing when the
+    /// pointer crosses onto a clear pixel, so this looks 20 times a second.
+    /// Off the window it takes clicks, so a quick move onto the skin may
+    /// lose a click on a clear pixel, never one on the skin.
+    pub fn watch_pointer(window: tauri::Window) {
+        std::thread::spawn(move || {
+            let mut ignoring = false;
+            loop {
+                std::thread::sleep(Duration::from_millis(50));
+                let Some((x, y)) = pointer(&window) else {
+                    continue;
+                };
+                let now = clear(&SHAPE.lock().unwrap(), x, y);
+                if now != ignoring {
+                    ignoring = now;
+                    let _ = window.set_ignore_cursor_events(now);
+                }
+            }
+        });
+    }
+
+    /// Moves the window with the pointer, as a title bar would. As on
+    /// Windows, a skin can send `drag` at any time: start only while the
+    /// pointer is on one of the skin's opaque pixels with the primary
+    /// button down. A press there is ours: clicks on clear pixels go to the
+    /// window underneath. It brings the player forward too: on the runner,
+    /// a press on it while another app was in front left that app in front
+    /// (`is_focused` still said yes), and the drag did nothing.
+    pub fn drag(window: &tauri::Window) {
+        let Some((x, y)) = pointer(window) else {
+            return;
+        };
+        if opaque(&SHAPE.lock().unwrap(), x, y) && NSEvent::pressedMouseButtons() & 1 != 0 {
+            let _ = window.set_focus();
+            let _ = window.start_dragging();
+        }
+    }
+
+    /// The app menu. AppKit's own Close Window and Minimize beep at a window
+    /// without those buttons, as the player is, so these two are ours.
+    pub fn menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
+        let sep = || PredefinedMenuItem::separator(app);
+        let name = app.package_info().name.clone();
+        Menu::with_items(
+            app,
+            &[
+                &Submenu::with_items(
+                    app,
+                    name,
+                    true,
+                    &[
+                        &PredefinedMenuItem::about(app, None, None)?,
+                        &sep()?,
+                        &PredefinedMenuItem::hide(app, None)?,
+                        &PredefinedMenuItem::hide_others(app, None)?,
+                        &PredefinedMenuItem::show_all(app, None)?,
+                        &sep()?,
+                        &PredefinedMenuItem::quit(app, None)?,
+                    ],
+                )?,
+                &Submenu::with_items(
+                    app,
+                    "Edit",
+                    true,
+                    &[
+                        &PredefinedMenuItem::cut(app, None)?,
+                        &PredefinedMenuItem::copy(app, None)?,
+                        &PredefinedMenuItem::paste(app, None)?,
+                        &PredefinedMenuItem::select_all(app, None)?,
+                    ],
+                )?,
+                &Submenu::with_items(
+                    app,
+                    "Window",
+                    true,
+                    &[
+                        &MenuItem::with_id(app, "app-minimize", "Minimize", true, Some("Cmd+M"))?,
+                        &MenuItem::with_id(app, "app-close", "Close Window", true, Some("Cmd+W"))?,
+                    ],
+                )?,
+            ],
+        )
+    }
+
+    /// Minimize and Close Window act on the window in front. The tray's
+    /// items come here too, and pass.
+    pub fn on_menu(app: &AppHandle, event: MenuEvent) {
+        let id = event.id().as_ref();
+        let Some(window) = app
+            .windows()
+            .into_values()
+            .find(|w| w.is_focused().unwrap_or(false))
+        else {
+            return;
+        };
+        let _ = match id {
+            "app-minimize" => window.minimize(),
+            "app-close" => window.close(),
+            _ => Ok(()),
+        };
+    }
+
+    #[test]
+    fn clear_pixels_are_in_the_view_off_the_runs() {
+        let shape = (10, 3, vec![[0, 0, 10, 1], [2, 1, 3, 2]]);
+        assert!(!clear(&shape, 0.0, 0.0));
+        assert!(!clear(&shape, 9.5, 0.5));
+        assert!(!clear(&shape, 4.9, 2.9));
+        assert!(clear(&shape, 1.0, 1.0));
+        assert!(clear(&shape, 9.0, 2.0));
+        // Off the window it takes clicks.
+        assert!(!clear(&shape, -1.0, 1.0));
+        assert!(!clear(&shape, 10.0, 1.0));
+        assert!(!clear(&shape, 5.0, 3.0));
+        // A drag starts only on the runs.
+        assert!(opaque(&shape, 3.0, 2.0));
+        assert!(!opaque(&shape, 1.0, 1.0));
+        assert!(!opaque(&shape, 20.0, 0.0));
+    }
+
+    #[test]
+    fn the_pointer_in_points_across_scales() {
+        // A 2x laptop as primary, the player at 1950 pt on a 1x display.
+        assert_eq!(in_view((4000.0, 200.0), 2.0, (1950, 50), 1.0), (50.0, 50.0));
+        // The player on the laptop itself.
+        assert_eq!(in_view((400.0, 200.0), 2.0, (300, 100), 2.0), (50.0, 50.0));
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
+    let builder = tauri::Builder::default();
+    #[cfg(target_os = "macos")]
+    let builder = builder.menu(macos::menu).on_menu_event(macos::on_menu);
+    builder
         // First, so a second launch hands over and exits before anything else
         // runs. The lock is named after the identifier, so the Winamp app
         // (com.datatuna.ntswinamp) has its own.
@@ -1232,6 +1427,8 @@ pub fn run() {
             window.restore_state(StateFlags::POSITION)?;
             #[cfg(windows)]
             win32::watch_cover(window.clone());
+            #[cfg(target_os = "macos")]
+            macos::watch_pointer(window.clone());
             pull_on_screen(&window)?;
             let size = window
                 .inner_size()?
@@ -1243,6 +1440,9 @@ pub fn run() {
             // Must match tauri.conf.json: WebView2 refuses a second webview
             // whose browser arguments differ from the first one's.
             .additional_browser_args(BROWSER_ARGS)
+            // On macOS the window is transparent (tauri.macos.conf.json), and
+            // the skin's clear pixels must show through it.
+            .transparent(cfg!(target_os = "macos"))
             .auto_resize()
             // The skin stays on its own origin and opens nothing.
             .on_navigation(is_skin_url)

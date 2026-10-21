@@ -83,6 +83,11 @@ jobs:
       - name: Play and shoot, house skin
         run: bash tools/mac-smoke.sh "/tmp/dmg/NTS Radio Bootleg Media Player.app" skins/house/house.wmz mac-smoke house
 
+      # Shape, click-through, drag, single instance, Cmd+H/Q/W, the
+      # remembered position, and the probe skin's escape attempts (ATA-230).
+      - name: Window checks
+        run: bash tools/macos/check.sh "/tmp/dmg/NTS Radio Bootleg Media Player.app/Contents/MacOS/nts-desktop-wmp" mac-smoke/check
+
       # Manual runs only, so a PR run never downloads a skin. The cache keeps
       # these three from being fetched twice.
       - name: Archive skins

@@ -6,6 +6,85 @@ the evidence.
 
 ## Stack
 
+### macOS: the skin's shape, drag, menu bar and app menu (ATA-230, 2026-10-21)
+
+Checked on the `macos-latest` GitHub runner with `tools/macos/check.sh`,
+which CI runs on the .dmg's app after the smoke test (ATA-229): it clicks,
+drags and types with synthetic events, and screenshots. There is no real
+Mac yet (ATA-234). Windows is unchanged: every macOS path is behind
+`cfg(target_os = "macos")` or `tauri.macos.conf.json`.
+
+- **The shape is the skin's clear pixels.** On macOS the main window is
+  transparent (`tauri.macos.conf.json`), and so is the skin webview. Tauri
+  2.12.1 and later need no `macOSPrivateApi` for that. The engine already
+  paints only inside the shape, and both pages have no background. Runner
+  screenshots: the house skin with the desktop showing through its
+  corners, where main shows a white rectangle.
+- **Clicks go through the clear pixels.** WKWebView takes the clicks on
+  them: with only the transparency, a click on the house skin's top-left
+  corner left the app in front. macOS says nothing when the pointer
+  crosses onto a clear pixel, so `macos::watch_pointer` looks 20 times a
+  second and sets `set_ignore_cursor_events` while the pointer is over one.
+  The pointer is worked out in points: tao gives the cursor in the primary
+  monitor's pixels and the window's origin in its own monitor's, which
+  differ with a Retina laptop and a plain display.
+  Off the window it takes clicks, so a fast move onto the skin can lose a
+  click on a clear pixel, never one on the skin. After it, the same click
+  put Finder in front.
+- **Drag** is `start_dragging`, only while the pointer is on one of the
+  skin's opaque pixels with the primary button down
+  (`NSEvent.pressedMouseButtons`, from `objc2-app-kit`, which Tauri already
+  builds). A press there is ours, since clicks on clear pixels go through,
+  so a skin sending `drag` cannot take over a drag the user started in the
+  window underneath. On the runner it moved the window by exactly the
+  drag. A press while another app was in front did not bring the player
+  forward and did not drag, and `is_focused` still said true; so the drag
+  calls `set_focus` first, and then the next press drags. Synthetic events
+  may explain it: check on a real Mac.
+- **Minimised, nothing draws.** WKWebView hides the page when the window
+  is minimised (the probe skin saw `visibilitychange` to hidden on
+  minimise, visible on restore), which stops `requestAnimationFrame` and
+  with it the visualisation frames. So macOS has no `watch_cover`.
+  WebKit's occlusion detection should do the same for a covered window;
+  not checked on the runner.
+- **Menu bar.** The icon stays in colour: as a template image it would be
+  the radio's outline filled in, with no screen or dial. A click opens the
+  menu, as on any Mac menu-bar item. The Dock icon stays: it brings the
+  player back, and without it the app would have no menu bar, so no Cmd+Q.
+  A click flips a check item's mark on macOS too (muda), and the code sets
+  the marks from the state afterwards, so nothing toggles twice. Clicking
+  the menu was not tried on the runner.
+- **App menu.** Cmd+Q and Cmd+H work from Tauri's default menu. Its Close
+  Window and Minimize call AppKit's `performClose:` and
+  `performMiniaturize:`, which beep at a window without those buttons:
+  Cmd+W left the app running. macOS gets its own menu (`macos::menu`), whose
+  Close Window (Cmd+W) and Minimize (Cmd+M) close or minimise the window
+  in front. On the runner: Cmd+H hid the window, Cmd+Q and Cmd+W quit.
+- **Media keys and Now Playing.** WKWebView publishes the page's media to
+  macOS: the menu bar's Now Playing item appeared while the app played,
+  on main and on this branch alike, and `navigator.mediaSession` and
+  `MediaMetadata` exist in the webview. So no `MPRemoteCommandCenter` code
+  for now. Whether the keys reach `main.ts`'s handlers needs a real Mac.
+- **Single instance and position.** A second launch left one process and
+  brought the player forward (also from Cmd+H). The position was saved on
+  Cmd+Q and restored on the next launch.
+- **Isolation.** The skin protocol is `skin://localhost` on macOS.
+  `tools/escape.mjs` needs a DevTools port, which WKWebView has not, so the
+  same attempts run from a probe skin (`tools/macos/probe.mjs`): the house
+  skin with a script that prints each result over the skin. From the skin
+  webview, every app and plugin command was refused by the ACL, a direct
+  `ipc://localhost` fetch failed, a raw `webkit.messageHandlers.ipc`
+  message reached nothing, the CSP blocked remote fetches and frames and
+  the app's own page, and `window.open` returned null. `/msg` took the
+  shape (204) and refused an unknown field (400); the trusted page's
+  `state` messages kept arriving. The probe sizes the window 1000 px wide
+  when every attempt failed and 999 when one got through, and `check.sh`
+  fails CI on 999.
+- **The main window is written twice.** `tauri.macos.conf.json` is a JSON
+  merge patch, which replaces the `windows` array whole. A test
+  (`tests/config.test.mjs`) keeps the two entries the same apart from
+  `transparent` and `additionalBrowserArgs`.
+
 ### `jscript:` attributes are worked out once, as in WMP (ATA-219, 2026-10-21)
 
 Row 5 of the ranked table in `docs/research/wmp-skin-engine.md`.
