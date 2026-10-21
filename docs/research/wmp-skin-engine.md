@@ -414,8 +414,10 @@ analysis machine.
 - `WMPPlaylistChangeEventType` runs from `wmplcUnknown` (0) to `wmplcLast`
   (10). There is no shuffle-mode enum: `settings.getMode`/`setMode` take
   strings (`"shuffle"`, `"loop"`).
-- Members 7.1 has and we lacked before ATA-218, by how many `works` skins use them (from
-  the survey; its member scan has some noise):
+- Members 7.1 has and we lack, by how many `works` skins use them (from
+  the survey; its member scan has some noise). ATA-218 added
+  `network.downloadProgress`, `view.minWidth`/`minHeight` and the
+  `resizable` default; the rest are still missing:
   - `network.downloadProgress` (15 skins, all through `wmpprop:`).
   - `view.minWidth`/`minHeight` (5), `maxWidth`/`maxHeight`, plus
     `titleBar`, `resizable`, `focusObjectID`, `maximize`, `restore`.
