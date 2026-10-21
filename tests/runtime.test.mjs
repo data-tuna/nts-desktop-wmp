@@ -488,17 +488,17 @@ test("a long name on the playing row scrolls right to left; other rows are cut o
   const long = "A show with a name far too long for the list";
   const items = ["NTS 1", long, `Not playing: ${long}`];
   const now = performance.now;
-  performance.now = () => 0;
-  const { skin } = load(`<theme><view width="100" height="48">
+  try {
+    performance.now = () => 0;
+    const { skin } = load(`<theme><view width="100" height="48">
        <playlist id="pl" left="0" top="0" width="100" height="48" fontSize="6"/>
      </view></theme>`, {}, { ...STATE, items, channel: 1 });
-  const texts = () => {
-    drawn.length = 0;
-    skin.paint();
-    return drawn.filter(([k]) => k === "fillText").map(([, , a, x]) => [a, x]);
-  };
-  // 6 px a character: 264 px of text in an 88 px box.
-  try {
+    const texts = () => {
+      drawn.length = 0;
+      skin.paint();
+      return drawn.filter(([k]) => k === "fillText").map(([, , a, x]) => [a, x]);
+    };
+    // 6 px a character: 264 px of text in an 88 px box.
     assert.deepEqual(texts().filter(([a]) => a === long), [[long, 6]], "it starts from its first word");
     assert.deepEqual(texts().filter(([a]) => a !== long), [["NTS 1", 6], [`Not playing: ${long}`, 6]]);
     assert.ok(skin.stepAt < Infinity, "the next step is due");
@@ -514,7 +514,7 @@ test("scrolling text moves like WMP's: 6 px every 85 ms, a 25 px gap, even when 
   // "Short" is 30 px in a 100 px box: copies 55 px apart.
   const { skin } = load(`<theme><view width="100" height="30">
        <text id="a" left="0" top="0" width="100" height="10" value="Short" scrolling="true"/>
-       <text id="b" left="0" top="10" width="100" height="10" value="Short" scrolling="true" scrollingDirection="Right" scrollingAmount="0" scrollingDelay="29"/>
+       <text id="b" left="0" top="10" width="100" height="10" value="Short" scrolling="true" scrollingDirection="Right" scrollingAmount="0" scrollingDelay="29" fontStyle="underline"/>
        <text id="c" left="0" top="20" width="100" height="10" value="Short" scrolling="true" scrollingDirection="up" scrollingAmount="2" scrollingDelay="30"/>
      </view></theme>`);
   const at = (ms) => {
@@ -522,17 +522,21 @@ test("scrolling text moves like WMP's: 6 px every 85 ms, a 25 px gap, even when 
     drawn.length = 0;
     skin.paint();
     const rows = {};
-    for (const [k, , , x, y] of drawn) if (k === "fillText") (rows[y] ??= []).push(x);
+    for (const [k, , a, b, c, h] of drawn) {
+      if (k === "fillText") (rows[c] ??= []).push(b);
+      if (k === "fillRect" && h === 1) (rows.underline ??= []).push(a);
+    }
     return rows;
   };
   const now = performance.now;
   try {
-    assert.deepEqual(at(0), { 1: [0, 55], 11: [0, 55], 21: [0, 55] });
+    // b is underlined: every copy is.
+    assert.deepEqual(at(0), { 1: [0, 55], 11: [0, 55], 21: [0, 55], underline: [0, 55] });
     // a: the defaults, 6 px left. b: an amount under 1 and a delay under 30
     // fall back to them, and it goes right. c: 2 px every 30 ms; "up" is left.
-    assert.deepEqual(at(85), { 1: [-6, 49], 11: [6, 61], 21: [-4, 51] });
+    assert.deepEqual(at(85), { 1: [-6, 49], 11: [6, 61], 21: [-4, 51], underline: [6, 61] });
     // Fully out after 55 px, it comes round again.
-    assert.deepEqual(at(85 * 10), { 1: [-5, 50], 11: [5, 60], 21: [-1, 54] });
+    assert.deepEqual(at(85 * 10), { 1: [-5, 50], 11: [5, 60], 21: [-1, 54], underline: [5, 60] });
   } finally {
     performance.now = now;
   }
