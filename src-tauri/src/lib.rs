@@ -609,10 +609,10 @@ fn handle(app: &AppHandle, msg: FromSkin) {
                     .and_then(|s| Ok(s.to_logical::<u32>(window.scale_factor()?)))
                     .is_ok_and(|s| (s.width, s.height) != (width, height));
                 let _ = window.set_size(LogicalSize::new(width, height));
-                // macOS needs no region: the window is transparent, and clicks
-                // on its clear pixels go to the window underneath.
                 #[cfg(windows)]
                 win32::apply(&window, rects);
+                #[cfg(target_os = "macos")]
+                macos::apply(rects);
                 // A bigger skin can push a remembered position off screen. Only
                 // on a new size: a mask change must not move a window the
                 // listener parked partly off screen.
@@ -1163,6 +1163,54 @@ mod win32 {
 #[cfg(target_os = "macos")]
 mod macos {
     use objc2_app_kit::NSEvent;
+    use std::sync::Mutex;
+    use std::time::Duration;
+
+    /// The skin's opaque runs, in CSS pixels. The window is transparent, so
+    /// the skin's clear pixels show what is underneath, but WKWebView still
+    /// takes the clicks on them.
+    static SHAPE: Mutex<Vec<[u32; 4]>> = Mutex::new(Vec::new());
+
+    pub fn apply(rects: Vec<[u32; 4]>) {
+        *SHAPE.lock().unwrap() = rects;
+    }
+
+    /// Whether the point `(x, y)`, in CSS pixels, is on one of `rects`.
+    fn on(rects: &[[u32; 4]], x: f64, y: f64) -> bool {
+        rects.iter().any(|&[l, t, w, h]| {
+            (l as f64..(l + w) as f64).contains(&x) && (t as f64..(t + h) as f64).contains(&y)
+        })
+    }
+
+    /// Lets clicks on the skin's clear pixels through to the window
+    /// underneath, as the Windows region does. macOS says nothing when the
+    /// pointer crosses onto a clear pixel, so this looks 20 times a second.
+    pub fn watch_pointer(window: tauri::Window) {
+        std::thread::spawn(move || {
+            let mut ignoring = false;
+            loop {
+                std::thread::sleep(Duration::from_millis(50));
+                let (Ok(cursor), Ok(origin), Ok(scale)) = (
+                    window.cursor_position(),
+                    window.outer_position(),
+                    window.scale_factor(),
+                ) else {
+                    continue;
+                };
+                let (x, y) = (
+                    (cursor.x - origin.x as f64) / scale,
+                    (cursor.y - origin.y as f64) / scale,
+                );
+                let shape = SHAPE.lock().unwrap();
+                let clear = !shape.is_empty() && !on(&shape, x, y);
+                drop(shape);
+                if clear != ignoring {
+                    ignoring = clear;
+                    let _ = window.set_ignore_cursor_events(clear);
+                }
+            }
+        });
+    }
 
     /// Moves the window with the pointer, as a title bar would. As on
     /// Windows, a skin can send `drag` at any time: start only while our
@@ -1181,6 +1229,17 @@ mod macos {
         if over && NSEvent::pressedMouseButtons() & 1 != 0 {
             let _ = window.start_dragging();
         }
+    }
+
+    #[test]
+    fn clear_pixels_are_off_the_runs() {
+        let runs = [[0, 0, 10, 1], [2, 1, 3, 2]];
+        assert!(on(&runs, 0.0, 0.0));
+        assert!(on(&runs, 9.5, 0.5));
+        assert!(!on(&runs, 10.0, 0.0));
+        assert!(on(&runs, 4.9, 2.9));
+        assert!(!on(&runs, 1.0, 1.0));
+        assert!(!on(&runs, -1.0, 0.0));
     }
 }
 
@@ -1262,6 +1321,13 @@ pub fn run() {
             window.restore_state(StateFlags::POSITION)?;
             #[cfg(windows)]
             win32::watch_cover(window.clone());
+            #[cfg(target_os = "macos")]
+            {
+                macos::watch_pointer(window.clone());
+                // Cmd+W is "Close Window", which does nothing to a window
+                // without a close button unless it is closable.
+                window.set_closable(true)?;
+            }
             pull_on_screen(&window)?;
             let size = window
                 .inner_size()?

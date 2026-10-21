@@ -18,7 +18,7 @@
     vis.push(Math.round((Date.now() - started) / 1000) + "s " + document.visibilityState);
   });
   var pre = document.createElement("pre");
-  pre.style.cssText = "position:fixed;inset:0;margin:0;padding:6px;background:#000;color:#9f9;font:10px/1.3 Menlo,monospace;white-space:pre-wrap;z-index:9";
+  pre.style.cssText = "position:fixed;inset:0;margin:0;padding:6px;background:#000;color:#9f9;font:10px/1.25 Menlo,monospace;white-space:pre-wrap;z-index:9";
   document.body.append(pre);
   function draw() {
     pre.textContent = "ATA-230 macOS probe, skin webview at " + location.href + "\n" +
@@ -39,7 +39,7 @@
   var row = async function (name, run) {
     var result;
     try { result = await run(); } catch (e) { result = "threw " + e; }
-    rows.push([name, String(result).slice(0, 140)]);
+    rows.push([name, String(result).replace(/\s+/g, " ").slice(0, 150)]);
     draw();
   };
   var n = 0;
@@ -59,7 +59,7 @@
   // Room for the rows: the window takes this size and shape, after the
   // engine has sent the skin's own.
   await new Promise(function (r) { setTimeout(r, 1500); });
-  await row("/msg shape 760x560", function () { return post({ type: "shape", width: 760, height: 560, rects: [[0, 0, 760, 560]] }); });
+  await row("/msg shape 1000x600", function () { return post({ type: "shape", width: 1000, height: 600, rects: [[0, 0, 1000, 600]] }); });
   await row("/msg unknown field", function () { return post({ type: "play", evil: 1 }); });
   await row("what Tauri injected", function () {
     return JSON.stringify({
