@@ -62,19 +62,29 @@ function load(wms, scripts = {}, state = STATE, images = new Map()) {
   return { skin, sent, js, set: (patch) => skin.setState({ ...skin.state, ...patch }) };
 }
 
-test("jscript: attributes read other elements and the skin's functions, and follow them", () => {
+test("jscript: attributes read other elements and the skin's functions, once, as WMP does", () => {
   const { js } = load(
     `<theme><view width="200" height="100" scriptFile="a.js">
        <subview id="a" left="10" width="jscript:ExprWidth();" height="20"/>
        <subview id="b" left="jscript:a.left+a.width;" top="jscript:a.height+gap;" width="jscript:view.width-left;" height="5"/>
+       <subview id="s" left="20" top="40" width="jscript:view.width-left;" height="5" horizontalAlignment="stretch"/>
+       <button id="d" left="0" top="60" width="20" height="20" sticky="true" down="jscript:Calls();"/>
      </view></theme>`,
-    { "a.js": "var gap = 3;\nfunction ExprWidth() { return 40; }" },
+    { "a.js": "var gap = 3, calls = 0;\nfunction ExprWidth() { return 40; }\nfunction Calls() { calls++; return false; }" },
   );
-  assert.deepEqual(js("[b.left, b.top, b.width]"), [50, 23, 150]);
+  assert.deepEqual(js("[b.left, b.top, b.width, s.width]"), [50, 23, 150, 180]);
   js("a.width = 70");
-  assert.deepEqual(js("[b.left, b.width]"), [80, 120], "worked out again after a script moves what they read");
+  assert.deepEqual(js("[b.left, b.width]"), [50, 150], "not worked out again after a script moves what they read");
+  // How Classic grows and shrinks: the value from load, moved by its alignment.
   js("view.width = 300");
-  assert.equal(js("b.width"), 220);
+  assert.deepEqual(js("[b.width, s.width]"), [150, 280]);
+  // A sticky button whose down came from jscript: goes back to its load
+  // value after a click (loop and shuffle: a radio has neither).
+  const at = { button: 0, clientX: 5, clientY: 65 };
+  listeners.mousedown(at);
+  listeners.mouseup(at);
+  assert.equal(js("d.down"), false);
+  assert.equal(js("calls"), 1, "worked out once, at load");
 });
 
 test("plain geometry follows its alignment when the view is resized", () => {

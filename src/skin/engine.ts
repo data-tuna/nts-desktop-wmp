@@ -68,6 +68,8 @@ function kindOf(tag: string): Kind {
 
 const HANDLER = /^on|_onchange$|^(playstatechange|openstatechange|statuschange|mediachange|modechange|disconnect)$/;
 const BINDING = /^\s*(jscript|wmpprop|wmpenabled|wmpdisabled):\s*([\s\S]*?)[\s;]*$/i;
+/** The bindings that follow their target. A `jscript:` value is worked out once, at load (ATA-219). */
+const FOLLOWS = /^\s*(wmpprop|wmpenabled|wmpdisabled):/i;
 
 class El {
   readonly kind: Kind;
@@ -87,6 +89,8 @@ class El {
   /** Geometry as it was at load, before any script ran: alignment moves
    * and stretches elements by how far their parent has grown since. */
   readonly design = new Map<string, number>();
+  /** `jscript:` values, by attribute, as worked out at load. */
+  readonly once = new Map<string, { ok: boolean; v?: unknown }>();
   private memo = new Map<string, number>();
   private memoGen = -1;
   // Reused offscreen canvases, one per purpose.
@@ -161,9 +165,9 @@ class El {
     return g;
   }
 
-  // Geometry. A number set by script wins; a `jscript:` expression is worked
-  // out again whenever anything has changed, since it may read other
-  // elements; a plain number moves with its alignment as the parent grows.
+  // Geometry. A number set by script wins; a `wmpprop:` binding follows its
+  // target; a plain number, or a `jscript:` value worked out at load, moves
+  // with its alignment as the parent grows, as in WMP (ATA-219).
   geo(name: "left" | "top" | "width" | "height"): number {
     const set = Number(this.props.get(name) ?? NaN);
     if (Number.isFinite(set)) return Math.round(set);
@@ -179,7 +183,7 @@ class El {
       const raw = this.attr(name);
       v = Math.round(this.skin.num(this, name) ?? this.natural(name));
       if (!this.design.has(name)) this.design.set(name, v);
-      else if (raw !== undefined && !BINDING.test(raw)) v += this.shift(name);
+      else if (raw !== undefined && !FOLLOWS.test(raw)) v += this.shift(name);
       this.memo.set(name, v);
     }
     return v;
@@ -919,6 +923,8 @@ export class Skin {
   private scope: object;
   private globals: Record<string, unknown>;
   private extras: Record<string, Record<string, any>>;
+  /** True once the scripts have run: `jscript:` values are kept from then on. */
+  private loaded = false;
   /** player.openState: open once the host names a channel. */
   openState = 0;
   private started = false;
@@ -1048,7 +1054,10 @@ export class Skin {
         for (const [name, v] of constants([code])) (globalThis as Record<string, unknown>)[name] ??= v;
       }
     }
-    // Geometry as it is at load, for alignment.
+    // Geometry as it is at load, for alignment. Its `jscript:` values are
+    // kept from here, in document order, as WMP works them out (ATA-219);
+    // any other `jscript:` value is kept from its first read.
+    this.loaded = true;
     for (const e of this.view.all()) for (const name of ["left", "top", "width", "height"] as const) if (e.kind !== "none") e.geo(name);
     this.players = [...this.view.all()].filter((e) => e.node.tag === "player");
     this.started = true;
@@ -1310,9 +1319,18 @@ export class Skin {
       return v === null ? this.fail(name, raw) : { ok: true, v: k === "wmpenabled" ? v : !v };
     }
     // wmpprop: reads the object model (`player.currentMedia.name`) or another
-    // element (`bgTransports.left`), and jscript: may call the skin's
-    // functions. Both are worked out again on every paint, so they follow
-    // the player's state and whatever the scripts change.
+    // element (`bgTransports.left`), and is worked out again on every paint,
+    // so it follows the player's state and whatever the scripts change.
+    // jscript: may call the skin's functions; WMP works it out once, after
+    // the scripts run, and never again (ATA-219).
+    const once = k === "jscript" && this.loaded;
+    if (once && e.once.has(name)) return e.once.get(name)!;
+    const result = this.evaluate(e, name, raw, expr);
+    if (once) e.once.set(name, result);
+    return result;
+  }
+
+  private evaluate(e: El, name: string, raw: string, expr: string): { ok: boolean; v?: unknown } {
     try {
       // An element's own properties come first: `width="jscript:parent.width-left;"`.
       let f = this.compiled.get(expr);
@@ -1773,7 +1791,9 @@ export class Skin {
         // A sticky button toggles its down property on a click, before its
         // onClick reads it. One whose down follows the player (a `wmpprop:`
         // binding, or a mute button's own) goes back to it after the
-        // handler, which has set what it shows.
+        // handler, which has set what it shows. So does one whose down came
+        // from `jscript:`, unlike WMP: the loop and shuffle buttons read
+        // getMode, and a radio has neither (ATA-219).
         const bound = BINDING.test(e.attr("down") ?? "") || (e.role === "mute" && !e.has("down"));
         if (inside && this.bool(e, "sticky", false)) this.setProp(e, "down", !this.wasDown);
         if (inside) this.click(e);

@@ -33,7 +33,7 @@ and WMP 12 refuses third-party skins. Every finding is read from code.
 Ranked by how many working skins they touch, how sure we are, and how
 cheap the fix looks. The sections below have the evidence. Mika turns
 these into issues; ATA-215 fixed rows 1, 2 and 10, ATA-216 row 3, ATA-217
-row 4 and ATA-218 rows 6–9 and 11. "Ours" there says what the engine did
+row 4, ATA-218 rows 6–9 and 11, and ATA-219 row 5. "Ours" there says what the engine did
 before.
 
 | # | Difference | WMP 7.1 | Ours | Skins | Confidence |
@@ -42,7 +42,7 @@ before.
 | 2 | Slider images are always tiled | The middle of a slider image is always repeated, never stretched | Stretched unless `tiled="true"` (fixed in ATA-215; `tiled="false"` still stretches) | 51 (33 without `tiled`) | medium |
 | 3 | Text scrolling defaults | `scrollingAmount` 6 px, `scrollingDelay` 85 ms (min 30), 25 px gap, scrolls even when the text fits, `scrollingDirection` left or right | 1 px, 100 ms (min 16), half-box gap, only when too wide, left only | 17 | high |
 | 4 | Colour values | `#RRGGBB` only; 140 named colours; `auto` = the image's top-left pixel; system colours; `none` | Also bare `RRGGBB`; 19 names; no `auto`, no system colours (fixed in ATA-217) | up to 55 | high |
-| 5 | `jscript:` attributes | Evaluated once, after the scripts run, in document order; never again | Re-evaluated after every change | all | high (WMP side); fix needs care, see 2c |
+| 5 | `jscript:` attributes | Evaluated once, after the scripts run, in document order; never again | Re-evaluated after every change (fixed in ATA-219) | all | high (WMP side); fix needs care, see 2c |
 | 6 | `network.downloadProgress` | A real member | Missing; the `wmpprop:` binding reads `undefined` (fixed in ATA-218: 100) | 15 | high |
 | 7 | Play state 11 | 7.1 has no `psReconnecting`; its states stop at 10 | Host reports 11 on reconnect (fixed in ATA-218: 6) | all that switch on play state | high |
 | 8 | Unknown attributes | Dropped with a warning; scripts cannot read them | Stored and readable from script (fixed in ATA-218) | few | high |
@@ -189,12 +189,15 @@ on a resize or on a later change. Evidence: `FUN_525499ac`.
 
 **Confidence:** high.
 
-**How we differ.** We evaluate `jscript:` geometry again after every
-change (decisions.md, ATA-110), and that is what lets Classic shrink and
-grow. In WMP, Classic must do that some other way, from its own script or
-`onresize`. Matching WMP could break Classic, so any fix should start from
-how Classic resizes under WMP, and be checked on Classic and the other
-`jscript:`-sized skins.
+**How we differed.** We evaluated `jscript:` geometry again after every
+change (decisions.md, ATA-110), and that was what let Classic shrink and
+grow. In WMP, alignment does it: each part of Classic that has to follow
+the window has a `horizontalAlignment` or `verticalAlignment` beside its
+`jscript:` value. Since
+ATA-219 we work each value out once and let the alignment move it, with
+the same pixels on Classic, Headspace, Canvas and iconic as they resize.
+A sticky button with a `jscript:` `down` still goes back to it after a
+click (decisions.md, ATA-219).
 
 ### 2d. `wmpprop:`, `wmpenabled:`, `wmpdisabled:`
 

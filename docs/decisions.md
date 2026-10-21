@@ -6,6 +6,42 @@ the evidence.
 
 ## Stack
 
+### `jscript:` attributes are worked out once, as in WMP (ATA-219, 2026-10-21)
+
+Row 5 of the ranked table in `docs/research/wmp-skin-engine.md`.
+
+- **How Classic resizes under WMP.** Not through its script: Classic's
+  `SizeChange()` only notes that the user resized, and its
+  `StartPlaying()` only sets `view.width` and `view.height`. Each part
+  that has to follow the window has a `horizontalAlignment` or
+  `verticalAlignment` beside its `jscript:` value: `navbar`, `videoview`
+  and `cpane` stretch, `cpane` stays at the bottom, and the clock and the
+  stereo icon move right. WMP works each expression out once at load and
+  lets the alignment move it after. The info texts (`show`, `clip`) have
+  no alignment and keep their load width, in WMP as here.
+- **So we do the same.** A `jscript:` geometry value is worked out after
+  the scripts run, in document order, kept, and moved by its alignment
+  when the parent grows, as a plain number is. Any other `jscript:` value
+  (`down`, `visible`, a colour) is worked out on its first read and kept.
+  `wmpprop:`, `wmpenabled:` and `wmpdisabled:` still follow their target.
+- **One difference kept on purpose.** In 12 `works` skins a sticky loop
+  or shuffle button takes its `down` from
+  `jscript:player.settings.getMode(…)`. In WMP a click would leave it down.
+  Here it goes back to its load value, as before: a radio has no loop or
+  shuffle, and `setMode` does nothing, so a button left down would claim a
+  mode that isn't on.
+- **Checked** in headless Edge, old engine against new: all 59 `works`
+  skins, stopped and playing, match pixel for pixel apart from the clock
+  and timing (Classic shrinks to 176 px while playing under both). Each
+  skin's own resize code, driven step by step, gives the same window
+  sizes and the same pixels: Classic grown to 400×450 and back to 176,
+  Headspace's playlist drawer, Canvas's playlist and EQ drawers, and
+  iconic's tiny mode.
+- `tools/compat.mjs` afterwards: no skin changed status but QuickSilver
+  (2), which came out `works`. It draws nothing (a bare 300×150 canvas)
+  on the old engine and the new alike, and passed only on timing, so the
+  list keeps it `broken`.
+
 ### Object-model gaps: downloadProgress, play state 11, attributes, booleans, view sizes (ATA-218, 2026-10-21)
 
 Rows 6, 7, 8, 9 and 11 of the ranked table in
@@ -1474,13 +1510,15 @@ what the 7 ATA-103 skins call; no code from Webamp Modern.
 - **Bindings and expressions.** `wmpprop:` reads the object model or another
   element (`wmpprop:bgTransports.left`); `wmpenabled:`/`wmpdisabled:` follow
   the transport. Both, and `jscript:`, are worked out again after every
-  change, so they follow the player and whatever scripts set. A property a
+  change, so they follow the player and whatever scripts set (`jscript:`
+  only until ATA-219, which works it out once, as WMP does). A property a
   script sets wins over the markup.
 - **Resizing.** A script can resize the view (Classic shrinks to 176 px tall
   while audio plays, as WMP does). Plain numbers then move and stretch by
   `horizontalAlignment`/`verticalAlignment` (`right`, `bottom`, `center`,
   `stretch`), by how far the parent has grown since load; `jscript:`
-  geometry is worked out again instead, so the two never add up. An element
+  geometry is worked out again instead, so the two never add up (until
+  ATA-219: now `jscript:` geometry moves by its alignment too). An element
   centred with no position of its own sits in the middle of its parent
   (Classic's logo). The skin sends a new `shape` whenever its shape changes.
 - **wmploc.dll.** Our own stand-ins, never Microsoft's: `RT_TEXT/#132` is an
