@@ -128,6 +128,22 @@ screenshots are on ATA-198.
   page the tray's "Show on nts.live" opens, not SoundCloud (`episodePage`
   in `picks.ts`). A pick without plain-slug aliases has no link.
 
+### Section headers in the playlist; a pick's tags first (ATA-208, 2026-10-21)
+
+Ata: the picks' tags "are currently shown in the playlist after the name,
+at the very end… The NTS Picks and the Infinite Mixtapes should be clearly
+separated." The request could be read more than one way; Mika chose this
+reading.
+
+- **A header row starts each section:** `— NTS Picks —` and
+  `— Infinite Mixtapes —`, only when that section has items. A header is an
+  `Item` with no url. It never plays: Next and Previous pass over it, and a
+  click on it does nothing. The dashes mark it out in every skin without
+  engine changes.
+- **A pick's tags come first:** `<genres and moods> · <name> - <location>`.
+  At the end, narrow skins cut them off. This replaces the title format of
+  ATA-197, below. The Winamp app's `picks.ts` keeps the old format.
+
 ### Picks before mixtapes; no SoundCloud credit or name (ATA-197, 2026-10-20)
 
 Reverses the pick credit of ATA-115 and the playlist order and pick titles

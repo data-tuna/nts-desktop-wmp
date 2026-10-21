@@ -239,7 +239,7 @@ test("a paused pick's clock and seeking stay with it when the playlist moves to 
   assert.deepEqual(widget.calls.filter((c) => c.startsWith("play")), [`play ${a}`, `play ${a}`]);
 });
 
-test("the playlist is NTS 1, NTS 2, the picks in the API's order, then the mixtapes; a pick's title is the episode's (ATA-197)", () => {
+test("the playlist is NTS 1, NTS 2, the picks in the API's order, then the mixtapes, each section under a header; a pick's title is the episode's (ATA-197, ATA-208)", () => {
   const picks = parsePicks(JSON.parse(readFileSync(new URL("picks-fixture.json", import.meta.url), "utf8")));
   const mixtape = { title: "Poolside", url: "https://streams.radiomast.io/poolside" };
   const items = playlist(picks, [mixtape]);
@@ -248,12 +248,37 @@ test("the playlist is NTS 1, NTS 2, the picks in the API's order, then the mixta
     [
       "NTS 1",
       "NTS 2",
-      "Buried Light - 100% AshTreJinkins - Los Angeles (Experimental, Minimal, Beats, Minimal Talkin)",
-      "POST-SUMMER DANCE RITUALS W/ JEAN-BAPTISTE DOMINICI - Paris (Electronica, Reggaeton, Arabic Pop)",
+      "— NTS Picks —",
+      "Experimental, Minimal, Beats, Minimal Talkin · Buried Light - 100% AshTreJinkins - Los Angeles",
+      "Electronica, Reggaeton, Arabic Pop · POST-SUMMER DANCE RITUALS W/ JEAN-BAPTISTE DOMINICI - Paris",
+      "— Infinite Mixtapes —",
       "Poolside",
     ],
   );
-  assert.deepEqual(items.map((item) => !!item.pick), [false, false, true, true, false]);
-  assert.equal(items[2].url, picks[0].url);
+  assert.deepEqual(items.map((item) => !!item.pick), [false, false, false, true, true, false, false]);
+  assert.equal(items[3].url, picks[0].url);
   assert.deepEqual(playlist([], []), CHANNELS);
+  assert.deepEqual(playlist([], [mixtape]).map((item) => item.title), ["NTS 1", "NTS 2", "— Infinite Mixtapes —", "Poolside"]);
+});
+
+test("a header row never plays: next and previous pass over it, a click on it does nothing (ATA-208)", () => {
+  const audio = fakeAudio();
+  const widget = fakeWidget();
+  const items = playlist([{ title: "A pick", url: "https://soundcloud.com/a/b" }], [{ title: "Poolside", url: "https://streams.radiomast.io/poolside" }]);
+  const player = createPlayer(audio, items, widget);
+  player.play();
+  player.select(2);
+  assert.equal(player.state().channel, 0);
+  player.step(1);
+  player.step(1);
+  assert.equal(player.state().channel, 3);
+  player.step(1);
+  assert.equal(player.state().channel, 5);
+  player.step(-1);
+  assert.equal(player.state().channel, 3);
+  player.step(-1);
+  player.step(-1);
+  player.step(-1);
+  assert.equal(player.state().channel, 5, "wraps past the channels");
+  assert.ok(!audio.loads.includes(""), "never loads a header");
 });

@@ -3,7 +3,8 @@
 // docs/decisions.md).
 // Copied from nts-desktop-winamp's src/picks.ts at bdc0f10, parsing only:
 // the Webamp playback stays behind. Fix a bug in both copies. This copy also
-// keeps the episode's aliases, for the link to its page (ATA-172, ATA-198).
+// keeps the episode's aliases, for the link to its page (ATA-172, ATA-198),
+// and puts the tags first (ATA-208).
 
 // The .ts extension lets `node --test` load this file directly.
 import { text } from "./live.ts";
@@ -14,7 +15,7 @@ export const PICKS_API = "https://www.nts.live/api/v2/collections/nts-picks?offs
 export type Pick = {
   /** The SoundCloud track page, query string dropped. */
   url: string;
-  /** `<name> - <location> (<genres and moods>)` */
+  /** `<genres and moods> · <name> - <location>` */
   title: string;
   artwork?: string;
   /** The episode's page is `/shows/<showAlias>/episodes/<episodeAlias>` on nts.live. */
@@ -40,7 +41,7 @@ export function parsePicks(body: unknown): Pick[] {
     return [
       {
         url,
-        title: `${name}${location ? ` - ${location}` : ""}${tags.length ? ` (${tags.join(", ")})` : ""}`,
+        title: `${tags.length ? `${tags.join(", ")} · ` : ""}${name}${location ? ` - ${location}` : ""}`,
         artwork: typeof picture === "string" && picture.startsWith("https://") ? picture : undefined,
         showAlias: text(episode?.show_alias),
         episodeAlias: text(episode?.episode_alias),
