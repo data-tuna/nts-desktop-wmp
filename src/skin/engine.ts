@@ -454,12 +454,12 @@ class El {
       g.clip();
       const src = this.skin.keyedImage(img, this.color("transparencycolor"));
       if (tiled) {
-        // borderSize px at each end are caps; the middle repeats (Headspace's EQ).
+        // borderSize px at each end are caps; the middle repeats along the slider
+        // only (Headspace's EQ). Across it, one copy at the image's own size.
         const [iw, ih] = [img.width, img.height];
         for (const [from, to, px] of tiles(vertical ? h : w, vertical ? ih : iw, border))
-          for (let c = 0; c < (vertical ? w : h); c += vertical ? iw : ih)
-            if (vertical) g.drawImage(src, 0, from, iw, px, x + c, y + to, iw, px);
-            else g.drawImage(src, from, 0, px, ih, x + to, y + c, px, ih);
+          if (vertical) g.drawImage(src, 0, from, iw, px, x, y + to, iw, px);
+          else g.drawImage(src, from, 0, px, ih, x + to, y, px, ih);
       } else g.drawImage(src, x, y, w, h);
       g.restore();
     };

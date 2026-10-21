@@ -19,7 +19,10 @@ This reverses ATA-192's "Not changed": `tiled` now defaults to true.
   centred. A click or drag puts the edge under the pointer. `sliderAt()` in
   `pixels.ts`, tested at the minimum, middle and maximum.
 - **Tiling.** A slider without `tiled` now repeats its image's middle
-  between ATA-192's end caps, as WMP does, instead of stretching it.
+  between ATA-192's end caps, as WMP does, instead of stretching it. It
+  repeats along the slider only: across it, one copy at the image's own
+  size. Repeating across too left a stray strip on Beck's volume slider,
+  17 px wide (its thumb's width) with a 16 px foreground.
   `tiled="false"` still stretches: which of WMP's three flags is `tiled`,
   and so whether `tiled="false"` does anything there, is still open.
 - **The foreground's far cap.** The foreground runs from the start to the
