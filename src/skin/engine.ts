@@ -7,7 +7,7 @@
 // skin reference (learn.microsoft.com/windows/win32/wmp/skin-programming-reference).
 import { CHANNELS } from "../player.ts";
 import { constants, type Node } from "./wms.ts";
-import { average, css, firstAt, keyed, mappedElement, mix, overlay, parseColor, playingColors, rgbAt, runs, textOn, thumb, tiles, type Pixels } from "./pixels.ts";
+import { average, css, firstAt, keyed, mappedElement, mix, overlay, parseColor, playingColors, rgbAt, runs, sliderAt, textOn, thumb, tiles, type Pixels } from "./pixels.ts";
 import { ALBUM_ART, drawEffect, EFFECTS, effectIndex, type Frame, type Memory } from "./effects.ts";
 import { clock, CONSTANTS, OS_MEDIA_CHANGING, OS_MEDIA_OPEN, objects, playState, resImage, resScript, resString, wmpObject, type Host } from "./runtime.ts";
 
@@ -282,13 +282,10 @@ class El {
     return this.skin.str(this, "direction").toLowerCase() === "vertical";
   }
 
-  /** The slider track: where the thumb's leading edge can go, and its size. */
-  track(): { from: number; span: number; thumb: Img | undefined } {
-    const thumb = this.img("thumbimage");
+  /** The slider track: the element inset by borderSize at each end. */
+  track(): { from: number; span: number } {
     const border = this.skin.num(this, "bordersize") ?? 0;
-    const length = this.vertical() ? this.h : this.w;
-    const t = thumb ? (this.vertical() ? thumb.height : thumb.width) : 0;
-    return { from: border, span: Math.max(0, length - 2 * border - t), thumb };
+    return { from: border, span: Math.max(0, (this.vertical() ? this.h : this.w) - 2 * border) };
   }
 
   /** Pressed, or held down: by the pointer, by its `down` property (a sticky
@@ -446,7 +443,8 @@ class El {
     const { x, y, w, h } = this;
     const bg = this.img("backgroundimage");
     const fg = this.img("foregroundimage");
-    const tiled = this.skin.bool(this, "tiled", false);
+    // WMP 7.1 repeats a slider image's middle; whether tiled="false" stretches it is not known.
+    const tiled = this.skin.bool(this, "tiled", true);
     const vertical = this.vertical();
     const border = this.skin.num(this, "bordersize") ?? 0;
     const drawTrack = (img: Img, clip?: [number, number, number, number]) => {
@@ -466,18 +464,19 @@ class El {
       g.restore();
     };
     if (bg) drawTrack(bg);
-    const { from, span, thumb } = this.track();
+    const thumb = this.img("thumbimage");
     const t = this.fraction();
-    const pos = Math.round(from + (vertical ? 1 - t : t) * span);
-    if (fg) {
-      // The foreground fills the track up to the thumb's middle.
-      const mid = pos + (thumb ? (vertical ? thumb.height : thumb.width) / 2 : 0);
-      drawTrack(fg, vertical ? [x, y + mid, w, h - mid] : [x, y, mid, h]);
+    const { edge, thumb: at } = sliderAt(vertical ? h : w, border, thumb ? (vertical ? thumb.height : thumb.width) : 0, vertical ? 1 - t : t);
+    if (fg && t > 0) {
+      // The foreground runs from the start to the edge, and takes in the far cap only when full.
+      if (vertical) drawTrack(fg, t < 1 ? [x, y + edge, w, h - edge] : undefined);
+      else drawTrack(fg, t < 1 ? [x, y, edge, h] : undefined);
     }
     if (!thumb) return;
+    // The thumb lines up with the slider's top (or left), as WMP's does.
     const img = this.stateImageThumb() ?? thumb;
-    if (vertical) this.drawImage(g, img, x + Math.round((w - thumb.width) / 2), y + pos);
-    else this.drawImage(g, img, x + pos, y + Math.round((h - thumb.height) / 2));
+    if (vertical) this.drawImage(g, img, x, y + at);
+    else this.drawImage(g, img, x + at, y);
   }
 
   private stateImageThumb(): Img | undefined {
@@ -763,10 +762,9 @@ class El {
       const pos = this.img("positionimage");
       t = pos ? this.gray(pos, lx, ly) : null;
     } else {
-      const { from, span, thumb } = this.track();
+      const { from, span } = this.track();
       const vertical = this.vertical();
-      const half = thumb ? (vertical ? thumb.height : thumb.width) / 2 : 0;
-      const along = (vertical ? ly : lx) - from - half;
+      const along = (vertical ? ly : lx) - from;
       t = span > 0 ? Math.min(1, Math.max(0, along / span)) : 0;
       if (vertical) t = 1 - t;
     }

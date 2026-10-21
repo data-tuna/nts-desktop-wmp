@@ -290,7 +290,9 @@ Constructor `FUN_5256829b`, layout `FUN_5256bdbe`, value mapping
 **Confidence:** high, except which flag is `tiled` (low-medium), and
 therefore whether `tiled="false"` changes anything.
 
-**How we differ.**
+**How we differ.** Ranks 1, 2 and 10 were fixed in ATA-215: the engine now
+does what WMP does above, except that `tiled="false"` still stretches. The
+notes below are what it did before.
 - **Thumb (rank 1).** We shorten the track by the thumb and centre the
   thumb across it. WMP does neither. At the ends of the range our thumb
   sits half a thumb further in than WMP's, and a thumb that is thinner or
