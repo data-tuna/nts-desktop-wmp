@@ -24,6 +24,7 @@
         "additionalBrowserArgs": "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection --autoplay-policy=no-user-gesture-required --enable-features=HardwareMediaKeyHandling"
       }
     ],
+    "macOSPrivateApi": true,
     "security": {
       "csp": null
     }

@@ -19,7 +19,9 @@ tauri-build = { version = "2", features = [] }
 [dependencies]
 # `unstable` for Window::add_child, which the skin webview rests on and semver
 # does not cover: pinned to the minor version it was checked on (ATA-107).
-tauri = { version = "~2.12.3", features = ["unstable", "tray-icon"] }
+# `macos-private-api` for transparent webviews on macOS, where the skin's
+# shape is its clear pixels (tauri.macos.conf.json). It does nothing elsewhere.
+tauri = { version = "~2.12.3", features = ["unstable", "tray-icon", "macos-private-api"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 # Skins come from archive.org, which sends no CORS headers (ATA-112). The
@@ -35,6 +37,11 @@ tauri-plugin-updater = { version = "2", default-features = false, features = ["n
 # Process loopback, for the visualisation during a pick (ATA-199). On the
 # windows crate Tauri already builds.
 wasapi = "0.26"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+# Whether the mouse button is down, before a skin's drag (lib.rs). Tauri
+# already builds it.
+objc2-app-kit = { version = "0.3", default-features = false, features = ["std", "NSEvent"] }
 
 # Size over speed: https://tauri.app/concept/size/#cargo-configuration
 [profile.release]

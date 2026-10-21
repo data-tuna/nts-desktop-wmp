@@ -595,6 +595,8 @@ fn handle(app: &AppHandle, msg: FromSkin) {
         FromSkin::Drag {} => {
             #[cfg(windows)]
             win32::drag(&window);
+            #[cfg(target_os = "macos")]
+            macos::drag(&window);
         }
         FromSkin::Shape {
             width,
@@ -607,6 +609,8 @@ fn handle(app: &AppHandle, msg: FromSkin) {
                     .and_then(|s| Ok(s.to_logical::<u32>(window.scale_factor()?)))
                     .is_ok_and(|s| (s.width, s.height) != (width, height));
                 let _ = window.set_size(LogicalSize::new(width, height));
+                // macOS needs no region: the window is transparent, and clicks
+                // on its clear pixels go to the window underneath.
                 #[cfg(windows)]
                 win32::apply(&window, rects);
                 // A bigger skin can push a remembered position off screen. Only
@@ -860,7 +864,9 @@ fn build_tray(app: &AppHandle) -> tauri::Result<()> {
     let mut tray = TrayIconBuilder::with_id("main")
         .tooltip("NTS Radio Bootleg Media Player")
         .menu(&menu)
-        .show_menu_on_left_click(false)
+        // A Mac menu-bar item opens its menu on a click; the Dock icon
+        // brings the player forward there.
+        .show_menu_on_left_click(cfg!(target_os = "macos"))
         .on_menu_event(on_tray_menu)
         .on_tray_icon_event(|tray, event| {
             if let TrayIconEvent::Click {
@@ -889,13 +895,13 @@ fn on_tray_menu(app: &AppHandle, event: MenuEvent) {
                 open_url(&url);
             }
         }
-        // Windows flips a check item's mark on every click; main.ts plays the
-        // clicked channel, so that one is checked, even if it already was.
+        // A click flips a check item's mark (muda does it on macOS too); main.ts
+        // plays the clicked channel, so that one is checked, even if it already was.
         id @ ("nts1" | "nts2") => {
             app.state::<Tray>().check(Some((id == "nts2") as usize));
             let _ = app.emit_to(EventTarget::webview("main"), "tray", id);
         }
-        // main.ts plays, stops, mutes and switches. Windows flips Mute's mark
+        // main.ts plays, stops, mutes and switches. The click flips Mute's mark
         // itself; now_playing then sets it from the setting.
         id => {
             let _ = app.emit_to(EventTarget::webview("main"), "tray", id);
@@ -1154,6 +1160,30 @@ mod win32 {
     }
 }
 
+#[cfg(target_os = "macos")]
+mod macos {
+    use objc2_app_kit::NSEvent;
+
+    /// Moves the window with the pointer, as a title bar would. As on
+    /// Windows, a skin can send `drag` at any time: start only while our
+    /// window is in front, under the pointer, with the primary button down.
+    pub fn drag(window: &tauri::Window) {
+        let (Ok(true), Ok(origin), Ok(size), Ok(cursor)) = (
+            window.is_focused(),
+            window.outer_position(),
+            window.outer_size(),
+            window.cursor_position(),
+        ) else {
+            return;
+        };
+        let over = (origin.x as f64..(origin.x + size.width as i32) as f64).contains(&cursor.x)
+            && (origin.y as f64..(origin.y + size.height as i32) as f64).contains(&cursor.y);
+        if over && NSEvent::pressedMouseButtons() & 1 != 0 {
+            let _ = window.start_dragging();
+        }
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -1243,6 +1273,9 @@ pub fn run() {
             // Must match tauri.conf.json: WebView2 refuses a second webview
             // whose browser arguments differ from the first one's.
             .additional_browser_args(BROWSER_ARGS)
+            // On macOS the window is transparent (tauri.macos.conf.json), and
+            // the skin's clear pixels must show through it.
+            .transparent(cfg!(target_os = "macos"))
             .auto_resize()
             // The skin stays on its own origin and opens nothing.
             .on_navigation(is_skin_url)
