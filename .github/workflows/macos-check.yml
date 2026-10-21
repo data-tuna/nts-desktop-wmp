@@ -50,7 +50,7 @@ jobs:
 
       - name: Check
         run: >
-          tools/macos/check.sh
+          bash tools/macos/check.sh
           ${{ matrix.side == 'before' && 'before/' || '' }}src-tauri/target/debug/nts-desktop-wmp
           out ${{ matrix.side == 'before' && 'shots' || 'full' }}
 
