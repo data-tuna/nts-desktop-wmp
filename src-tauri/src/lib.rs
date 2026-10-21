@@ -1165,6 +1165,8 @@ mod macos {
     use objc2_app_kit::NSEvent;
     use std::sync::Mutex;
     use std::time::Duration;
+    use tauri::menu::{Menu, MenuEvent, MenuItem, PredefinedMenuItem, Submenu};
+    use tauri::{AppHandle, Manager, Wry};
 
     /// The view's size and its opaque runs, in CSS pixels. The window is
     /// transparent, so the skin's clear pixels show what is underneath, but
@@ -1220,6 +1222,7 @@ mod macos {
     /// Windows, a skin can send `drag` at any time: start only while our
     /// window is in front, under the pointer, with the primary button down.
     pub fn drag(window: &tauri::Window) {
+        eprintln!("DEBUG drag focused={:?}", window.is_focused());
         let (Ok(true), Ok(origin), Ok(size), Ok(cursor)) = (
             window.is_focused(),
             window.outer_position(),
@@ -1230,9 +1233,77 @@ mod macos {
         };
         let over = (origin.x as f64..(origin.x + size.width as i32) as f64).contains(&cursor.x)
             && (origin.y as f64..(origin.y + size.height as i32) as f64).contains(&cursor.y);
+        eprintln!(
+            "DEBUG drag over={over} buttons={} focused",
+            NSEvent::pressedMouseButtons()
+        );
         if over && NSEvent::pressedMouseButtons() & 1 != 0 {
             let _ = window.start_dragging();
         }
+    }
+
+    /// The app menu. AppKit's own Close Window and Minimize beep at a window
+    /// without those buttons, as the player is, so these two are ours.
+    pub fn menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
+        let sep = || PredefinedMenuItem::separator(app);
+        let name = app.package_info().name.clone();
+        Menu::with_items(
+            app,
+            &[
+                &Submenu::with_items(
+                    app,
+                    name,
+                    true,
+                    &[
+                        &PredefinedMenuItem::about(app, None, None)?,
+                        &sep()?,
+                        &PredefinedMenuItem::hide(app, None)?,
+                        &PredefinedMenuItem::hide_others(app, None)?,
+                        &PredefinedMenuItem::show_all(app, None)?,
+                        &sep()?,
+                        &PredefinedMenuItem::quit(app, None)?,
+                    ],
+                )?,
+                &Submenu::with_items(
+                    app,
+                    "Edit",
+                    true,
+                    &[
+                        &PredefinedMenuItem::cut(app, None)?,
+                        &PredefinedMenuItem::copy(app, None)?,
+                        &PredefinedMenuItem::paste(app, None)?,
+                        &PredefinedMenuItem::select_all(app, None)?,
+                    ],
+                )?,
+                &Submenu::with_items(
+                    app,
+                    "Window",
+                    true,
+                    &[
+                        &MenuItem::with_id(app, "app-minimize", "Minimize", true, Some("Cmd+M"))?,
+                        &MenuItem::with_id(app, "app-close", "Close Window", true, Some("Cmd+W"))?,
+                    ],
+                )?,
+            ],
+        )
+    }
+
+    /// Minimize and Close Window act on the window in front. The tray's
+    /// items come here too, and pass.
+    pub fn on_menu(app: &AppHandle, event: MenuEvent) {
+        let id = event.id().as_ref();
+        let Some(window) = app
+            .windows()
+            .into_values()
+            .find(|w| w.is_focused().unwrap_or(false))
+        else {
+            return;
+        };
+        let _ = match id {
+            "app-minimize" => window.minimize(),
+            "app-close" => window.close(),
+            _ => Ok(()),
+        };
     }
 
     #[test]
@@ -1252,7 +1323,10 @@ mod macos {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
+    let builder = tauri::Builder::default();
+    #[cfg(target_os = "macos")]
+    let builder = builder.menu(macos::menu).on_menu_event(macos::on_menu);
+    builder
         // First, so a second launch hands over and exits before anything else
         // runs. The lock is named after the identifier, so the Winamp app
         // (com.datatuna.ntswinamp) has its own.
@@ -1329,12 +1403,7 @@ pub fn run() {
             #[cfg(windows)]
             win32::watch_cover(window.clone());
             #[cfg(target_os = "macos")]
-            {
-                macos::watch_pointer(window.clone());
-                // Cmd+W is "Close Window", which does nothing to a window
-                // without a close button unless it is closable.
-                window.set_closable(true)?;
-            }
+            macos::watch_pointer(window.clone());
             pull_on_screen(&window)?;
             let size = window
                 .inner_size()?

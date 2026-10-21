@@ -42,6 +42,7 @@ log "after a click on the skin's body, in front: $("$mac" front)"
 "$mac" click $((x + 3)) $((y + 3)); sleep 1
 log "after a click on its clear top-left corner, in front: $("$mac" front)"
 "$mac" click $(body); sleep 1
+log "after another click on the body, in front: $("$mac" front)"
 "$mac" drag $(body) $((x + 395 + 120)) $((y + 30 + 80)); sleep 1
 log "after a drag by +120,+80: $(bounds)"
 
@@ -62,6 +63,7 @@ log "after Cmd+Q: $(running) process(es) running; saved state: $(cat "$state" 2>
 launch
 log "relaunched at: $(bounds)"
 "$mac" click $(read -r _ x y _ _ < <(bounds); echo $((x + 395)) $((y + 30))); sleep 1
+log "before Cmd+W, in front: $("$mac" front)"
 "$mac" key 13; sleep 3
 log "after Cmd+W: $(running) process(es) running"
 
