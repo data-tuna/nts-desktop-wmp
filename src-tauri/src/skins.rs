@@ -40,8 +40,38 @@ pub fn working() -> impl Iterator<Item = &'static Skin> {
     list().iter().filter(|s| s.status == "works")
 }
 
+/// The local library (ATA-220): every `.wmz` in the checkout's gitignored
+/// `skins/local/`, for development. Unchecked, so not on the random draw. A
+/// build made elsewhere finds no such folder and lists none.
+const LOCAL_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../skins/local");
+
+pub fn local() -> &'static [Skin] {
+    static LIST: OnceLock<Vec<Skin>> = OnceLock::new();
+    LIST.get_or_init(|| local_in(Path::new(LOCAL_DIR)))
+}
+
+fn local_in(dir: &Path) -> Vec<Skin> {
+    let mut skins: Vec<Skin> = fs::read_dir(dir)
+        .into_iter()
+        .flatten()
+        .flatten()
+        .filter_map(|e| {
+            let name = e.file_name().into_string().ok()?;
+            let size = e.metadata().ok()?.len();
+            name.to_lowercase().ends_with(".wmz").then(|| Skin {
+                path: format!("local/{name}"),
+                md5: String::new(),
+                size,
+                status: "local".into(),
+            })
+        })
+        .collect();
+    skins.sort_by_key(|s| s.path.to_lowercase());
+    skins
+}
+
 pub fn find(path: &str) -> Option<&'static Skin> {
-    working().find(|s| s.path == path)
+    working().chain(local()).find(|s| s.path == path)
 }
 
 pub fn random() -> Option<&'static Skin> {
@@ -119,6 +149,10 @@ impl Drop for Claim {
 /// The skin's bytes from the cache, or downloaded into it. Either way they
 /// must match the md5 the compatibility list was built from.
 pub fn fetch(app: &AppHandle, skin: &Skin) -> Result<Vec<u8>, String> {
+    if let Some(name) = skin.path.strip_prefix("local/") {
+        return fs::read(Path::new(LOCAL_DIR).join(name))
+            .map_err(|e| format!("{}: {e}", skin.path));
+    }
     let _claim = Claim::new(&skin.md5);
     let dir = cache_dir(app)?;
     let path = dir.join(format!("{}.wmz", skin.md5));
@@ -317,15 +351,23 @@ fn fetch_and_wear(app: &AppHandle, skin: &'static Skin, id: u64) -> Result<(), S
     result.map(|_| ())
 }
 
+/// The skin to wear on launch. A remembered skin no longer on the list gets
+/// the house skin, and the choice stays. A local one that is missing gets a
+/// random skin: a build from another checkout, or the installed app sharing
+/// `skin.json`, will never find it (ATA-220).
+fn launch_skin(choice: Option<String>) -> Option<&'static Skin> {
+    match choice {
+        Some(path) if path.starts_with("local/") => find(&path).or_else(random),
+        Some(path) => find(&path),
+        None => random(),
+    }
+}
+
 /// On launch: the listener's skin, or a random one, fetched on its own
 /// thread. A remembered skin no longer on the list gets the house skin, and
 /// the choice stays.
 pub fn start(app: &AppHandle) {
-    let skin = match choice(app) {
-        Some(path) => find(&path),
-        None => random(),
-    };
-    if let Some(skin) = skin {
+    if let Some(skin) = launch_skin(choice(app)) {
         let id = begin();
         let app = app.clone();
         std::thread::spawn(move || fetch_and_wear(&app, skin, id));
@@ -392,6 +434,25 @@ mod tests {
         drop(first);
         assert!(waiter.join().unwrap() >= released);
         drop(other);
+    }
+
+    #[test]
+    fn the_local_library_lists_its_wmz_files() {
+        let dir = std::env::temp_dir().join(format!("nts-wmp-local-{}", std::process::id()));
+        fs::create_dir_all(&dir).unwrap();
+        for name in ["b.wmz", "A.WMZ", "notes.txt"] {
+            fs::write(dir.join(name), [0u8; 3]).unwrap();
+        }
+        let paths: Vec<_> = local_in(&dir).into_iter().map(|s| s.path).collect();
+        fs::remove_dir_all(&dir).unwrap();
+        assert_eq!(paths, ["local/A.WMZ", "local/b.wmz"]);
+        assert!(local_in(&dir).is_empty());
+    }
+
+    #[test]
+    fn a_missing_local_choice_gets_a_random_skin() {
+        assert!(launch_skin(Some("local/not there.wmz".into())).is_some());
+        assert!(launch_skin(Some("microsoft/not there.wmz".into())).is_none());
     }
 
     #[test]

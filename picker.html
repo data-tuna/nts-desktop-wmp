@@ -10,10 +10,15 @@
   <body>
     <header>
       <label class="random"><input id="random" type="radio" name="mode" /> A random skin on every launch</label>
+      <select id="source" aria-label="Skins from" hidden>
+        <option value="archive">archive.org</option>
+        <option value="local">Local library</option>
+      </select>
       <p id="status" role="status"></p>
     </header>
     <main>
-      <ul id="skins"></ul>
+      <ul id="skins" class="list"></ul>
+      <ul id="local" class="list" hidden></ul>
       <aside>
         <div id="preview" role="status">Select a skin to see it here.</div>
         <button id="use" type="button" disabled>Use this skin</button>
