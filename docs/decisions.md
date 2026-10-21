@@ -15,14 +15,18 @@ standing rule that skins never enter this public repository, so they
 live in the checkout but outside git.
 
 - **Where.** `skins/local/`, gitignored (`*.wmz` already was). Copy the
-  skins there by hand. Rust lists the folder at a path fixed at build time
-  (`CARGO_MANIFEST_DIR/../skins/local`), so only a build from a checkout
-  that has the folder shows them; CI and release builds list none.
+  `.wmz` files straight into that folder by hand, with no subfolders: only
+  its top level is read. Rust lists the folder at a path fixed at build
+  time (`CARGO_MANIFEST_DIR/../skins/local`), so only a build from a
+  checkout that has the folder shows them; CI and release builds list
+  none.
 - **Picker.** A select above the list switches between the archive.org
   menu, as before, and "Local library (N)", shown only when the folder has
   skins. Local skins preview and wear like the others, are read from disk
   with no cache or download, and can be kept for every launch
-  (`local/<file>.wmz` in `skin.json`).
+  (`local/<file>.wmz` in `skin.json`). Every build shares `skin.json`, so
+  a build that cannot find a kept local skin (the installed release, say)
+  wears a random one instead of the house skin on every launch.
 - **Not checked.** The local skins are not on the compatibility list, so
   some draw nothing (Batman Begins is "broken" there); the preview says
   "No preview" and wearing one gives the house skin. They are never drawn

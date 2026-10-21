@@ -351,15 +351,23 @@ fn fetch_and_wear(app: &AppHandle, skin: &'static Skin, id: u64) -> Result<(), S
     result.map(|_| ())
 }
 
+/// The skin to wear on launch. A remembered skin no longer on the list gets
+/// the house skin, and the choice stays. A local one that is missing gets a
+/// random skin: a build from another checkout, or the installed app sharing
+/// `skin.json`, will never find it (ATA-220).
+fn launch_skin(choice: Option<String>) -> Option<&'static Skin> {
+    match choice {
+        Some(path) if path.starts_with("local/") => find(&path).or_else(random),
+        Some(path) => find(&path),
+        None => random(),
+    }
+}
+
 /// On launch: the listener's skin, or a random one, fetched on its own
 /// thread. A remembered skin no longer on the list gets the house skin, and
 /// the choice stays.
 pub fn start(app: &AppHandle) {
-    let skin = match choice(app) {
-        Some(path) => find(&path),
-        None => random(),
-    };
-    if let Some(skin) = skin {
+    if let Some(skin) = launch_skin(choice(app)) {
         let id = begin();
         let app = app.clone();
         std::thread::spawn(move || fetch_and_wear(&app, skin, id));
@@ -439,6 +447,12 @@ mod tests {
         fs::remove_dir_all(&dir).unwrap();
         assert_eq!(paths, ["local/A.WMZ", "local/b.wmz"]);
         assert!(local_in(&dir).is_empty());
+    }
+
+    #[test]
+    fn a_missing_local_choice_gets_a_random_skin() {
+        assert!(launch_skin(Some("local/not there.wmz".into())).is_some());
+        assert!(launch_skin(Some("microsoft/not there.wmz".into())).is_none());
     }
 
     #[test]

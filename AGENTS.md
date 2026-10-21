@@ -155,7 +155,8 @@ polite to archive.org: one skin per launch, no bulk downloads. The app
 downloads at most one skin per launch, plus one for each skin the listener
 selects in the picker, to preview or wear it, and never two at once for
 the same skin. For development, `skins/local/` holds a local library
-of `.wmz` files copied in by hand; it is gitignored, and the picker's
+of `.wmz` files copied in by hand, straight into the folder (subfolders
+are not read); it is gitignored, and the picker's
 "Local library" menu lists it only in a build from that checkout
 (ATA-220). `tools/compat.mjs` is the one bulk download, run by hand
 when the engine changes: it fetches each file once, a few seconds apart,
