@@ -1219,12 +1219,13 @@ mod macos {
     }
 
     /// Moves the window with the pointer, as a title bar would. As on
-    /// Windows, a skin can send `drag` at any time: start only while our
-    /// window is in front, under the pointer, with the primary button down.
+    /// Windows, a skin can send `drag` at any time: start only while the
+    /// pointer is over our window with the primary button down. It brings
+    /// the player forward too: on the runner, a press on it while another
+    /// app was in front left that app in front (`is_focused` still said
+    /// yes), and the drag did nothing.
     pub fn drag(window: &tauri::Window) {
-        eprintln!("DEBUG drag focused={:?}", window.is_focused());
-        let (Ok(true), Ok(origin), Ok(size), Ok(cursor)) = (
-            window.is_focused(),
+        let (Ok(origin), Ok(size), Ok(cursor)) = (
             window.outer_position(),
             window.outer_size(),
             window.cursor_position(),
@@ -1233,10 +1234,6 @@ mod macos {
         };
         let over = (origin.x as f64..(origin.x + size.width as i32) as f64).contains(&cursor.x)
             && (origin.y as f64..(origin.y + size.height as i32) as f64).contains(&cursor.y);
-        eprintln!(
-            "DEBUG drag over={over} buttons={} focused",
-            NSEvent::pressedMouseButtons()
-        );
         if over && NSEvent::pressedMouseButtons() & 1 != 0 {
             let _ = window.set_focus();
             let _ = window.start_dragging();

@@ -72,8 +72,14 @@ Written in English.
                           skin engine behaves (wmp-skin-engine.md, ATA-212).
     tests/                `node --test` tests and their fixtures.
     tools/                DevTools and window probes; see Observing the app.
+    tools/macos/          The macOS runner's checks (ATA-230): check.sh
+                          clicks, drags and types with synthetic events, so
+                          CI only; probe.mjs builds the probe skin that
+                          runs escape.mjs's attempts inside WKWebView.
     .github/workflows/    ci.yml checks every PR on windows-latest; release.yml
                           publishes a v* tag and installs it on a fresh runner.
+                          macos-check.yml runs tools/macos/check.sh on main
+                          and the PR (temporary, until ATA-229's macOS job).
 
 ## Commands
 
@@ -273,6 +279,15 @@ the key colour (`#FF00FF`) must have crisp edges (`shape-rendering=
 "crispEdges"`, or sit 1.5 px inside a crisp shape): a smoothed edge blends
 into it and leaves a pink fringe the transparency key cannot remove. The
 build refuses pixels that are not opaque.
+
+**macOS draws the skin's shape with transparency, not a region.** The
+window and both webviews are transparent there (`tauri.macos.conf.json`),
+and `macos::watch_pointer` lets clicks on the skin's clear pixels through,
+since WKWebView takes them otherwise. The skin protocol is
+`skin://localhost`, and WKWebView has no DevTools port, so isolation is
+checked with `tools/macos/probe.mjs` instead of `escape.mjs`. AppKit's own
+Close Window and Minimize do nothing to a window without buttons, so the
+macOS app menu has its own (ATA-230).
 
 **`tauri dev` needs port 1430 free.** Vite runs with `strictPort`, so a
 leftover dev server makes the next launch fail rather than pick another port.
