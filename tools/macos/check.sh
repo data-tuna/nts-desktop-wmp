@@ -44,7 +44,13 @@ log "after a click on its clear top-left corner, in front: $("$mac" front)"
 "$mac" click $(body); sleep 1
 log "after another click on the body, in front: $("$mac" front)"
 "$mac" drag $(body) $((x + 395 + 120)) $((y + 30 + 80)); sleep 1
-log "after a drag by +120,+80: $(bounds)"
+log "after a drag by +120,+80: $(bounds), in front: $("$mac" front)"
+"$app" >>"$out/app.log" 2>&1 &
+sleep 5
+log "after another launch, in front: $("$mac" front)"
+read -r _ x y w h < <(bounds)
+"$mac" drag $(body) $((x + 395 - 60)) $((y + 30 - 40)); sleep 1
+log "after a drag by -60,-40: $(bounds)"
 
 "$app" >>"$out/app.log" 2>&1 &
 sleep 5

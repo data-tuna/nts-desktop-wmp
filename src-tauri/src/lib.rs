@@ -1238,6 +1238,7 @@ mod macos {
             NSEvent::pressedMouseButtons()
         );
         if over && NSEvent::pressedMouseButtons() & 1 != 0 {
+            let _ = window.set_focus();
             let _ = window.start_dragging();
         }
     }
