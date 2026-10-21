@@ -18,7 +18,8 @@
     <text id="title" left="180" top="46" width="206" height="20"
           value="wmpprop:player.currentMedia.name"
           fontFace="Tahoma" fontSize="11" fontStyle="bold" foregroundColor="#2A1803"
-          scrolling="true" scrollingDelay="40" scrollingAmount="1"/>
+          scrolling="false" scrollingDelay="40" scrollingAmount="1"
+          textwidth_onchange="JScript:scrolling=(textwidth&gt;width);"/>
     <text id="status" left="180" top="78" width="74" height="16"
           value="wmpprop:player.status"
           fontFace="Tahoma" fontSize="8" foregroundColor="#6E430E"/>

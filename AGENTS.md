@@ -433,7 +433,8 @@ build, the tests and `cargo fmt --check`.
 With one showing, the app uses about
 15–33 % of a core, depending on the skin (5–7 % without; the Winamp app
 about 18 % with its spectrum). The top of that range is Bootleg House, whose
-scrolling title repaints the whole skin. Each frame redraws only the
+scrolling title repaints the whole skin. It scrolls only a title too long
+for its box (ATA-216). Each frame redraws only the
 visualisation, so most of that is the frames' trip: an IPC call from the
 trusted page, a script evaluated in the skin webview, a composite of both
 webviews. Frames go 20 a second, and none while the player is minimised or

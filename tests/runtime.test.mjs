@@ -542,6 +542,25 @@ test("scrolling text moves like WMP's: 6 px every 85 ms, a 25 px gap, even when 
   }
 });
 
+test("textwidth_onchange runs when the text's width changes, so a skin can scroll only a title too long for its box (TheUnit, the house skin)", () => {
+  const { skin, set } = load(`<theme><view width="100" height="10">
+       <text id="t" left="0" top="0" width="100" height="10" value="wmpprop:player.currentMedia.name"
+         scrolling="false" textwidth_onchange="JScript:scrolling=(textwidth&gt;width);"/>
+     </view></theme>`);
+  const xs = () => {
+    drawn.length = 0;
+    skin.paint();
+    return drawn.filter(([k]) => k === "fillText").map(([, , , x]) => x);
+  };
+  // "NTS 1" is 30 px: it stands still, and nothing is due.
+  xs();
+  assert.deepEqual(xs(), [0]);
+  assert.equal(skin.stepAt, Infinity);
+  set({ title: "A show with a name far too long" });
+  xs();
+  assert.ok(skin.stepAt < Infinity, "the long title scrolls");
+});
+
 test("a double click on the scroll bar never opens a pick's page", () => {
   const items = Array.from({ length: 20 }, (_, i) => `Pick ${i}`);
   const { sent } = load(`<theme><view width="100" height="48">
