@@ -6,6 +6,46 @@ the evidence.
 
 ## Stack
 
+### Scrolling text like WMP 7.1: 6 px every 85 ms, a 25 px gap (ATA-216, 2026-10-21)
+
+Row 3 of the ranked table in `docs/research/wmp-skin-engine.md`.
+
+- **Defaults:** `scrollingAmount` 6 px and `scrollingDelay` 85 ms, as in
+  WMP. Before, 1 px every 100 ms. An amount under 1 or a delay under 30 is
+  ignored and the default kept, since WMP rejects them. Before, delays went
+  down to 16 ms.
+- **The repeat** follows the text after 25 px, not half the box. As many
+  copies are drawn as fill the box.
+- **Text that fits scrolls too** when `scrolling` is true, from where its
+  `justification` puts it.
+- **`scrollingDirection`:** `right` moves the text right. Anything else
+  is left, the default.
+- **Each copy is underlined** when `fontStyle` names underline.
+- **The playlist's long names** use the same code, so they now move 6 px
+  every 85 ms too, unless the list names other values. They still scroll
+  only when wider than the row.
+- **`textwidth_onchange` runs** after a paint in which a text's width
+  changed, the first paint included. Run during the paint, its change
+  dropped the window shape half way and the paint threw. Skins use it to
+  scroll only text too long for its box: `works` TheUnit, The_Unit_v3,
+  Ursula and v2_underworld, and `partial` Gorillaz, robbie, Creed,
+  Mandalay and Utomjording. Atomic (`partial`) moves its text with it.
+- **The house skin** does the same, with `scrolling="false"` in the
+  markup. Scrolling a title that fits would repaint the whole skin 25
+  times a second for nothing. On a release build on a hidden desktop,
+  playing NTS 2 with a 200 px title in the 206 px box and no
+  visualisation, the app used 12.7–13.5 % of a core with the title
+  scrolling and 5.6–8.2 % with it still (main: 5.7–5.9 %). Stopped:
+  12.4–17.3 % and 4.0–4.3 % (main: 3.3–4.2 %). NTS 1's 211 px title still
+  scrolls.
+
+A scan of the `works` skins finds 15 with a `<text scrolling="true">`. 7 of
+them set a delay under 30 (2 to 25 ms), and now step every 85 ms as in
+WMP. Checked on a release build on a hidden desktop: springflower
+(`scrollingDelay="10"`, 1 px) moved its title 12 px in a second, and shows
+the 25 px gap; Halloween (2 px every 80 ms) moved it about 25 px, as
+before, with the repeat now 25 px behind.
+
 ### Sliders like WMP 7.1: thumb on the value edge, images tiled (ATA-215, 2026-10-21)
 
 Rows 1, 2 and 10 of the ranked table in `docs/research/wmp-skin-engine.md`.
@@ -915,11 +955,11 @@ a scroll bar, its playing row is green, and long show names are cut off.
   `pixels.ts`).
 - **Long names.** The playing row's name scrolls right to left when it is
   wider than the row, by the same code and timer as a `scrolling` text
-  (1 px every 100 ms unless the list names `scrollingAmount` or
-  `scrollingDelay`). It starts from the first word whenever the playing
-  row or its name changes. Other rows are cut off, as before. A press on
-  the scroll bar disarms the pick link, so a double click there never
-  opens SoundCloud.
+  (6 px every 85 ms since ATA-216, unless the list names
+  `scrollingAmount` or `scrollingDelay`). It starts from the first word
+  whenever the playing row or its name changes. Other rows are cut off,
+  as before. A press on the scroll bar disarms the pick link, so a double
+  click there never opens SoundCloud.
 - **Covered or minimised.** The state message gains `covered`, Rust's
   existing cover check passed on by the trusted page. While it is true,
   no scrolling step is scheduled, for the playlist or any `scrolling`
