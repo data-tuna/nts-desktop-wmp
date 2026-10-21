@@ -6,6 +6,45 @@ the evidence.
 
 ## Stack
 
+### Object-model gaps: downloadProgress, play state 11, attributes, booleans, view sizes (ATA-218, 2026-10-21)
+
+Rows 6, 7, 8, 9 and 11 of the ranked table in
+`docs/research/wmp-skin-engine.md`.
+
+- **`network.downloadProgress` reads 100.** A live stream has nothing
+  left to download, and `bufferingProgress` already reads 100. 15 `works`
+  skins bind it with `wmpprop:`; it read `undefined` before.
+- **A reconnect reads as buffering (6).** WMP 7.1 has no
+  `psReconnecting`, so a 2000–2002 skin has no name for 11 and showed
+  nothing during a reconnect. The host keeps its own `reconnecting`
+  state, and `player.status` still says "Reconnecting". `psReconnecting`
+  stays defined for later skins that name it.
+- **Scripts can't read an attribute WMP doesn't know.** We checked
+  the skins first: the 59 `works` skins read 43 different attribute
+  names from script (109 tag and name pairs), and every one is a WMP
+  member or a handler. The 22 other attribute names they write that WMP
+  doesn't know are typos (`scrolingDelay`, `backgoundColor`) or names no
+  version has (`editButtonsVisible`, `enable`), and no script reads them.
+  `scriptFile` is the 23rd; the engine reads it by name, as WMP does. The known names are the members of WMP's skin
+  element interfaces in `wmp.dll`'s type library (WMP 12, a superset of
+  7.1's), one list for all elements where WMP has one per element. The
+  engine itself still reads every attribute it draws from.
+- **Booleans convert as OLE does:** `true` or `false` in any case, or a
+  number, non-zero being true; anything else keeps the default. `"0"` was
+  true before. The issue said only `-1` is true, but OLE takes any
+  non-zero number, and Cablemusic writes `visible="1"`.
+  The_Doobie_Brothers' `down="false; jscript:…"` is not a boolean, so it
+  keeps the default, which is false.
+- **`view.minWidth` and `minHeight`** read 0 when unset (12 `works`
+  skins set them). **`view.resizable`** defaults to the view's
+  `titleBar`, which defaults to true. Nothing resizes the window by hand
+  yet, so these only answer scripts.
+- **Checked** on Classic and 9SeriesDefault in headless Edge, against
+  `main`: the same pixels apart from the clock, and the
+  `downloadProgress` and `resizable` "not supported" warnings are gone.
+- `tools/compat.mjs` afterwards: works 59, partial 97, broken 60, as
+  before, with no skin changing status.
+
 ### Colour values like WMP: 140 names, auto, system colours (ATA-217, 2026-10-21)
 
 Row 4 of the ranked table in `docs/research/wmp-skin-engine.md`.
@@ -244,7 +283,8 @@ screenshots are on ATA-198.
   that way. `playlist.setColumnWidth` now
   does nothing instead of throwing, which stopped TwinBlade's drawer
   script. A boolean that starts with `false` is false:
-  The_Doobie_Brothers' button has `down="false; jscript:…"`.
+  The_Doobie_Brothers' button has `down="false; jscript:…"`. (ATA-218
+  replaced this rule with WMP's conversion.)
 - **Not fixed here.** 47 of the 136 listed skins with a playlist have it
   only in a view the engine never opens; view switching is Mika's call.
   The rest are in `AGENTS.md`, Known gaps.
@@ -1417,7 +1457,7 @@ what the 7 ATA-103 skins call; no code from Webamp Modern.
   DVD, no library, no scanning, no presets. Unknown members are logged once
   and read as undefined.
 - **Play and open states.** `playing` is psPlaying, `buffering` psBuffering,
-  `reconnecting` psReconnecting, `paused` psPaused, `stopped` psStopped. The
+  `reconnecting` psBuffering (psReconnecting until ATA-218), `paused` psPaused, `stopped` psStopped. The
   open state is osMediaOpen once the host names a channel; a channel switch
   passes through osMediaChanging. `<player>` fires its `*_onchange` and
   `playStateChange(NewState)`/`openStateChange(NewState)` handlers, open

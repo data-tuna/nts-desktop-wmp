@@ -32,8 +32,9 @@ and WMP 12 refuses third-party skins. Every finding is read from code.
 
 Ranked by how many working skins they touch, how sure we are, and how
 cheap the fix looks. The sections below have the evidence. Mika turns
-these into issues; ATA-215 fixed rows 1, 2 and 10, and "Ours" there says
-what the engine did before.
+these into issues; ATA-215 fixed rows 1, 2 and 10, ATA-216 row 3, ATA-217
+row 4 and ATA-218 rows 6–9 and 11. "Ours" there says what the engine did
+before.
 
 | # | Difference | WMP 7.1 | Ours | Skins | Confidence |
 |---|---|---|---|---|---|
@@ -42,12 +43,12 @@ what the engine did before.
 | 3 | Text scrolling defaults | `scrollingAmount` 6 px, `scrollingDelay` 85 ms (min 30), 25 px gap, scrolls even when the text fits, `scrollingDirection` left or right | 1 px, 100 ms (min 16), half-box gap, only when too wide, left only | 17 | high |
 | 4 | Colour values | `#RRGGBB` only; 140 named colours; `auto` = the image's top-left pixel; system colours; `none` | Also bare `RRGGBB`; 19 names; no `auto`, no system colours (fixed in ATA-217) | up to 55 | high |
 | 5 | `jscript:` attributes | Evaluated once, after the scripts run, in document order; never again | Re-evaluated after every change | all | high (WMP side); fix needs care, see 2c |
-| 6 | `network.downloadProgress` | A real member | Missing; the `wmpprop:` binding reads `undefined` | 15 | high |
-| 7 | Play state 11 | 7.1 has no `psReconnecting`; its states stop at 10 | Host reports 11 on reconnect | all that switch on play state | high |
-| 8 | Unknown attributes | Dropped with a warning; scripts cannot read them | Stored and readable from script | few | high |
-| 9 | Boolean values | OLE conversion: `0`/`false` false, `-1`/`true` true; anything else leaves the default | Anything not starting with "false" is true | few | medium |
+| 6 | `network.downloadProgress` | A real member | Missing; the `wmpprop:` binding reads `undefined` (fixed in ATA-218: 100) | 15 | high |
+| 7 | Play state 11 | 7.1 has no `psReconnecting`; its states stop at 10 | Host reports 11 on reconnect (fixed in ATA-218: 6) | all that switch on play state | high |
+| 8 | Unknown attributes | Dropped with a warning; scripts cannot read them | Stored and readable from script (fixed in ATA-218) | few | high |
+| 9 | Boolean values | OLE conversion: `0`/`false` false, `-1`/`true` true; anything else leaves the default | Anything not starting with "false" is true (fixed in ATA-218) | few | medium |
 | 10 | Slider foreground's far cap | Drawn when the foreground fills the track | Never drawn: the foreground is clipped at the thumb's middle, short of the cap (fixed in ATA-215) | tiled sliders with `borderSize` | high |
-| 11 | `view.minWidth`/`minHeight`, `resizable` default | Present; `resizable` defaults to whether the view has a title bar | Missing | 12 / 35 | high |
+| 11 | `view.minWidth`/`minHeight`, `resizable` default | Present; `resizable` defaults to whether the view has a title bar | Missing (fixed in ATA-218) | 12 / 35 | high |
 
 Not ranked: our `wmpenabled:`/`wmpdisabled:` accept only `player.controls.*`
 targets, where WMP accepts any property, but all 33 `works` skins that use
