@@ -16,10 +16,10 @@ Mac yet (ATA-234). Windows is unchanged: every macOS path is behind
 
 - **The shape is the skin's clear pixels.** On macOS the main window is
   transparent (`tauri.macos.conf.json`), and so is the skin webview. Tauri
-  2.12.1 and later need no `macOSPrivateApi` for that. The engine already paints only inside the shape, and both
-  pages have no background. Runner screenshots: the house skin with the
-  desktop showing through its corners, where main shows a white
-  rectangle.
+  2.12.1 and later need no `macOSPrivateApi` for that. The engine already
+  paints only inside the shape, and both pages have no background. Runner
+  screenshots: the house skin with the desktop showing through its
+  corners, where main shows a white rectangle.
 - **Clicks go through the clear pixels.** WKWebView takes the clicks on
   them: with only the transparency, a click on the house skin's top-left
   corner left the app in front. macOS says nothing when the pointer
@@ -36,11 +36,11 @@ Mac yet (ATA-234). Windows is unchanged: every macOS path is behind
   (`NSEvent.pressedMouseButtons`, from `objc2-app-kit`, which Tauri already
   builds). A press there is ours, since clicks on clear pixels go through,
   so a skin sending `drag` cannot take over a drag the user started in the
-  window underneath. On the runner it moved the window by exactly the drag. A press
-  while another app was in front did not bring the player forward and did
-  not drag, and `is_focused` still said true; so the drag calls
-  `set_focus` first, and then the next press drags. Synthetic events may
-  explain it: check on a real Mac.
+  window underneath. On the runner it moved the window by exactly the
+  drag. A press while another app was in front did not bring the player
+  forward and did not drag, and `is_focused` still said true; so the drag
+  calls `set_focus` first, and then the next press drags. Synthetic events
+  may explain it: check on a real Mac.
 - **Minimised, nothing draws.** WKWebView hides the page when the window
   is minimised (the probe skin saw `visibilitychange` to hidden on
   minimise, visible on restore), which stops `requestAnimationFrame` and

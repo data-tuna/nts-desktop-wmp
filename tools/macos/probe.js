@@ -59,7 +59,7 @@
   // Room for the rows: the window takes this size and shape, after the
   // engine has sent the skin's own.
   await new Promise(function (r) { setTimeout(r, 1500); });
-  await row("/msg shape 1000x600", function () { return post({ type: "shape", width: 1000, height: 600, rects: [[0, 0, 1000, 600]] }); });
+  await row("/msg shape 998x600", function () { return post({ type: "shape", width: 998, height: 600, rects: [[0, 0, 998, 600]] }); });
   await row("/msg unknown field", function () { return post({ type: "play", evil: 1 }); });
   await row("what Tauri injected", function () {
     return JSON.stringify({
