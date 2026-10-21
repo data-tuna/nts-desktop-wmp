@@ -138,8 +138,10 @@ reading.
 - **A header row starts each section:** `— NTS Picks —` and
   `— Infinite Mixtapes —`, only when that section has items. A header is an
   `Item` with no url. It never plays: Next and Previous pass over it, and a
-  click on it does nothing. The dashes mark it out in every skin without
-  engine changes.
+  click on it does nothing. The dashes mark it out in every skin.
+- **The state message gains `headers`,** the header rows' indexes. The
+  skin ignores a press on one, so the current row never moves, even for a
+  moment (review round 1).
 - **A pick's tags come first:** `<genres and moods> · <name> - <location>`.
   At the end, narrow skins cut them off. This replaces the title format of
   ATA-197, below. The Winamp app's `picks.ts` keeps the old format.
