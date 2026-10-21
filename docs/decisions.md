@@ -10,14 +10,13 @@ the evidence.
 
 Checked on the `macos-latest` GitHub runner with `tools/macos/check.sh`,
 which CI runs on the .dmg's app after the smoke test (ATA-229): it clicks,
-drags and types with synthetic events, and screenshots. There is no real Mac yet (ATA-234). Windows is unchanged:
-every macOS path is behind `cfg(target_os = "macos")` or
-`tauri.macos.conf.json`.
+drags and types with synthetic events, and screenshots. There is no real
+Mac yet (ATA-234). Windows is unchanged: every macOS path is behind
+`cfg(target_os = "macos")` or `tauri.macos.conf.json`.
 
 - **The shape is the skin's clear pixels.** On macOS the main window is
-  transparent (`tauri.macos.conf.json`; `macOSPrivateApi` and Tauri's
-  `macos-private-api` feature, which do nothing on Windows), and so is the
-  skin webview. The engine already paints only inside the shape, and both
+  transparent (`tauri.macos.conf.json`), and so is the skin webview. Tauri
+  2.12.1 and later need no `macOSPrivateApi` for that. The engine already paints only inside the shape, and both
   pages have no background. Runner screenshots: the house skin with the
   desktop showing through its corners, where main shows a white
   rectangle.
@@ -26,13 +25,18 @@ every macOS path is behind `cfg(target_os = "macos")` or
   corner left the app in front. macOS says nothing when the pointer
   crosses onto a clear pixel, so `macos::watch_pointer` looks 20 times a
   second and sets `set_ignore_cursor_events` while the pointer is over one.
+  The pointer is worked out in points: tao gives the cursor in the primary
+  monitor's pixels and the window's origin in its own monitor's, which
+  differ with a Retina laptop and a plain display.
   Off the window it takes clicks, so a fast move onto the skin can lose a
   click on a clear pixel, never one on the skin. After it, the same click
   put Finder in front.
-- **Drag** is `start_dragging`, guarded as on Windows: only while the
-  pointer is over the window with the primary button down
+- **Drag** is `start_dragging`, only while the pointer is on one of the
+  skin's opaque pixels with the primary button down
   (`NSEvent.pressedMouseButtons`, from `objc2-app-kit`, which Tauri already
-  builds). On the runner it moved the window by exactly the drag. A press
+  builds). A press there is ours, since clicks on clear pixels go through,
+  so a skin sending `drag` cannot take over a drag the user started in the
+  window underneath. On the runner it moved the window by exactly the drag. A press
   while another app was in front did not bring the player forward and did
   not drag, and `is_focused` still said true; so the drag calls
   `set_focus` first, and then the next press drags. Synthetic events may
@@ -73,7 +77,14 @@ every macOS path is behind `cfg(target_os = "macos")` or
   message reached nothing, the CSP blocked remote fetches and frames and
   the app's own page, and `window.open` returned null. `/msg` took the
   shape (204) and refused an unknown field (400); the trusted page's
-  `state` messages kept arriving.
+  `state` messages kept arriving. The probe sizes the window 1000 px wide
+  when every attempt failed and 999 when one got through, and `check.sh`
+  fails CI on 999.
+- **The main window is written twice.** `tauri.macos.conf.json` is a JSON
+  merge patch, which replaces the `windows` array whole. A test
+  (`tests/config.test.mjs`) keeps the two entries the same apart from
+  `transparent` and `additionalBrowserArgs`.
+
 ### Object-model gaps: downloadProgress, play state 11, attributes, booleans, view sizes (ATA-218, 2026-10-21)
 
 Rows 6, 7, 8, 9 and 11 of the ranked table in

@@ -84,5 +84,6 @@ NTS_WMP_SKIN=$out/probe.wmz launch 75
 "$app" >>"$out/app.log" 2>&1 &
 sleep 5
 shots probe
+expect "the probe skin reached nothing (1000 px wide)" '[ "$(bounds | cut -d" " -f4)" = 1000 ]'
 pkill -x nts-desktop-wmp
 exit $failed

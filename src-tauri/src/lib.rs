@@ -1177,15 +1177,43 @@ mod macos {
         *SHAPE.lock().unwrap() = (width, height, rects);
     }
 
+    /// Whether `(x, y)`, in CSS pixels, is on one of the skin's opaque runs.
+    fn opaque((_, _, rects): &(u32, u32, Vec<[u32; 4]>), x: f64, y: f64) -> bool {
+        rects.iter().any(|&[l, t, w, h]| {
+            (l as f64..(l + w) as f64).contains(&x) && (t as f64..(t + h) as f64).contains(&y)
+        })
+    }
+
     /// Whether `(x, y)`, in CSS pixels, is a clear pixel of the view: inside
     /// it, on none of its runs.
-    fn clear((width, height, rects): &(u32, u32, Vec<[u32; 4]>), x: f64, y: f64) -> bool {
-        let within = |x: f64, left: u32, w: u32| (left as f64..(left + w) as f64).contains(&x);
-        within(x, 0, *width)
-            && within(y, 0, *height)
-            && !rects
-                .iter()
-                .any(|&[l, t, w, h]| within(x, l, w) && within(y, t, h))
+    fn clear(shape: &(u32, u32, Vec<[u32; 4]>), x: f64, y: f64) -> bool {
+        let (width, height, _) = *shape;
+        (0.0..width as f64).contains(&x)
+            && (0.0..height as f64).contains(&y)
+            && !opaque(shape, x, y)
+    }
+
+    /// The pointer in the view's CSS pixels (points). tao gives the cursor
+    /// in the primary monitor's pixels and the window's origin in its own
+    /// monitor's, which differ with a Retina laptop and a plain display.
+    fn in_view(cursor: (f64, f64), primary: f64, origin: (i32, i32), scale: f64) -> (f64, f64) {
+        (
+            cursor.0 / primary - origin.0 as f64 / scale,
+            cursor.1 / primary - origin.1 as f64 / scale,
+        )
+    }
+
+    fn pointer(window: &tauri::Window) -> Option<(f64, f64)> {
+        let cursor = window.cursor_position().ok()?;
+        let primary = window.primary_monitor().ok()??.scale_factor();
+        let origin = window.outer_position().ok()?;
+        let scale = window.scale_factor().ok()?;
+        Some(in_view(
+            (cursor.x, cursor.y),
+            primary,
+            (origin.x, origin.y),
+            scale,
+        ))
     }
 
     /// Lets clicks on the skin's clear pixels through to the window
@@ -1198,17 +1226,9 @@ mod macos {
             let mut ignoring = false;
             loop {
                 std::thread::sleep(Duration::from_millis(50));
-                let (Ok(cursor), Ok(origin), Ok(scale)) = (
-                    window.cursor_position(),
-                    window.outer_position(),
-                    window.scale_factor(),
-                ) else {
+                let Some((x, y)) = pointer(&window) else {
                     continue;
                 };
-                let (x, y) = (
-                    (cursor.x - origin.x as f64) / scale,
-                    (cursor.y - origin.y as f64) / scale,
-                );
                 let now = clear(&SHAPE.lock().unwrap(), x, y);
                 if now != ignoring {
                     ignoring = now;
@@ -1220,21 +1240,16 @@ mod macos {
 
     /// Moves the window with the pointer, as a title bar would. As on
     /// Windows, a skin can send `drag` at any time: start only while the
-    /// pointer is over our window with the primary button down. It brings
-    /// the player forward too: on the runner, a press on it while another
-    /// app was in front left that app in front (`is_focused` still said
-    /// yes), and the drag did nothing.
+    /// pointer is on one of the skin's opaque pixels with the primary
+    /// button down. A press there is ours: clicks on clear pixels go to the
+    /// window underneath. It brings the player forward too: on the runner,
+    /// a press on it while another app was in front left that app in front
+    /// (`is_focused` still said yes), and the drag did nothing.
     pub fn drag(window: &tauri::Window) {
-        let (Ok(origin), Ok(size), Ok(cursor)) = (
-            window.outer_position(),
-            window.outer_size(),
-            window.cursor_position(),
-        ) else {
+        let Some((x, y)) = pointer(window) else {
             return;
         };
-        let over = (origin.x as f64..(origin.x + size.width as i32) as f64).contains(&cursor.x)
-            && (origin.y as f64..(origin.y + size.height as i32) as f64).contains(&cursor.y);
-        if over && NSEvent::pressedMouseButtons() & 1 != 0 {
+        if opaque(&SHAPE.lock().unwrap(), x, y) && NSEvent::pressedMouseButtons() & 1 != 0 {
             let _ = window.set_focus();
             let _ = window.start_dragging();
         }
@@ -1316,6 +1331,18 @@ mod macos {
         assert!(!clear(&shape, -1.0, 1.0));
         assert!(!clear(&shape, 10.0, 1.0));
         assert!(!clear(&shape, 5.0, 3.0));
+        // A drag starts only on the runs.
+        assert!(opaque(&shape, 3.0, 2.0));
+        assert!(!opaque(&shape, 1.0, 1.0));
+        assert!(!opaque(&shape, 20.0, 0.0));
+    }
+
+    #[test]
+    fn the_pointer_in_points_across_scales() {
+        // A 2x laptop as primary, the player at 1950 pt on a 1x display.
+        assert_eq!(in_view((4000.0, 200.0), 2.0, (1950, 50), 1.0), (50.0, 50.0));
+        // The player on the laptop itself.
+        assert_eq!(in_view((400.0, 200.0), 2.0, (300, 100), 2.0), (50.0, 50.0));
     }
 }
 

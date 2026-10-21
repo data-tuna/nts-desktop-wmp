@@ -22,7 +22,7 @@
   document.body.append(pre);
   function draw() {
     pre.textContent = "ATA-230 macOS probe, skin webview at " + location.href + "\n" +
-      rows.map(function (r) { return r[0] + ": " + r[1]; }).join("\n") +
+      rows.map(function (r) { return (r[0] + ": " + r[1]).slice(0, 160); }).join("\n") +
       "\ncontrol: " + states + " state messages from the trusted page, last title " + JSON.stringify(title) +
       "\nvisibility: " + vis.join(", ");
   }
@@ -39,7 +39,7 @@
   var row = async function (name, run) {
     var result;
     try { result = await run(); } catch (e) { result = "threw " + e; }
-    rows.push([name, String(result).replace(/\s+/g, " ").slice(0, 150)]);
+    rows.push([name, String(result).replace(/\s+/g, " ")]);
     draw();
   };
   var n = 0;
@@ -110,6 +110,19 @@
   await row("frame the app's page", frame("tauri://localhost/"));
   await row("window.open the app's page", function () { return window.open("tauri://localhost/") ? "opened" : "null"; });
   await row("Media Session", function () { return typeof navigator.mediaSession + ", MediaMetadata " + typeof window.MediaMetadata; });
+  // The verdict, for check.sh: 1000 px wide if every attempt failed, 999 if
+  // one got through.
+  var held = rows.every(function (r) {
+    var name = r[0], result = r[1];
+    if (name.indexOf("/msg") === 0 || name === "what Tauri injected" || name.indexOf("  ") === 0 || name === "Media Session") return true;
+    if (/^(fetch|frame) /.test(name)) return result.indexOf("CSP: ") === 0 || /not reached$/.test(result);
+    if (name.indexOf("window.open") === 0) return result === "null";
+    return /^(rejected|no reply)/.test(result) && !/REACHED/.test(result) || result === "posted | not reached";
+  });
+  await row("verdict", function () {
+    var w = held ? 1000 : 999;
+    return post({ type: "shape", width: w, height: 600, rects: [[0, 0, w, 600]] }).then(function () { return held ? "every attempt failed" : "SOMETHING GOT THROUGH"; });
+  });
   // check.sh brings the window back with a second launch.
   await row("minimize in 2 s", function () { setTimeout(function () { post({ type: "minimize" }); }, 2000); return "sent later"; });
 })();
