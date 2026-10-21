@@ -130,10 +130,29 @@ test("mapping-image hit testing finds the element by colour", () => {
   assert.equal(mappedElement(map, 0, 0, [null, 0xff0000]), 1, "an unreadable colour matches nothing");
 });
 
-test("parseColor reads hex and the colour names skins use", () => {
+test("parseColor reads colours as WMP does", () => {
   assert.equal(parseColor("#FF00FF"), 0xff00ff);
-  assert.equal(parseColor("9aacdb"), 0x9aacdb);
+  assert.equal(parseColor("9aacdb"), null, "WMP rejects a bare RRGGBB");
+  assert.equal(parseColor("#ffff"), null);
   assert.equal(parseColor(" White "), 0xffffff);
+  // WMP's 140 names, Internet Explorer's list: lightgrey, but no grey.
+  assert.equal(parseColor("Chartreuse"), 0x7fff00);
+  assert.equal(parseColor("lightgoldenrodyellow"), 0xfafad2);
+  assert.equal(parseColor("yellowgreen"), 0x9acd32);
+  assert.equal(parseColor("lightgrey"), 0xd3d3d3);
+  assert.equal(parseColor("grey"), null);
+  assert.equal(parseColor("lightgray"), null);
+  // System colours, at Windows' defaults.
+  assert.equal(parseColor("Scrollbar"), 0xc8c8c8);
+  assert.equal(parseColor("buttonface"), 0xf0f0f0);
+  assert.equal(parseColor("threeddarkshadow"), 0x696969);
+  assert.equal(parseColor("windowtext"), 0x000000);
+  // auto: the top-left pixel of the image the colour applies to.
+  const img = image(2, 2, (x, y) => (x === 0 && y === 0 ? 0x123456 : 0xffffff));
+  assert.equal(parseColor("auto", img), 0x123456);
+  assert.equal(parseColor(" AUTO ", img), 0x123456);
+  assert.equal(parseColor("auto"), null, "no image");
+  assert.equal(parseColor("auto", image(0, 0, () => 0)), null, "empty image");
   assert.equal(parseColor("none"), null);
   assert.equal(parseColor("constructor"), null);
   assert.equal(parseColor(undefined), null);

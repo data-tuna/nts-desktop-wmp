@@ -135,9 +135,14 @@ class El {
     return this.props.has(name) || this.attr(name) !== undefined;
   }
 
-  /** A colour attribute, evaluated like any other (`jscript:NormalTextColor`). */
+  /** A colour attribute, evaluated like any other (`jscript:NormalTextColor`).
+   * `auto` reads the image it keys: the clippingImage for clippingColor,
+   * else the image or the backgroundImage. */
   color(name: string): number | null {
-    return parseColor(this.skin.str(this, name) || undefined);
+    const value = this.skin.str(this, name) || undefined;
+    if (value?.trim().toLowerCase() !== "auto") return parseColor(value);
+    const image = (name === "clippingcolor" && this.img("clippingimage")) || this.img("image") || this.img("backgroundimage");
+    return parseColor(value, image);
   }
 
   img(name: string): Img | undefined {
