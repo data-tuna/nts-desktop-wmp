@@ -717,12 +717,39 @@ test("the playlist lies over every image in the view, whatever its zIndex or pla
   assert.equal(sent.filter((m) => m.type === "drag").length, 0, "the press is on the list, not the body over it");
 });
 
-test("a boolean attribute that starts with false is false, whatever follows (The_Doobie_Brothers' playlist button)", () => {
+test("boolean attributes convert as WMP's do: true, false or a number; anything else keeps the default", () => {
   const { js } = load(`<theme><view width="10" height="10">
        <button id="b" sticky="true" down="false; jscript:pl.visible='true';"/>
-       <button id="c" down="true"/>
+       <button id="c" down="True"/>
+       <button id="d" visible="0" down="-1"/>
+       <button id="e" visible="yes" down="yes"/>
+       <button id="f" visible=" 1 "/>
      </view></theme>`);
-  assert.deepEqual(js("[b.down, c.down]"), [false, true]);
+  // The_Doobie_Brothers' playlist button: not a boolean, so down keeps its default.
+  assert.deepEqual(js("[b.down, c.down, d.visible, d.down, e.visible, e.down, f.visible]"), [false, true, false, true, true, false, true]);
+});
+
+test("scripts cannot read an attribute WMP's elements do not have", () => {
+  const { js } = load(`<theme><view width="10" height="10">
+       <button id="b" upToolTip="Play" scrolingDelay="5"/>
+     </view></theme>`);
+  assert.deepEqual(js("[b.upToolTip, b.scrolingDelay]"), ["Play", undefined]);
+});
+
+test("view.minWidth and minHeight read 0 when unset; resizable follows the title bar", () => {
+  const read = (attrs) => load(`<theme><view width="10" height="10" ${attrs}/></theme>`).js("[view.minWidth, view.minHeight, view.resizable]");
+  assert.deepEqual(read(""), [0, 0, true]);
+  assert.deepEqual(read(`titleBar="false" minWidth="255" minHeight="176"`), [255, 176, false]);
+  assert.deepEqual(read(`titleBar="false" resizable="true"`), [0, 0, true]);
+});
+
+test("network.downloadProgress reads 100, and a reconnect reads as buffering", () => {
+  const { js, set } = load(`<theme><view width="10" height="10">
+       <text id="dl" value="wmpprop:player.network.downloadProgress"/>
+     </view></theme>`);
+  assert.equal(js("dl.value"), "100");
+  set({ playState: "reconnecting" });
+  assert.deepEqual(js("[player.playState, psBuffering]"), [6, 6]);
 });
 
 test("a shown playlist is part of the window shape, even over a hole in a subview (TEDDY's list)", () => {

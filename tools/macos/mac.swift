@@ -8,7 +8,9 @@ let num = { (i: Int) in CGFloat(Double(args[i])!) }
 
 func window() -> (Int, CGRect)? {
   let list = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]] ?? []
-  for w in list where w[kCGWindowOwnerName as String] as? String == "nts-desktop-wmp" && w[kCGWindowLayer as String] as? Int == 0 {
+  // The bare binary, or the .app.
+  let names = ["nts-desktop-wmp", "NTS Radio Bootleg Media Player"]
+  for w in list where names.contains(w[kCGWindowOwnerName as String] as? String ?? "") && w[kCGWindowLayer as String] as? Int == 0 {
     if let b = w[kCGWindowBounds as String], let rect = CGRect(dictionaryRepresentation: b as! CFDictionary) {
       return (w[kCGWindowNumber as String] as! Int, rect)
     }

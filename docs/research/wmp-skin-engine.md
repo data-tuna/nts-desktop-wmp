@@ -32,8 +32,9 @@ and WMP 12 refuses third-party skins. Every finding is read from code.
 
 Ranked by how many working skins they touch, how sure we are, and how
 cheap the fix looks. The sections below have the evidence. Mika turns
-these into issues; ATA-215 fixed rows 1, 2 and 10, and "Ours" there says
-what the engine did before.
+these into issues; ATA-215 fixed rows 1, 2 and 10, ATA-216 row 3, ATA-217
+row 4 and ATA-218 rows 6–9 and 11. "Ours" there says what the engine did
+before.
 
 | # | Difference | WMP 7.1 | Ours | Skins | Confidence |
 |---|---|---|---|---|---|
@@ -42,12 +43,12 @@ what the engine did before.
 | 3 | Text scrolling defaults | `scrollingAmount` 6 px, `scrollingDelay` 85 ms (min 30), 25 px gap, scrolls even when the text fits, `scrollingDirection` left or right | 1 px, 100 ms (min 16), half-box gap, only when too wide, left only | 17 | high |
 | 4 | Colour values | `#RRGGBB` only; 140 named colours; `auto` = the image's top-left pixel; system colours; `none` | Also bare `RRGGBB`; 19 names; no `auto`, no system colours (fixed in ATA-217) | up to 55 | high |
 | 5 | `jscript:` attributes | Evaluated once, after the scripts run, in document order; never again | Re-evaluated after every change | all | high (WMP side); fix needs care, see 2c |
-| 6 | `network.downloadProgress` | A real member | Missing; the `wmpprop:` binding reads `undefined` | 15 | high |
-| 7 | Play state 11 | 7.1 has no `psReconnecting`; its states stop at 10 | Host reports 11 on reconnect | all that switch on play state | high |
-| 8 | Unknown attributes | Dropped with a warning; scripts cannot read them | Stored and readable from script | few | high |
-| 9 | Boolean values | OLE conversion: `0`/`false` false, `-1`/`true` true; anything else leaves the default | Anything not starting with "false" is true | few | medium |
+| 6 | `network.downloadProgress` | A real member | Missing; the `wmpprop:` binding reads `undefined` (fixed in ATA-218: 100) | 15 | high |
+| 7 | Play state 11 | 7.1 has no `psReconnecting`; its states stop at 10 | Host reports 11 on reconnect (fixed in ATA-218: 6) | all that switch on play state | high |
+| 8 | Unknown attributes | Dropped with a warning; scripts cannot read them | Stored and readable from script (fixed in ATA-218) | few | high |
+| 9 | Boolean values | OLE conversion: `0`/`false` false, `-1`/`true` true; anything else leaves the default | Anything not starting with "false" is true (fixed in ATA-218) | few | medium |
 | 10 | Slider foreground's far cap | Drawn when the foreground fills the track | Never drawn: the foreground is clipped at the thumb's middle, short of the cap (fixed in ATA-215) | tiled sliders with `borderSize` | high |
-| 11 | `view.minWidth`/`minHeight`, `resizable` default | Present; `resizable` defaults to whether the view has a title bar | Missing | 12 / 35 | high |
+| 11 | `view.minWidth`/`minHeight`, `resizable` default | Present; `resizable` defaults to whether the view has a title bar | Missing (fixed in ATA-218) | 12 / 35 | high |
 
 Not ranked: our `wmpenabled:`/`wmpdisabled:` accept only `player.controls.*`
 targets, where WMP accepts any property, but all 33 `works` skins that use
@@ -116,12 +117,15 @@ per-element defaults (only partly read).
 - Encoding: we hard-code Windows-1252 where WMP uses the system code page.
   That is the same on Western systems and better for us everywhere else,
   since a skin is not tied to the listener's locale. No change.
-- Unknown attributes: we keep them and let scripts read them; WMP drops
-  them. Harmless unless a skin relies on a failure, so low priority.
+- Unknown attributes: WMP drops them. Fixed in ATA-218: scripts read
+  only names that are members of WMP's skin elements (one list from
+  `wmp.dll`'s type library for all elements, so a little looser than
+  WMP). The engine still reads every attribute it draws from.
 - Booleans and numbers: WMP's setters use standard OLE conversion, so
   `"0"` is false, and a value such as `"yes"` or `"10px"` fails and leaves
-  the default. Our rule makes `"0"` true. Medium confidence: it assumes
-  the setters convert through the standard dispatch path.
+  the default. Medium confidence: it assumes the setters convert through
+  the standard dispatch path. Fixed in ATA-218: `true`/`false` or a
+  number (non-zero true); anything else keeps the default.
 - We accept leading spaces before `jscript:` and friends; WMP does not.
   Harmless.
 - A non-`<theme>` root: `parse()` falls back to the first element, but
@@ -378,10 +382,10 @@ analysis machine.
 - Our empty stand-in for every `RT_TEXT` id is right: the script only
   carries constants, and we put the same constants in the skin's scope.
 - We define `psReconnecting` (11) and `osOpeningUnknownURL` (21), which
-  the 7.1 script does not, and the host reports play state 11 when a
-  stream reconnects. A 2000–2002 skin has no name for 11: a `switch` on
-  the play state falls to its default branch. WMP 7.1 itself has no
-  reconnecting state (its type library stops at `wmppsReady`, 10).
+  the 7.1 script does not. WMP 7.1 itself has no reconnecting state (its
+  type library stops at `wmppsReady`, 10), so a 2000–2002 skin has no
+  name for 11. Fixed in ATA-218: skins see a reconnect as buffering (6);
+  the host keeps its own reconnecting state.
 
 ### The other `wmploc` resources skins use
 
@@ -411,7 +415,9 @@ analysis machine.
   (10). There is no shuffle-mode enum: `settings.getMode`/`setMode` take
   strings (`"shuffle"`, `"loop"`).
 - Members 7.1 has and we lack, by how many `works` skins use them (from
-  the survey; its member scan has some noise):
+  the survey; its member scan has some noise). ATA-218 added
+  `network.downloadProgress`, `view.minWidth`/`minHeight` and the
+  `resizable` default; the rest are still missing:
   - `network.downloadProgress` (15 skins, all through `wmpprop:`).
   - `view.minWidth`/`minHeight` (5), `maxWidth`/`maxHeight`, plus
     `titleBar`, `resizable`, `focusObjectID`, `maximize`, `restore`.
@@ -434,9 +440,10 @@ interface's members and each enum's values.
 
 **How we differ.** Our ps 0–10 and os 0–20 values match exactly. The
 extra 11 and 21 are covered above. The missing members read as
-`undefined` and are logged, which most skins survive; the ones worth
-adding are `network.downloadProgress` (a `wmpprop:` binding in 15 working
-skins that now reads `undefined`) and `view.minWidth`/`minHeight`.
+`undefined` and are logged, which most skins survive. Fixed in ATA-218:
+`network.downloadProgress` (a `wmpprop:` binding in 15 working skins)
+reads 100, `view.minWidth`/`minHeight` read 0 when unset, and
+`view.resizable` defaults to the view's `titleBar`.
 
 ## Still open
 

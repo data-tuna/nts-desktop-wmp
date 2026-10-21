@@ -4,6 +4,12 @@ on:
   pull_request:
   push:
     branches: [main]
+  workflow_dispatch:
+    inputs:
+      archive-skins:
+        description: Also shoot Classic, Headspace and 9SeriesDefault from archive.org (macOS)
+        type: boolean
+        default: false
 
 jobs:
   check:
@@ -30,3 +36,90 @@ jobs:
 
       - name: Rust formatting
         run: cargo fmt --manifest-path src-tauri/Cargo.toml --check
+
+  # The macOS runner is our only Mac (ATA-229): it checks the Rust side,
+  # builds an unsigned universal .dmg, then opens the app from it and shoots
+  # the window once it plays. Nothing here is notarised; the build's ad-hoc
+  # signature is all it has.
+  macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: rustup target add aarch64-apple-darwin x86_64-apple-darwin
+
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          workspaces: src-tauri
+
+      - run: npm ci
+
+      # The Rust side reads dist/ and dist-skin/ at compile time.
+      - run: npm run build
+
+      - name: Clippy
+        run: cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
+
+      - name: Rust tests
+        run: cargo test --manifest-path src-tauri/Cargo.toml
+
+      - name: Build the .dmg
+        run: npm run tauri build -- --target universal-apple-darwin
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: macos-dmg
+          path: src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg
+          retention-days: 7
+
+      - name: Mount the .dmg
+        run: hdiutil attach -nobrowse -mountpoint /tmp/dmg src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg
+
+      - name: Play and shoot, house skin
+        run: bash tools/mac-smoke.sh "/tmp/dmg/NTS Radio Bootleg Media Player.app" skins/house/house.wmz mac-smoke house
+
+      # Shape, click-through, drag, single instance, Cmd+H/Q/W, the
+      # remembered position, and the probe skin's escape attempts (ATA-230).
+      - name: Window checks
+        run: bash tools/macos/check.sh "/tmp/dmg/NTS Radio Bootleg Media Player.app/Contents/MacOS/nts-desktop-wmp" mac-smoke/check
+
+      # Manual runs only, so a PR run never downloads a skin. The cache keeps
+      # these three from being fetched twice.
+      - name: Archive skins
+        if: github.event_name == 'workflow_dispatch' && inputs.archive-skins
+        id: skins
+        uses: actions/cache@v6
+        with:
+          path: ci-skins
+          key: ci-skins-classic-headspace-9series
+
+      - name: Fetch archive skins
+        if: github.event_name == 'workflow_dispatch' && inputs.archive-skins && steps.skins.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p ci-skins
+          for s in Classic Headspace 9SeriesDefault; do
+            curl -fsSL --retry 2 -o ci-skins/$s.wmz "https://archive.org/download/windowsmediaplayerskinsarchive/microsoft/$s.wmz"
+            sleep 5
+          done
+
+      - name: Play and shoot, archive skins
+        if: github.event_name == 'workflow_dispatch' && inputs.archive-skins
+        # NTS_WMP_SKIN skips the app's md5 check, so check the cached files here.
+        run: |
+          for s in Classic Headspace 9SeriesDefault; do
+            want=$(node -p "require('./skins/compatible.json').find(k => k.path === 'microsoft/$s.wmz').md5")
+            [ "$(md5 -q ci-skins/$s.wmz)" = "$want" ] || { echo "::error::ci-skins/$s.wmz does not match compatible.json"; exit 1; }
+            bash tools/mac-smoke.sh "/tmp/dmg/NTS Radio Bootleg Media Player.app" ci-skins/$s.wmz mac-smoke $s || exit 1
+          done
+
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: macos-smoke
+          path: mac-smoke/
+          retention-days: 7

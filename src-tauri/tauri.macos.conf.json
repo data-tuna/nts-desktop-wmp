@@ -14,5 +14,8 @@
         "transparent": true
       }
     ]
+  },
+  "bundle": {
+    "targets": ["dmg"]
   }
 }

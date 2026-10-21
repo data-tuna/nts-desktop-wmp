@@ -20,9 +20,10 @@ export const CONSTANTS: Record<string, number> = Object.fromEntries([
 export const OS_MEDIA_CHANGING = 8;
 export const OS_MEDIA_OPEN = 13;
 
-/** WMP's play state for the host's. */
+/** WMP's play state for the host's. A reconnect reads as buffering: WMP 7.1
+ * has no psReconnecting, so the 2000–2002 skins have no name for 11 (ATA-218). */
 export function playState(p: State["playState"]): number {
-  return { stopped: 1, paused: 2, playing: 3, buffering: 6, reconnecting: 11 }[p];
+  return { stopped: 1, paused: 2, playing: 3, buffering: 6, reconnecting: 6 }[p];
 }
 
 /** What the runtime needs from the engine. */
@@ -150,6 +151,8 @@ export function objects(host: Host) {
   }, log);
   const network = {
     bufferingprogress: 100,
+    // A live stream has nothing left to download.
+    downloadprogress: 100,
     bitrate: 256000,
     maxbitrate: 256000,
     receptionquality: 100,

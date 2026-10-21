@@ -9,8 +9,8 @@ the evidence.
 ### macOS: the skin's shape, drag, menu bar and app menu (ATA-230, 2026-10-21)
 
 Checked on the `macos-latest` GitHub runner with `tools/macos/check.sh`,
-which builds the app, clicks, drags and types with synthetic events, and
-screenshots. There is no real Mac yet (ATA-234). Windows is unchanged:
+which CI runs on the .dmg's app after the smoke test (ATA-229): it clicks,
+drags and types with synthetic events, and screenshots. There is no real Mac yet (ATA-234). Windows is unchanged:
 every macOS path is behind `cfg(target_os = "macos")` or
 `tauri.macos.conf.json`.
 
@@ -74,6 +74,44 @@ every macOS path is behind `cfg(target_os = "macos")` or
   the app's own page, and `window.open` returned null. `/msg` took the
   shape (204) and refused an unknown field (400); the trusted page's
   `state` messages kept arriving.
+### Object-model gaps: downloadProgress, play state 11, attributes, booleans, view sizes (ATA-218, 2026-10-21)
+
+Rows 6, 7, 8, 9 and 11 of the ranked table in
+`docs/research/wmp-skin-engine.md`.
+
+- **`network.downloadProgress` reads 100.** A live stream has nothing
+  left to download, and `bufferingProgress` already reads 100. 15 `works`
+  skins bind it with `wmpprop:`; it read `undefined` before.
+- **A reconnect reads as buffering (6).** WMP 7.1 has no
+  `psReconnecting`, so a 2000–2002 skin has no name for 11 and showed
+  nothing during a reconnect. The host keeps its own `reconnecting`
+  state, and `player.status` still says "Reconnecting". `psReconnecting`
+  stays defined for later skins that name it.
+- **Scripts can't read an attribute WMP doesn't know.** We checked
+  the skins first: the 59 `works` skins read 43 different attribute
+  names from script (109 tag and name pairs), and every one is a WMP
+  member or a handler. The 22 other attribute names they write that WMP
+  doesn't know are typos (`scrolingDelay`, `backgoundColor`) or names no
+  version has (`editButtonsVisible`, `enable`), and no script reads them.
+  `scriptFile` is the 23rd; the engine reads it by name, as WMP does. The known names are the members of WMP's skin
+  element interfaces in `wmp.dll`'s type library (WMP 12, a superset of
+  7.1's), one list for all elements where WMP has one per element. The
+  engine itself still reads every attribute it draws from.
+- **Booleans convert as OLE does:** `true` or `false` in any case, or a
+  number, non-zero being true; anything else keeps the default. `"0"` was
+  true before. The issue said only `-1` is true, but OLE takes any
+  non-zero number, and Cablemusic writes `visible="1"`.
+  The_Doobie_Brothers' `down="false; jscript:…"` is not a boolean, so it
+  keeps the default, which is false.
+- **`view.minWidth` and `minHeight`** read 0 when unset (12 `works`
+  skins set them). **`view.resizable`** defaults to the view's
+  `titleBar`, which defaults to true. Nothing resizes the window by hand
+  yet, so these only answer scripts.
+- **Checked** on Classic and 9SeriesDefault in headless Edge, against
+  `main`: the same pixels apart from the clock, and the
+  `downloadProgress` and `resizable` "not supported" warnings are gone.
+- `tools/compat.mjs` afterwards: works 59, partial 97, broken 60, as
+  before, with no skin changing status.
 
 ### Colour values like WMP: 140 names, auto, system colours (ATA-217, 2026-10-21)
 
@@ -313,7 +351,8 @@ screenshots are on ATA-198.
   that way. `playlist.setColumnWidth` now
   does nothing instead of throwing, which stopped TwinBlade's drawer
   script. A boolean that starts with `false` is false:
-  The_Doobie_Brothers' button has `down="false; jscript:…"`.
+  The_Doobie_Brothers' button has `down="false; jscript:…"`. (ATA-218
+  replaced this rule with WMP's conversion.)
 - **Not fixed here.** 47 of the 136 listed skins with a playlist have it
   only in a view the engine never opens; view switching is Mika's call.
   The rest are in `AGENTS.md`, Known gaps.
@@ -1019,6 +1058,50 @@ full 25 times a second for its title. RAM, playing, on the merged build:
 290–310 MB private (560–610 MB working set, which counts shared pages more
 than once), against 280 MB (540 MB) for the Winamp app.
 
+### macOS: CI builds the .dmg and shoots the app (ATA-229, 2026-10-21)
+
+We have no Mac, so the `macos` job in `ci.yml` is ours. It runs on every PR
+and on `main`.
+
+- **Universal, unsigned.** `tauri build --target universal-apple-darwin`
+  builds both architectures and joins them: one `.dmg` that runs on Apple
+  silicon and Intel. It carries only the ad-hoc signature the build applies;
+  no Developer ID, no notarisation (those wait for Ata). Its bundle settings
+  are in `src-tauri/tauri.macos.conf.json`, which Tauri merges on macOS
+  only, so the Windows NSIS build is unchanged. The `.dmg` is a workflow
+  artifact kept 7 days.
+- **Playing means a held connection, as on Windows.** `tools/mac-smoke.sh`
+  mounts the `.dmg`, starts the app from it with `NTS_WMP_SKIN`, and waits
+  for a connection to a radiomast audio edge that stays up for 15 s
+  (`netstat`, which sees WebKit's networking process too). A `skin.json`
+  naming no listed skin keeps the app from downloading one. Then
+  `screencapture` shoots the window and the whole screen. Nobody hears it:
+  that needs a real Mac.
+- **What the runner showed on `main` (run 39682749731).** All four skins
+  (Bootleg House, Classic, Headspace, 9SeriesDefault) opened, played NTS 1
+  and showed its title and clock. On a 1024x768 screen at scale 1:
+  - **No window shape and no transparency.** The window is the skin's
+    bounding rectangle, filled white where the skin is cut away: the shape
+    is set only by `win32::apply`. 9SeriesDefault draws at the right of a
+    mostly white window.
+  - **Big skins go off screen.** The window opens centred at its configured
+    234x201, then grows right and down to the skin's size: Headspace
+    (760x394) and 9SeriesDefault (859x468) cross the right edge and run
+    under the Dock. `pull_on_screen` did not move them back.
+  - **Fonts** drew with no missing glyphs; the house skin asks for Tahoma.
+    Not compared pixel by pixel with Windows.
+  - **The playlist** (house skin) lists NTS 1 and NTS 2 with the playing
+    row highlighted, and a scroll bar. Long names are cut at the box's edge.
+  - **The visualiser** shows Album Art, the default effect, with the show's
+    picture in all three skins that have one. Bars, scope, ambience and
+    Milkdrop were not switched to: the runner has no DevTools into WebKit.
+  - **The menu bar** shows Tauri's default menu (File, Edit, View, Window,
+    Help) and the tray icon; the app also has a Dock icon.
+  - Each run held two connections to edges at once. Why is not known yet.
+- **Not seen on the runner:** dragging, clicks, media keys, sound, Retina
+  scale, and the updater (a local build has no endpoint and says so).
+  ATA-230 and ATA-232 work from the list above.
+
 ## Skins
 
 ### The playlist like WMP's: scroll bar, colours, long names (ATA-191, 2026-10-19)
@@ -1486,7 +1569,7 @@ what the 7 ATA-103 skins call; no code from Webamp Modern.
   DVD, no library, no scanning, no presets. Unknown members are logged once
   and read as undefined.
 - **Play and open states.** `playing` is psPlaying, `buffering` psBuffering,
-  `reconnecting` psReconnecting, `paused` psPaused, `stopped` psStopped. The
+  `reconnecting` psBuffering (psReconnecting until ATA-218), `paused` psPaused, `stopped` psStopped. The
   open state is osMediaOpen once the host names a channel; a channel switch
   passes through osMediaChanging. `<player>` fires its `*_onchange` and
   `playStateChange(NewState)`/`openStateChange(NewState)` handlers, open
