@@ -4,7 +4,8 @@
 
 import type { Pick as NtsPick } from "./picks.ts";
 
-/** A playlist row. A pick plays through `Widget`, everything else through the <audio> element. */
+/** A playlist row. A pick plays through `Widget`, everything else through
+ * the <audio> element. A section's header row has no url and never plays. */
 export type Item = { title: string; url: string; pick?: boolean; artwork?: string };
 
 /** What plays a pick (main.ts: SoundCloud's widget). It reports a finish or an error to the caller itself. */
@@ -32,10 +33,13 @@ export const CHANNELS: Item[] = [
 ];
 
 /** The playlist: the channels, the picks (newest first, as the API gives
- * them), then the mixtapes (ATA-197). A pick's title is the episode's. */
+ * them), then the mixtapes (ATA-197). A pick's title is the episode's. Each
+ * section after the channels starts with a header row (ATA-208). */
 export const playlist = (picks: NtsPick[], mixtapes: Item[]): Item[] => [
   ...CHANNELS,
+  ...(picks.length ? [{ title: "— NTS Picks —", url: "" }] : []),
   ...picks.map(({ title, url }) => ({ title, url, pick: true })),
+  ...(mixtapes.length ? [{ title: "— Infinite Mixtapes —", url: "" }] : []),
   ...mixtapes,
 ];
 
@@ -172,9 +176,13 @@ export function createPlayer(audio: Media, items: Item[] = [...CHANNELS], widget
     load();
   };
 
-  /** Item `i`, wrapping around; it plays if the player was playing. */
-  const select = (i: number) => {
-    const next = (((Math.trunc(i) || 0) % items.length) + items.length) % items.length;
+  /** Item `i`, wrapping around; it plays if the player was playing. A header
+   * row is passed over in the direction `by`, or ignored when `by` is 0 (a click). */
+  const select = (i: number, by = 0) => {
+    const wrap = (n: number) => (((Math.trunc(n) || 0) % items.length) + items.length) % items.length;
+    let next = wrap(i);
+    if (!items[next].url && !by) return;
+    while (!items[next].url) next = wrap(next + by);
     // The current item again (a double click on its row): leave it playing.
     if (next === channel && mode === "playing" && timer === undefined) return;
     channel = next;
@@ -200,8 +208,8 @@ export function createPlayer(audio: Media, items: Item[] = [...CHANNELS], widget
       widget?.stop();
     },
     /** Next (1) or previous (-1) item, wrapping around. */
-    step: (by: number) => select(channel + by),
-    select,
+    step: (by: number) => select(channel + by, Math.sign(by)),
+    select: (i: number) => select(i),
     /** Only a pick can seek; a live stream has nowhere to go. */
     seek(seconds: number) {
       if (loaded()) widget?.seek(seconds);

@@ -129,6 +129,10 @@ cache); with none picked, every launch wears a random working skin.
 
 **The playlist is NTS 1, NTS 2, the picks, then the mixtapes** (ATA-197).
 `playlist()` in `player.ts` builds it; everything else indexes that list.
+The picks and the mixtapes each start with a header row, an item with no
+url (ATA-208). It never plays: Next and Previous pass over it, and a click
+on it does nothing. A pick's title puts its tags first:
+`<genres and moods> · <name> - <location>`.
 
 **No SoundCloud credit or name.** Ata dropped the credit SoundCloud's terms
 ask for and accepts the risk (ATA-197, 2026-10-20). A pick's title is the

@@ -242,7 +242,7 @@ setInterval(() => {
   updateOverlay(now.channel);
   void updateArt(now.channel);
   updateTray(shown.title, now.channel);
-  const state = { type: "state", ...now, ...shown, items: items.map((_, i) => info(i).title), ...settings, level: level(), covered };
+  const state = { type: "state", ...now, ...shown, items: items.map((_, i) => info(i).title), headers: items.flatMap((item, i) => (item.url ? [] : [i])), ...settings, level: level(), covered };
   void invoke("skin_send", { msg: state }).catch(() => {});
   startVis();
 }, 250);

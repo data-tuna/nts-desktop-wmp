@@ -28,6 +28,8 @@ export type State = {
   link: string;
   /** The playlist's titles; `channel` is the current one's index. */
   items: string[];
+  /** The playlist's header rows, which never play (ATA-208). */
+  headers?: number[];
   time: number;
   duration: number;
   volume: number;
@@ -1777,7 +1779,7 @@ export class Skin {
   /** A click on a playlist row selects that item, playing it if the player was playing. */
   private pick(list: El, ev: MouseEvent) {
     const i = list.rowAt(this.point(ev)[1] - list.origin()[1]);
-    if (i < 0) return;
+    if (i < 0 || this.state.headers?.includes(i)) return;
     this.send({ type: "select", index: i });
     // A double click opens a pick only if its row was already the current pick
     // at the first press: one that starts it should not open its page as well.
