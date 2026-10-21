@@ -6,6 +6,34 @@ the evidence.
 
 ## Stack
 
+### Colour values like WMP: 140 names, auto, system colours (ATA-217, 2026-10-21)
+
+Row 4 of the ranked table in `docs/research/wmp-skin-engine.md`.
+
+- **Bare `RRGGBB` is rejected,** as in WMP. Only `#RRGGBB` reads as hex.
+  Of the 216 listed skins, one writes a bare value: PastAndBeyond
+  (`partial`), as `backgroundColor="FF0000"` on subviews that also have
+  a background image. No `works` skin does, so nothing relied on us
+  accepting it.
+- **Names:** the 140 WMP knows, which is Internet Explorer's list:
+  `lightgrey` but not `lightgray`, and no `grey` spellings. The names
+  were checked against wmp.dll's table and the values against Edge. We
+  dropped `grey`, which no listed skin uses. Skins that now get a colour
+  they didn't before: 8 with `pink`, and one each with `brown`
+  (sankofa skin, `works`), `chartreuse` and `lightblue`.
+- **System colours:** the 28 CSS 2 names WMP resolves with
+  `GetSysColor`, fixed at the Windows 10 and 11 defaults. A fixed value
+  keys the same on every machine; a live one would follow the user's
+  theme, which skins drawn in 2001 did not expect. Only digitaldj
+  (`broken`) uses one (`scrollbar`).
+- **`auto`** is the top-left pixel of the image the colour keys: the
+  `clippingImage` for `clippingColor`, else the `image`, else the
+  `backgroundImage`. Used by compact, Compact, Plus! Plasma Ball and
+  digitaldj, all `partial` or `broken` for other reasons.
+- **`none`** stays null.
+- `tools/compat.mjs` afterwards: works 59, partial 97, broken 60, as
+  before, with no skin changing status.
+
 ### Scrolling text like WMP 7.1: 6 px every 85 ms, a 25 px gap (ATA-216, 2026-10-21)
 
 Row 3 of the ranked table in `docs/research/wmp-skin-engine.md`.

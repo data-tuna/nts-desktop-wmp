@@ -40,7 +40,7 @@ what the engine did before.
 | 1 | Slider thumb position | Thumb centre on the value edge; track not shortened by the thumb; thumb aligned to the track's top (or left), not centred | Track shortened by the thumb; thumb centred across (fixed in ATA-215) | 51 | high |
 | 2 | Slider images are always tiled | The middle of a slider image is always repeated, never stretched | Stretched unless `tiled="true"` (fixed in ATA-215; `tiled="false"` still stretches) | 51 (33 without `tiled`) | medium |
 | 3 | Text scrolling defaults | `scrollingAmount` 6 px, `scrollingDelay` 85 ms (min 30), 25 px gap, scrolls even when the text fits, `scrollingDirection` left or right | 1 px, 100 ms (min 16), half-box gap, only when too wide, left only | 17 | high |
-| 4 | Colour values | `#RRGGBB` only; 140 named colours; `auto` = the image's top-left pixel; system colours; `none` | Also bare `RRGGBB`; 19 names; no `auto`, no system colours | up to 55 | high |
+| 4 | Colour values | `#RRGGBB` only; 140 named colours; `auto` = the image's top-left pixel; system colours; `none` | Also bare `RRGGBB`; 19 names; no `auto`, no system colours (fixed in ATA-217) | up to 55 | high |
 | 5 | `jscript:` attributes | Evaluated once, after the scripts run, in document order; never again | Re-evaluated after every change | all | high (WMP side); fix needs care, see 2c |
 | 6 | `network.downloadProgress` | A real member | Missing; the `wmpprop:` binding reads `undefined` | 15 | high |
 | 7 | Play state 11 | 7.1 has no `psReconnecting`; its states stop at 10 | Host reports 11 on reconnect | all that switch on play state | high |
@@ -248,10 +248,8 @@ we handle. No change needed.
 
 **How we differ.**
 - Exact matching, no tolerance and no special colours: as ours.
-- Colours: we also accept bare `RRGGBB` (WMP leaves the attribute at its
-  default), know only 19 names, and have neither `auto` nor the system
-  colours. A skin that writes `transparencyColor="auto"` or a CSS name
-  outside our 19 gets no keying from us.
+- Colours: as WMP since ATA-217. The 28 system colours are fixed at
+  Windows' defaults rather than read from the machine.
 - 8-bit BMPs: we decode to RGB first, so a key colour that is not in the
   palette never matches either. Same result.
 
