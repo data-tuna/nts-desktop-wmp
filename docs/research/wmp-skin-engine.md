@@ -117,12 +117,15 @@ per-element defaults (only partly read).
 - Encoding: we hard-code Windows-1252 where WMP uses the system code page.
   That is the same on Western systems and better for us everywhere else,
   since a skin is not tied to the listener's locale. No change.
-- Unknown attributes: we keep them and let scripts read them; WMP drops
-  them. Harmless unless a skin relies on a failure, so low priority.
+- Unknown attributes: WMP drops them. Fixed in ATA-218: scripts read
+  only names that are members of WMP's skin elements (one list from
+  `wmp.dll`'s type library for all elements, so a little looser than
+  WMP). The engine still reads every attribute it draws from.
 - Booleans and numbers: WMP's setters use standard OLE conversion, so
   `"0"` is false, and a value such as `"yes"` or `"10px"` fails and leaves
-  the default. Our rule makes `"0"` true. Medium confidence: it assumes
-  the setters convert through the standard dispatch path.
+  the default. Medium confidence: it assumes the setters convert through
+  the standard dispatch path. Fixed in ATA-218: `true`/`false` or a
+  number (non-zero true); anything else keeps the default.
 - We accept leading spaces before `jscript:` and friends; WMP does not.
   Harmless.
 - A non-`<theme>` root: `parse()` falls back to the first element, but
@@ -379,10 +382,10 @@ analysis machine.
 - Our empty stand-in for every `RT_TEXT` id is right: the script only
   carries constants, and we put the same constants in the skin's scope.
 - We define `psReconnecting` (11) and `osOpeningUnknownURL` (21), which
-  the 7.1 script does not, and the host reports play state 11 when a
-  stream reconnects. A 2000–2002 skin has no name for 11: a `switch` on
-  the play state falls to its default branch. WMP 7.1 itself has no
-  reconnecting state (its type library stops at `wmppsReady`, 10).
+  the 7.1 script does not. WMP 7.1 itself has no reconnecting state (its
+  type library stops at `wmppsReady`, 10), so a 2000–2002 skin has no
+  name for 11. Fixed in ATA-218: skins see a reconnect as buffering (6);
+  the host keeps its own reconnecting state.
 
 ### The other `wmploc` resources skins use
 
@@ -411,7 +414,7 @@ analysis machine.
 - `WMPPlaylistChangeEventType` runs from `wmplcUnknown` (0) to `wmplcLast`
   (10). There is no shuffle-mode enum: `settings.getMode`/`setMode` take
   strings (`"shuffle"`, `"loop"`).
-- Members 7.1 has and we lack, by how many `works` skins use them (from
+- Members 7.1 has and we lacked before ATA-218, by how many `works` skins use them (from
   the survey; its member scan has some noise):
   - `network.downloadProgress` (15 skins, all through `wmpprop:`).
   - `view.minWidth`/`minHeight` (5), `maxWidth`/`maxHeight`, plus
@@ -435,9 +438,10 @@ interface's members and each enum's values.
 
 **How we differ.** Our ps 0–10 and os 0–20 values match exactly. The
 extra 11 and 21 are covered above. The missing members read as
-`undefined` and are logged, which most skins survive; the ones worth
-adding are `network.downloadProgress` (a `wmpprop:` binding in 15 working
-skins that now reads `undefined`) and `view.minWidth`/`minHeight`.
+`undefined` and are logged, which most skins survive. Fixed in ATA-218:
+`network.downloadProgress` (a `wmpprop:` binding in 15 working skins)
+reads 100, `view.minWidth`/`minHeight` read 0 when unset, and
+`view.resizable` defaults to the view's `titleBar`.
 
 ## Still open
 
