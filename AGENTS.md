@@ -88,8 +88,10 @@ Written in English.
     npm run build:house   Rebuild skins/house/house.wmz from its sources
     node tools/compat.mjs Rebuild skins/compatible.json (downloads the item once; slow)
     npm test              node --test on tests/ (Node 22.18+ runs the .ts imports)
-    npm run check         lint + typecheck + build + test; CI runs this plus cargo fmt
-    npm run tauri build   Release binary and the NSIS installer (slow, minutes)
+    npm run check         lint + typecheck + build + test; CI runs this plus cargo fmt,
+                          and clippy, cargo test and the .dmg on macOS
+    npm run tauri build   Release binary and the NSIS installer, or the .dmg
+                          on a Mac (tauri.macos.conf.json; slow, minutes)
 
     cargo fmt --manifest-path src-tauri/Cargo.toml --check
 

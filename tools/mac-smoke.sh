@@ -2,7 +2,7 @@
 # Usage: mac-smoke.sh <App.app> <skin.wmz> <out dir> <name>
 # The macOS runner's version of install-check.ps1 (ATA-229): starts the app
 # wearing <skin.wmz>, waits until it plays, and shoots the window and the
-# screen into <out dir>/<name>-*.png. "Playing" is one connection to a
+# screen into <out dir>/<name>-*.png. "Playing" is a connection to a
 # radiomast audio edge held for 15 s, as on Windows. The app's own skin
 # download is switched off with a skin.json naming a skin not on the list,
 # so the run fetches nothing from archive.org.
@@ -59,7 +59,7 @@ while [ $SECONDS -lt $deadline ]; do
   sleep 15
   stream | grep -qF "$first" || continue
   shoot 2
-  echo "$name: playing, one connection ($first) for 15 s"
+  echo "$name: playing, $(stream | wc -l | tr -d ' ') edge connection(s); $first held 15 s"
   exit 0
 done
 shoot fail

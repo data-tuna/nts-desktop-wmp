@@ -104,7 +104,13 @@ jobs:
 
       - name: Play and shoot, archive skins
         if: github.event_name == 'workflow_dispatch' && inputs.archive-skins
-        run: for s in Classic Headspace 9SeriesDefault; do bash tools/mac-smoke.sh "/tmp/dmg/NTS Radio Bootleg Media Player.app" ci-skins/$s.wmz mac-smoke $s || exit 1; done
+        # NTS_WMP_SKIN skips the app's md5 check, so check the cached files here.
+        run: |
+          for s in Classic Headspace 9SeriesDefault; do
+            want=$(node -p "require('./skins/compatible.json').find(k => k.path === 'microsoft/$s.wmz').md5")
+            [ "$(md5 -q ci-skins/$s.wmz)" = "$want" ] || { echo "::error::ci-skins/$s.wmz does not match compatible.json"; exit 1; }
+            bash tools/mac-smoke.sh "/tmp/dmg/NTS Radio Bootleg Media Player.app" ci-skins/$s.wmz mac-smoke $s || exit 1
+          done
 
       - uses: actions/upload-artifact@v7
         if: always()
