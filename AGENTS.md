@@ -72,8 +72,10 @@ Written in English.
                           skin engine behaves (wmp-skin-engine.md, ATA-212).
     tests/                `node --test` tests and their fixtures.
     tools/                DevTools and window probes; see Observing the app.
-    .github/workflows/    ci.yml checks every PR on windows-latest; release.yml
-                          publishes a v* tag and installs it on a fresh runner.
+    .github/workflows/    ci.yml checks every PR on windows-latest, and builds
+                          and smoke-tests a macOS .dmg on macos-latest;
+                          release.yml publishes a v* tag and installs it on
+                          a fresh runner.
 
 ## Commands
 
@@ -328,6 +330,7 @@ hidden desktop (a debug build needs `npx vite` running for its pages):
     powershell -File tools/ram.ps1 nts-desktop-wmp
     powershell -File tools/cpu.ps1 nts-desktop-wmp 30   % of one core, whole tree
     powershell -File tools/install-check.ps1 <setup.exe>  Installs for real; see below
+    bash tools/mac-smoke.sh <App.app> <skin.wmz> <dir> <name>   macOS CI only: plays, shoots
     node tools/proxy.mjs 8899                    A CONNECT proxy you can cut; see below
 
 A debug build reads `dist-skin/engine.js` each time the skin page loads, so
@@ -426,8 +429,17 @@ cache: about 0.3 s. No thumbnails are saved.
 **The icon is the Winamp app's.** Both apps look the same in the taskbar
 until this one gets its own.
 
-**PR CI does not build the Rust side.** It runs typecheck, lint, the frontend
-build, the tests and `cargo fmt --check`.
+**PR CI builds the Rust side on macOS only.** The Windows job runs
+typecheck, lint, the frontend build, the tests and `cargo fmt --check`. The
+macOS job (ATA-229) runs clippy and `cargo test`, builds an unsigned
+universal `.dmg`, then opens the app from it with the house skin and
+uploads the `.dmg` and window shots once it plays (`tools/mac-smoke.sh`). A
+manual run (Actions > CI > Run workflow, "archive-skins") also shoots
+Classic, Headspace and 9SeriesDefault, fetched from archive.org once and
+kept by `actions/cache`; PR runs fetch no skins. The runner's clippy is
+newer than a local one may be, so a lint can fail there first.
+The runner is the only Mac: what it shows is in `docs/decisions.md`
+(ATA-229).
 
 **A visualisation costs about 10–25 points of a core** (ATA-116, ATA-122).
 With one showing, the app uses about

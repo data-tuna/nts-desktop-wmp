@@ -950,6 +950,50 @@ full 25 times a second for its title. RAM, playing, on the merged build:
 290–310 MB private (560–610 MB working set, which counts shared pages more
 than once), against 280 MB (540 MB) for the Winamp app.
 
+### macOS: CI builds the .dmg and shoots the app (ATA-229, 2026-10-21)
+
+We have no Mac, so the `macos` job in `ci.yml` is ours. It runs on every PR
+and on `main`.
+
+- **Universal, unsigned.** `tauri build --target universal-apple-darwin`
+  builds both architectures and joins them: one `.dmg` that runs on Apple
+  silicon and Intel. It carries only the ad-hoc signature the build applies;
+  no Developer ID, no notarisation (those wait for Ata). Its bundle settings
+  are in `src-tauri/tauri.macos.conf.json`, which Tauri merges on macOS
+  only, so the Windows NSIS build is unchanged. The `.dmg` is a workflow
+  artifact kept 7 days.
+- **Playing means a held connection, as on Windows.** `tools/mac-smoke.sh`
+  mounts the `.dmg`, starts the app from it with `NTS_WMP_SKIN`, and waits
+  for a connection to a radiomast audio edge that stays up for 15 s
+  (`netstat`, which sees WebKit's networking process too). A `skin.json`
+  naming no listed skin keeps the app from downloading one. Then
+  `screencapture` shoots the window and the whole screen. Nobody hears it:
+  that needs a real Mac.
+- **What the runner showed on `main` (run 39682749731).** All four skins
+  (Bootleg House, Classic, Headspace, 9SeriesDefault) opened, played NTS 1
+  and showed its title and clock. On a 1024x768 screen at scale 1:
+  - **No window shape and no transparency.** The window is the skin's
+    bounding rectangle, filled white where the skin is cut away: the shape
+    is set only by `win32::apply`. 9SeriesDefault draws at the right of a
+    mostly white window.
+  - **Big skins go off screen.** The window opens centred at its configured
+    234x201, then grows right and down to the skin's size: Headspace
+    (760x394) and 9SeriesDefault (859x468) cross the right edge and run
+    under the Dock. `pull_on_screen` did not move them back.
+  - **Fonts** drew with no missing glyphs; the house skin asks for Tahoma.
+    Not compared pixel by pixel with Windows.
+  - **The playlist** (house skin) lists NTS 1 and NTS 2 with the playing
+    row highlighted, and a scroll bar. Long names are cut at the box's edge.
+  - **The visualiser** shows Album Art, the default effect, with the show's
+    picture in all three skins that have one. Bars, scope, ambience and
+    Milkdrop were not switched to: the runner has no DevTools into WebKit.
+  - **The menu bar** shows Tauri's default menu (File, Edit, View, Window,
+    Help) and the tray icon; the app also has a Dock icon.
+  - Each run held two connections to edges at once; WebKit's, not explained yet.
+- **Not seen on the runner:** dragging, clicks, media keys, sound, Retina
+  scale, and the updater (a local build has no endpoint and says so).
+  ATA-230 and ATA-232 work from the list above.
+
 ## Skins
 
 ### The playlist like WMP's: scroll bar, colours, long names (ATA-191, 2026-10-19)
