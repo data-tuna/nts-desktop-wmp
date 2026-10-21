@@ -240,6 +240,8 @@ fn skin_file() -> Response<Vec<u8>> {
 #[derive(serde::Serialize)]
 struct SkinList {
     skins: Vec<PickerSkin>,
+    /// The local library's skins (ATA-220); empty outside a checkout.
+    local: Vec<PickerSkin>,
     /// The skin picked to wear on every launch; none for a random one.
     choice: Option<String>,
     /// The skin on the window now; none for the house skin.
@@ -257,7 +259,7 @@ struct PickerSkin {
     cached: bool,
 }
 
-/// The picker's list: every skin marked as working.
+/// The picker's lists: every skin marked as working, and the local library.
 #[tauri::command]
 fn list_skins(app: AppHandle) -> SkinList {
     let (worn, fetching) = skins::status();
@@ -268,6 +270,15 @@ fn list_skins(app: AppHandle) -> SkinList {
                 page: skins::page(s).into(),
                 size: s.size,
                 cached: skins::is_cached(&app, s),
+            })
+            .collect(),
+        local: skins::local()
+            .iter()
+            .map(|s| PickerSkin {
+                path: s.path.clone(),
+                page: String::new(),
+                size: s.size,
+                cached: true,
             })
             .collect(),
         choice: skins::choice(&app),

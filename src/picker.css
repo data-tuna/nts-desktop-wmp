@@ -3,19 +3,20 @@ body { margin: 0; display: flex; flex-direction: column; height: 100vh; }
 header, footer { padding: 10px 12px; }
 header { border-bottom: 1px solid #8884; }
 footer { border-top: 1px solid #8884; font-size: 12px; opacity: 0.85; }
+#source { float: right; font: inherit; }
 #status { margin: 4px 0 0; min-height: 1.4em; opacity: 0.8; }
 main { flex: 1; display: flex; min-height: 0; }
-#skins { flex: 1; overflow-y: auto; margin: 0; padding: 4px 0; list-style: none; }
+.list { flex: 1; overflow-y: auto; margin: 0; padding: 4px 0; list-style: none; }
 aside { width: 320px; display: flex; flex-direction: column; gap: 8px; padding: 12px; border-left: 1px solid #8884; }
 /* The preview webview sits over this pane; the colour matches its background (lib.rs). */
 #preview { flex: 1; display: grid; place-items: center; padding: 8px; text-align: center; background: #3a3a3a; color: #ddd; }
 #use { align-self: flex-end; font: inherit; padding: 4px 12px; }
-#skins li { display: flex; align-items: center; gap: 8px; padding: 0 12px; }
-#skins li[aria-current="true"] { background: #e8a33d33; }
-#skins li.selected { outline: 1px solid #e8a33d; outline-offset: -1px; }
-#skins button { flex: 1; text-align: left; background: none; border: 0; padding: 6px 0; font: inherit; color: inherit; cursor: pointer; transition: transform 120ms ease-out; }
-#skins button:active { transform: scale(0.98); }
-#skins button:disabled { cursor: progress; }
+.list li { display: flex; align-items: center; gap: 8px; padding: 0 12px; }
+.list li[aria-current="true"] { background: #e8a33d33; }
+.list li.selected { outline: 1px solid #e8a33d; outline-offset: -1px; }
+.list button { flex: 1; text-align: left; background: none; border: 0; padding: 6px 0; font: inherit; color: inherit; cursor: pointer; transition: transform 120ms ease-out; }
+.list button:active { transform: scale(0.98); }
+.list button:disabled { cursor: progress; }
 .from, .size { font-size: 11px; opacity: 0.65; }
 .chosen::after { content: " (kept)"; font-size: 11px; opacity: 0.65; }
 a { color: inherit; }
