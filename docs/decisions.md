@@ -1454,6 +1454,17 @@ against the 7 ATA-103 skins; no code from Webamp Modern.
 
 ## Research
 
+### WMP 7.1's own skin engine, read with REA (ATA-212, 2026-10-21)
+
+Static analysis of WMP 7.1's `wmpui.dll`, `wmploc.DLL` and type libraries
+checked the engine's guesses against what WMP does. The findings, the
+evidence and a ranked list of differences are in
+`docs/research/wmp-skin-engine.md`. The engine is unchanged by it; each
+difference worth fixing becomes an issue of its own. Two earlier choices
+are confirmed: ATA-192's slider end caps (with one refinement for the
+foreground's far cap) and ATA-110's empty `RT_TEXT/#132` stand-in, since
+WMP's shared script holds only the `ps*`/`os*` constants.
+
 ### WMP skins through Webamp Modern's engine (ATA-103, 2026-10-10)
 
 The spike ran Webamp Modern's experimental WMP engine on 7 real skins

@@ -66,6 +66,8 @@ Written in English.
                           capabilities/.
     src-tauri/icons/      App icons. For now the Winamp app's pixel-art radio.
     docs/decisions.md     Decisions, research findings, and why.
+    docs/research/        Longer research notes, such as how WMP 7.1's own
+                          skin engine behaves (wmp-skin-engine.md, ATA-212).
     tests/                `node --test` tests and their fixtures.
     tools/                DevTools and window probes; see Observing the app.
     .github/workflows/    ci.yml checks every PR on windows-latest; release.yml
@@ -269,6 +271,9 @@ leftover dev server makes the next launch fail rather than pick another port.
 
     docs/decisions.md     The stack, the skin source, the ATA-103 research.
                           Add an entry when you make or reverse a decision.
+    docs/research/wmp-skin-engine.md
+                          What WMP 7.1's skin engine really does, read with
+                          REA, and where ours differs (ATA-212).
 
 Project tracking lives in the Multica project *nts-desktop-wmp*, not here.
 Ata decides anything that is not already written down.
