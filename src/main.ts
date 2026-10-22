@@ -11,6 +11,7 @@ import { CHANNELS, channelTitle, createPlayer, playlist, type Item } from "./pla
 import { BANDS, clamp, loadSettings } from "./settings";
 import { createWidget } from "./widget";
 import { createAnalyser } from "./analyser";
+import { feed } from "./feed";
 import { bands, effectsMenu, samples } from "./skin/effects";
 
 const SETTINGS_KEY = "player";
@@ -45,7 +46,9 @@ const widget = createWidget({
   paused: () => player.pause(),
   resumed: () => player.play(),
 });
-const player = createPlayer(audio, items, widget);
+// WebKit opens a second connection for a stream src (ATA-236).
+const mac = navigator.userAgent.includes("Mac OS X");
+const player = createPlayer(audio, items, widget, mac ? (url) => feed(audio, url) : undefined);
 // The show on each channel; undefined where the live API gave none.
 let onAir: (OnAir | undefined)[] = [];
 
