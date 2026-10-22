@@ -85,5 +85,7 @@ NTS_WMP_SKIN=$out/probe.wmz launch 75
 sleep 5
 shots probe
 expect "the probe skin reached nothing (1000 px wide)" '[ "$(bounds | cut -d" " -f4)" = 1000 ]'
+# ATA-236: on macOS the stream reaches Web Audio through a MediaSource.
+expect "the analyser heard the stream (600 px high)" '[ "$(bounds | cut -d" " -f5)" = 600 ]'
 pkill -x nts-desktop-wmp
 exit $failed

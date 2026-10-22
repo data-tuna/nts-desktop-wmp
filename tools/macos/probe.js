@@ -10,7 +10,12 @@
   var title = "";
   var started = Date.now();
   var vis = ["0s " + document.visibilityState];
+  // The analyser frames the trusted page sends (ATA-236): a bar above 0
+  // means sound reached Web Audio, not just a moving clock.
+  var frames = 0;
+  var peak = 0;
   addEventListener("message", function (e) {
+    if (e.data && e.data.type === "vis") frames++, (peak = Math.max.apply(Math, [peak].concat(e.data.bars)));
     if (e.data && e.data.type === "state") states++, (title = e.data.title);
     if (e.data && e.data.title) seen.push(e.data.title);
   });
@@ -24,7 +29,8 @@
     pre.textContent = "ATA-230 macOS probe, skin webview at " + location.href + "\n" +
       rows.map(function (r) { return (r[0] + ": " + r[1]).slice(0, 160); }).join("\n") +
       "\ncontrol: " + states + " state messages from the trusted page, last title " + JSON.stringify(title) +
-      "\nvisibility: " + vis.join(", ");
+      "\nvisibility: " + vis.join(", ") +
+      "\nanalyser: " + frames + " frames, loudest bar " + peak + " of 255";
   }
   setInterval(draw, 500);
   var post = function (m) {
@@ -111,7 +117,7 @@
   await row("window.open the app's page", function () { return window.open("tauri://localhost/") ? "opened" : "null"; });
   await row("Media Session", function () { return typeof navigator.mediaSession + ", MediaMetadata " + typeof window.MediaMetadata; });
   // The verdict, for check.sh: 1000 px wide if every attempt failed, 999 if
-  // one got through.
+  // one got through; 600 px high if the analyser heard the stream, 599 if not.
   var held = rows.every(function (r) {
     var name = r[0], result = r[1];
     if (name.indexOf("/msg") === 0 || name === "what Tauri injected" || name.indexOf("  ") === 0 || name === "Media Session") return true;
@@ -121,7 +127,10 @@
   });
   await row("verdict", function () {
     var w = held ? 1000 : 999;
-    return post({ type: "shape", width: w, height: 600, rects: [[0, 0, w, 600]] }).then(function () { return held ? "every attempt failed" : "SOMETHING GOT THROUGH"; });
+    var h = peak > 0 ? 600 : 599;
+    return post({ type: "shape", width: w, height: h, rects: [[0, 0, w, h]] }).then(function () {
+      return (held ? "every attempt failed" : "SOMETHING GOT THROUGH") + (peak > 0 ? "; the analyser heard the stream" : "; THE ANALYSER HEARD SILENCE");
+    });
   });
   // check.sh brings the window back with a second launch.
   await row("minimize in 2 s", function () { setTimeout(function () { post({ type: "minimize" }); }, 2000); return "sent later"; });
