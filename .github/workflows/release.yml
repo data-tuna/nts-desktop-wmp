@@ -3,7 +3,10 @@ name: Release
 # Pushing a tag such as v0.1.0 builds the Windows installer and publishes it,
 # with its signature and the updater's latest.json, as a GitHub Release. A
 # fresh runner then installs the published installer, plays, updates from the
-# release before it, and uninstalls.
+# release before it, and uninstalls. The macOS job then adds the universal
+# .dmg and the updater's .app.tar.gz to the same release, and its darwin-*
+# entries to latest.json (ATA-231). update-check.yml tries the macOS update
+# with a throwaway key on PRs that touch this file.
 on:
   push:
     tags: ["v*"]
@@ -52,7 +55,46 @@ jobs:
           releaseBody: |
             Windows: download the `-setup.exe` below and run it. Windows SmartScreen will warn that the app is unrecognised, because it is not code-signed: click **More info**, then **Run anyway**. Installed copies update themselves on launch.
 
+            macOS: download the `.dmg` below, open it, and drag the app to Applications. It runs on Apple silicon and Intel Macs. The app is not signed by Apple, so macOS refuses to open it the first time. On macOS 15 and later, click **Done**, then open System Settings › Privacy & Security, scroll down to the message about the app, click **Open Anyway** and confirm. On macOS 14 and earlier, Control-click the app in Applications, choose **Open**, then **Open** again. Installed copies update themselves on launch.
+
             An unofficial fan project, not made or endorsed by NTS. Support the station at https://www.nts.live/supporters.
+          releaseDraft: false
+          prerelease: false
+
+  # After the Windows job, never beside it: tauri-action downloads the
+  # release's latest.json, adds this build's platforms and uploads it again,
+  # so two jobs at once would each drop the other's entries. A universal
+  # build gives darwin-aarch64 and darwin-x86_64 the same .app.tar.gz.
+  macos:
+    needs: windows
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: rustup target add aarch64-apple-darwin x86_64-apple-darwin
+
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          workspaces: src-tauri
+
+      - run: npm ci
+
+      # Not Apple-signed or notarised: the build's ad-hoc signature only.
+      # The release exists by now, so tagName finds it and its notes stay.
+      - uses: tauri-apps/tauri-action@84b9d35b5fc46c1e45415bdb6144030364f7ebc5 # v0.6.2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          args: --target universal-apple-darwin --config src-tauri/tauri.release.conf.json
+          tagName: ${{ github.ref_name }}
+          releaseName: NTS Radio Bootleg Media Player ${{ github.ref_name }}
           releaseDraft: false
           prerelease: false
 

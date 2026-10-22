@@ -275,6 +275,25 @@ test("wmploc stand-ins: our own strings and glyphs, nothing for the rest", () =>
   assert.equal(resImage("res://wmploc/RT_IMAGE/#9999"), null);
 });
 
+test("a property reads the same with call syntax, as through COM (ATA-235)", () => {
+  store.clear();
+  store.set("effectType", "Milkdrop");
+  store.set("effectPreset", "3");
+  const { skin, js, sent } = load(`<theme><view width="100" height="100">
+       <effects id="vis" width="50" height="40" currentEffectType="jscript:mediacenter.effectType();" currentPreset="jscript:mediacenter.effectPreset();"/>
+     </view></theme>`);
+  assert.deepEqual(js("[vis.currentEffectType, vis.currentPreset]"), ["Milkdrop", 3], "the Kenwood_MP7 and TheUnit attributes");
+  assert.ok(![...skin.logged].some((m) => m.includes("could not be worked out")));
+  assert.deepEqual(js("[mediacenter.effectType(), mediacenter.EffectType, player.settings.volume(), player.Settings().Volume(), vis.currentPreset()]"), ["Milkdrop", "Milkdrop", 50, 50, 3]);
+  js("player.settings.volume = 20");
+  assert.deepEqual(js("[player.settings.volume, player.settings.volume()]"), [20, 20], "assigning still works");
+  js("player.controls.play()");
+  assert.equal(sent.at(-1).type, "play", "a real method still runs");
+  assert.equal(js("player.settings.getMode('loop')"), false);
+  assert.equal(js("'ab'.toUpperCase()"), "AB", "other objects keep JavaScript's rules");
+  for (const call of ["'ab'.length()", "player.nothing()"]) assert.equal(js(`(function () { try { ${call}; } catch (e) { return e instanceof TypeError; } })()`), true, `${call} still throws`);
+});
+
 test("effects start on Album Art, step through the visualisations, save them through their _onchange, and ask for frames only while one moves", async () => {
   store.clear();
   const { js, sent } = load(`<theme><view width="100" height="100">

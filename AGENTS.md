@@ -75,12 +75,16 @@ Written in English.
     tools/macos/          The macOS runner's checks (ATA-230): check.sh
                           clicks, drags and types with synthetic events, so
                           CI only; probe.mjs builds the probe skin that
-                          runs escape.mjs's attempts inside WKWebView.
+                          runs escape.mjs's attempts inside WKWebView;
+                          update-check.sh has an old build update itself
+                          (ATA-231).
     .github/workflows/    ci.yml checks every PR on windows-latest, and builds
                           and smoke-tests a macOS .dmg on macos-latest,
                           with tools/macos/check.sh;
-                          release.yml publishes a v* tag and installs it on
-                          a fresh runner.
+                          release.yml publishes a v* tag, for Windows and
+                          macOS, and installs the Windows one on a fresh
+                          runner; update-check.yml tries the macOS update
+                          with a throwaway key (ATA-231).
 
 ## Commands
 
@@ -102,8 +106,10 @@ Written in English.
 
 Releasing: bump `version` in `package.json` and `src-tauri/Cargo.toml`, merge,
 then push the tag (`git tag v0.1.1 && git push origin v0.1.1`). The release
-workflow signs the installer for the updater with the repository secrets;
-`docs/decisions.md` (ATA-116) says where the key is kept.
+workflow signs the installer and the macOS `.app.tar.gz` for the updater
+with the repository secrets; `docs/decisions.md` (ATA-116) says where the
+key is kept. Only the tag jobs see that key: `update-check.yml` makes its
+own on the runner and throws it away.
 
 Rust lives in `%USERPROFILE%\.cargo\bin`. A shell that cannot find `cargo` is
 missing that directory on `PATH`.
@@ -272,7 +278,12 @@ functions to the global object: inside the `with` block they would
 otherwise appear only when execution reaches them. Element members are
 case-insensitive, as COM's are, but handler attributes are not members:
 `onLoad="OnLoad();"` must reach the function, not the attribute. Two skins never share a webview,
-so their globals never meet.
+so their globals never meet. Every `.name()` with no arguments in skin
+code becomes `.__wmpCall.name` before it runs, so a property reads with
+call syntax, as through COM (`comCalls` in `runtime.ts`, ATA-235). It is
+textual: it rewrites inside string literals too. A log that says
+`reading '__wmpCall'` means whatever came before a `.name()` was
+undefined.
 
 **Node's `TextDecoder("windows-1252")` is Latin-1.** It gets 0x80-0x9F
 wrong (`€`, curly quotes), so `wms.ts` maps that range itself. WebView2 gets

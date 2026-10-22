@@ -57,6 +57,41 @@ yet (ATA-234).
   drop on macOS, and memory over hours with the 30 s trim. Those need a
   real Mac (ATA-234).
 
+### Properties read with call syntax, as through COM (ATA-235, 2026-10-22)
+
+- **Why.** WMP's objects are COM objects. JScript reaches them through
+  `IDispatch::Invoke`, which a caller may ask for "a method or a property
+  get" when its language can't tell the two apart (Microsoft's
+  `IDispatch::Invoke` reference). So under WMP `mediacenter.effectType()`
+  reads `mediacenter.effectType`. 12 of The Skins Factory's skins rely on
+  it: `currentEffectType="jscript:mediacenter.effectType();"` and
+  `currentPreset="jscript:mediacenter.effectPreset();"`.
+- **How.** JavaScript cannot call a string, and the object model returns
+  plain values, so the hook is in the code, not the values. `comCalls()`
+  in `runtime.ts` rewrites every `.name()` with no arguments in skin code
+  (script files, handlers, `jscript:` values) to `.__wmpCall.name`. The
+  object model's objects and the elements answer `__wmpCall` with a view
+  that calls a method and reads a property. Every other object gets
+  `__wmpCall` from `Object.prototype`, with JavaScript's rules:
+  `"ab".toUpperCase()` still works and `"ab".length()` still throws. An
+  unknown member called on a WMP object still throws too, as COM's
+  "Object doesn't support this property or method" would. Assignment and
+  calls with arguments are untouched.
+- **Limits.** The rewrite is textual. It also rewrites inside string
+  literals, where it still runs if the string is evaluated later, and it
+  breaks `new a.B()`. One archive skin has an empty call in a string:
+  tubeframe's `setTimeout("player.CDRomCollection.item(0).eject()",1000)`.
+  The string runs later as code, where `__wmpCall` is global too, so its
+  behaviour doesn't change. No skin has `new a.B()`. A call on something
+  undefined now logs `reading '__wmpCall'`, not the member's name.
+- **Compatibility.** `tools/compat.mjs` before and after: works 56,
+  partial 100, broken 60, then works 60, partial 97, broken 59.
+  Kenwood_MP7, TheUnit and The_Unit_v3 go back to `works`. The 9 other
+  skins that logged the two expressions lose those notes and stay
+  `partial` for other reasons. No skin got worse, and none gained a note.
+  QuickSilver (2) came out `works` again on timing alone (see ATA-228),
+  so the list keeps it `broken`.
+
 ### A slider's natural size from its track images, never the thumb (ATA-228, 2026-10-22)
 
 `docs/research/wmp-skin-engine.md`, section 4, Sliders, "Natural size".
@@ -1222,8 +1257,9 @@ and on `main`.
 
 - **Universal, unsigned.** `tauri build --target universal-apple-darwin`
   builds both architectures and joins them: one `.dmg` that runs on Apple
-  silicon and Intel. It carries only the ad-hoc signature the build applies;
-  no Developer ID, no notarisation (those wait for Ata). Its bundle settings
+  silicon and Intel. It carries only an ad-hoc signature (ATA-231 found
+  the bundle had none until `signingIdentity` was `"-"`); no Developer ID,
+  no notarisation (those wait for Ata). Its bundle settings
   are in `src-tauri/tauri.macos.conf.json`, which Tauri merges on macOS
   only, so the Windows NSIS build is unchanged. The `.dmg` is a workflow
   artifact kept 7 days.
@@ -1259,6 +1295,47 @@ and on `main`.
 - **Not seen on the runner:** dragging, clicks, media keys, sound, Retina
   scale, and the updater (a local build has no endpoint and says so).
   ATA-230 and ATA-232 work from the list above.
+
+### macOS releases and updates, tried without a tag (ATA-231, 2026-10-22)
+
+- **The tag adds a macOS job.** After the Windows job, `release.yml`'s
+  `macos` job runs tauri-action with `--target universal-apple-darwin` and
+  the same release config. It uploads the universal `.dmg`, the updater's
+  `.app.tar.gz` and its `.sig`, signed with the real key, to the release
+  the Windows job made, and adds `darwin-aarch64` and `darwin-x86_64` to its
+  `latest.json`. Both point at the one universal `.app.tar.gz`, as do the
+  `-app` keys tauri-action also writes.
+- **One job at a time, so `latest.json` keeps both.** tauri-action (v0.6.2,
+  `upload-version-json.ts`) downloads the release's `latest.json`, keeps its
+  `platforms`, adds its own and uploads it again. Two jobs at once could
+  each drop the other's entries, so the macOS job `needs: windows`. Until
+  it finishes, a Mac that checks finds no darwin entry, and plays on.
+- **macOS builds the `app` target as well as `dmg`.** With `dmg` alone the
+  bundler warned "no updater-enabled targets were built" and made no
+  `.app.tar.gz`, so a release would have had no darwin entries.
+- **Ad-hoc signed.** `signingIdentity: "-"` in `tauri.macos.conf.json`.
+  Without it `codesign --verify` said the bundle "is not signed at all".
+  Not a Developer ID, and not notarised.
+- **Tried on PRs, never with the real key.** `update-check.yml` runs on PRs
+  that touch the release, the bundle config (`tauri*.conf.json`) or
+  `Cargo.toml`/`Cargo.lock`, and by hand; a change to `update()` in
+  `lib.rs` alone does not start it. It
+  makes a key on the runner (`tauri signer generate --ci`), builds the new
+  version with the release config plus one that swaps in that key's public
+  half and an endpoint at `http://127.0.0.1:8765` (plain http only there,
+  `dangerousInsecureTransportProtocol`), then a 0.0.1 the same way.
+  `tools/macos/update-check.sh` serves the new `.app.tar.gz` with a
+  `latest.json` shaped like tauri-action's, and starts a copy of 0.0.1,
+  natively and then under Rosetta. In run 39699234191 both copies fetched
+  `latest.json` and the archive, swapped the bundle for 0.3.0 and
+  restarted, and `codesign` passed on the swapped bundle
+  (`Signature=adhoc`).
+- **Not proven:** tauri-action's upload and merge into a real release
+  (that needs a tag); the real key on a Mac build; that the published URLs
+  download; that macOS 15's Open Anyway appears for this `.dmg` (the
+  runner never quarantines a download); an update that needs an
+  administrator password, as in `/Applications` owned by another user; and
+  sound. Those need a tag or a real Mac.
 
 ## Skins
 

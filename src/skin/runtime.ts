@@ -53,14 +53,45 @@ export function clock(t: number): string {
 
 const clamp = (v: unknown, lo: number, hi: number) => Math.min(hi, Math.max(lo, Number(v) || 0));
 
+/** Through COM, a script can read a property with call syntax:
+ * `mediacenter.effectType()` reads `mediacenter.effectType`. IDispatch::Invoke
+ * takes "a method or a property get" for a language that can't tell them
+ * apart. `comCalls` rewrites every `.name()` with no arguments in skin code to
+ * `.__wmpCall.name`. The object model and the elements answer `__wmpCall`
+ * with `calls(obj, true)`; every other object gets it from Object.prototype,
+ * with JavaScript's rules. */
+// ponytail: textual, so it also rewrites inside string literals and breaks
+// `new a.B()`. One archive skin has one in a string (tubeframe's setTimeout,
+// run as code later, so unchanged); none has `new a.B()`.
+export const comCalls = (code: string) => code.replace(/(?<!\.)\.(\s*[A-Za-z_$][\w$]*)\s*\(\s*\)/g, ".__wmpCall.$1");
+
+export function calls(obj: any, com: boolean): object {
+  return new Proxy(Object.create(null), {
+    get(_, k) {
+      const v = obj[k];
+      if (typeof v === "function") return v.call(obj);
+      if (com && k in obj) return v;
+      throw new TypeError(`${String(k)} is not a function`);
+    },
+  });
+}
+
+if (!Object.prototype.hasOwnProperty("__wmpCall"))
+  Object.defineProperty(Object.prototype, "__wmpCall", {
+    get(this: unknown) {
+      return calls(this, false);
+    },
+  });
+
 /** COM objects are case-insensitive (`player.PlayState`, `player.playstate`),
  * so members are kept lower-case and looked up that way. */
 export function wmpObject(name: string, members: object, log: (msg: string) => void): Record<string, any> {
   Object.setPrototypeOf(members, null);
   return new Proxy(members as Record<string, any>, {
     has: (t, k) => typeof k === "string" && k.toLowerCase() in t,
-    get(t, k) {
+    get(t, k, proxy) {
       if (typeof k !== "string") return undefined;
+      if (k === "__wmpCall") return calls(proxy, true);
       const lk = k.toLowerCase();
       if (lk in t) return t[lk];
       log(`${name}.${k} is not supported`);
