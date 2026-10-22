@@ -36,6 +36,11 @@ tauri-plugin-updater = { version = "2", default-features = false, features = ["n
 # windows crate Tauri already builds.
 wasapi = "0.26"
 
+[target.'cfg(target_os = "macos")'.dependencies]
+# Whether the mouse button is down, before a skin's drag (lib.rs). Tauri
+# already builds it.
+objc2-app-kit = { version = "0.3", default-features = false, features = ["std", "NSEvent"] }
+
 # Size over speed: https://tauri.app/concept/size/#cargo-configuration
 [profile.release]
 codegen-units = 1

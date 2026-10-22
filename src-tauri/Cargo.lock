@@ -2219,6 +2219,7 @@ name = "nts-desktop-wmp"
 version = "0.3.0"
 dependencies = [
  "md-5",
+ "objc2-app-kit",
  "serde",
  "serde_json",
  "tauri",
