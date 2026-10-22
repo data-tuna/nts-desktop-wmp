@@ -10,7 +10,6 @@ use std::collections::hash_map::RandomState;
 use std::fs;
 use std::hash::BuildHasher;
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Condvar, Mutex, OnceLock};
 use std::time::Duration;
 use tauri::{AppHandle, Manager, Url};
@@ -93,28 +92,53 @@ pub fn local() -> Vec<&'static Skin> {
     LOCAL.lock().unwrap().clone()
 }
 
-static SCANNING: AtomicBool = AtomicBool::new(false);
+/// The folders of the latest read still running.
+static SCANNING: Mutex<Option<Vec<PathBuf>>> = Mutex::new(None);
 
-/// Scans on its own thread, unless a scan is running: an offline share
-/// takes some 20 s to fail, and the picker's lists must not wait for it.
-/// The result lands in `local()` for the picker's next poll.
+/// Reads the folder on its own thread: an offline share takes some 20 s to
+/// fail, and the picker's lists must not wait for it. The result lands in
+/// `local()` for the picker's next poll.
 pub fn rescan_local(app: &AppHandle) {
-    if SCANNING.swap(true, Ordering::SeqCst) {
-        return;
-    }
     let app = app.clone();
-    std::thread::spawn(move || {
-        scan_local(&app);
-        SCANNING.store(false, Ordering::SeqCst);
-    });
+    std::thread::spawn(move || scan_local(&app));
+}
+
+/// Reads the folder here, unless a read of it is running.
+fn scan_local(app: &AppHandle) {
+    let Ok(dirs) = local_dirs(app) else { return };
+    if begin_scan(&dirs) {
+        let found = local_in(&dirs);
+        end_scan(&dirs, found);
+    }
+}
+
+/// Whether to start a read of `dirs`: one per folder at a time, but a new
+/// folder never waits for an old one.
+fn begin_scan(dirs: &[PathBuf]) -> bool {
+    let mut scanning = SCANNING.lock().unwrap();
+    if scanning.as_deref() == Some(dirs) {
+        return false;
+    }
+    *scanning = Some(dirs.to_vec());
+    true
+}
+
+/// Keeps a read's result, unless a read of another folder began since.
+fn end_scan(dirs: &[PathBuf], found: Vec<Skin>) -> bool {
+    let mut scanning = SCANNING.lock().unwrap();
+    if scanning.as_deref() != Some(dirs) {
+        return false;
+    }
+    *scanning = None;
+    store(found);
+    true
 }
 
 pub fn scanning() -> bool {
-    SCANNING.load(Ordering::SeqCst)
+    SCANNING.lock().unwrap().is_some()
 }
 
-pub fn scan_local(app: &AppHandle) {
-    let found = local_dirs(app).map(|d| local_in(&d)).unwrap_or_default();
+fn store(found: Vec<Skin>) {
     let mut list = LOCAL.lock().unwrap();
     *list = found
         .into_iter()
@@ -571,6 +595,19 @@ mod tests {
         assert_eq!(found, want.map(|(p, s)| (p.to_string(), s.to_string())));
         // A missing folder lists nothing either.
         assert!(local_in(&[tmp]).is_empty());
+    }
+
+    #[test]
+    fn a_read_of_an_old_folder_never_holds_up_a_new_one() {
+        let (old, new) = (vec![PathBuf::from("old")], vec![PathBuf::from("new")]);
+        assert!(begin_scan(&old));
+        assert!(!begin_scan(&old));
+        assert!(begin_scan(&new));
+        // The old folder's read lands late: dropped.
+        assert!(!end_scan(&old, Vec::new()));
+        assert!(scanning());
+        assert!(end_scan(&new, Vec::new()));
+        assert!(!scanning());
     }
 
     #[test]

@@ -26,7 +26,9 @@ them too. This replaces the **Picker** point of the entry below.
   fail. So it is never read on the setup path or the main thread: the
   launch reads it on its own thread, and only for a kept local skin, and
   `list_skins` returns the last read at once while a new one runs in the
-  background ("Reading <folder>…" until the first lands).
+  background ("Reading <folder>…" until the first lands). One read runs
+  per folder; a newly chosen folder never waits for an old one, and an old
+  folder's late result is dropped.
 - A kept `local/<file>.wmz` that the new folder does not have gets a random
   skin on launch, as before.
 
