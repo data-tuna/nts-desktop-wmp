@@ -1,0 +1,85 @@
+name: Update check
+
+# The macOS release, tried without a tag (ATA-231). It builds what
+# release.yml's macOS job would publish, signed with a key made on the
+# runner and thrown away with it, then has a 0.0.1 build update itself to
+# that from a local server. The real signing key is only ever in
+# release.yml's tag jobs. Runs on PRs that touch the release, the bundle
+# config or the updater's version; not lib.rs's update(), or it would run on
+# most Rust PRs.
+on:
+  pull_request:
+    paths:
+      - .github/workflows/release.yml
+      - .github/workflows/update-check.yml
+      - tools/macos/update-check.sh
+      - src-tauri/tauri.conf.json
+      - src-tauri/tauri.release.conf.json
+      - src-tauri/tauri.macos.conf.json
+      - src-tauri/Cargo.toml
+      - src-tauri/Cargo.lock
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  macos:
+    runs-on: macos-latest
+    env:
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: throwaway
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: rustup target add aarch64-apple-darwin x86_64-apple-darwin
+
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          workspaces: src-tauri
+
+      - run: npm ci
+
+      # Its public key replaces the real one, and the endpoint is the local
+      # server, over plain http, in these test builds only.
+      - name: A throwaway update key
+        run: |
+          echo "TAURI_SIGNING_PRIVATE_KEY=$RUNNER_TEMP/update.key" >> "$GITHUB_ENV"
+          TAURI_SIGNING_PRIVATE_KEY=$RUNNER_TEMP/update.key
+          npx tauri signer generate --ci -p "$TAURI_SIGNING_PRIVATE_KEY_PASSWORD" -w "$TAURI_SIGNING_PRIVATE_KEY"
+          PUBKEY=$(cat "$TAURI_SIGNING_PRIVATE_KEY.pub") node -e '
+            console.log(JSON.stringify({ plugins: { updater: {
+              pubkey: process.env.PUBKEY,
+              endpoints: ["http://127.0.0.1:8765/latest.json"],
+              dangerousInsecureTransportProtocol: true,
+            } } }))' > "$RUNNER_TEMP/update.conf.json"
+
+      # The same arguments as release.yml's macOS job, plus the test config.
+      - name: Build the new version
+        run: |
+          npm run tauri build -- --target universal-apple-darwin --config src-tauri/tauri.release.conf.json --config "$RUNNER_TEMP/update.conf.json"
+          mkdir -p update-check/new
+          cp -R src-tauri/target/universal-apple-darwin/release/bundle/macos/*.app.tar.gz* src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg update-check/new/
+          ls -l update-check/new
+
+      - name: Build 0.0.1
+        run: |
+          npm run tauri build -- --target universal-apple-darwin --bundles app --config src-tauri/tauri.release.conf.json --config "$RUNNER_TEMP/update.conf.json" --config '{"version":"0.0.1"}'
+          ditto src-tauri/target/universal-apple-darwin/release/bundle/macos/*.app "$RUNNER_TEMP/old/NTS Radio Bootleg Media Player.app"
+
+      - name: 0.0.1 updates itself, natively and under Rosetta
+        run: bash tools/macos/update-check.sh "$RUNNER_TEMP/old/NTS Radio Bootleg Media Player.app" update-check/new/*.app.tar.gz "$(node -p "require('./package.json').version")" update-check
+
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: update-check
+          path: |
+            update-check/
+            !update-check/apps/
+            !update-check/serve/app.tar.gz
+          retention-days: 7

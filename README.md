@@ -41,6 +41,24 @@ signature does not match.
 Uninstall from Settings > Apps. Downloaded skins stay in
 `%LOCALAPPDATA%\com.datatuna.ntswmp`; delete that folder to remove them.
 
+## Install (macOS)
+
+Download `NTS.Radio.Bootleg.Media.Player_<version>_universal.dmg` from the
+latest [release](https://github.com/data-tuna/nts-desktop-wmp/releases/latest),
+open it, and drag the app to Applications. It runs on Apple silicon and
+Intel Macs.
+
+The app is not signed by Apple, so macOS will not open it the first time.
+On macOS 15 and later, click **Done** in that message, then open System
+Settings › Privacy & Security, scroll down to the message about the app,
+click **Open Anyway** and confirm with your password. On macOS 14 and
+earlier, Control-click the app in Applications, choose **Open**, then
+**Open** again. After that it opens normally.
+
+It updates itself in the same way as on Windows. To uninstall, drag it from
+Applications to the Bin. Downloaded skins stay in
+`~/Library/Application Support/com.datatuna.ntswmp`.
+
 ## Credits
 
 - The skins are the work of their original authors, many of them Microsoft's
