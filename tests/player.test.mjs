@@ -51,6 +51,16 @@ test("play starts NTS 1; next and previous wrap around", () => {
   assert.equal(player.state().title, "NTS 2");
 });
 
+test("each stream load goes through src, on its first play and its reconnects (ATA-236)", () => {
+  const audio = fakeAudio();
+  const player = createPlayer(audio, undefined, undefined, (url) => `fed:${url}`);
+  player.play();
+  audio.fire("error");
+  mock.timers.tick(1000);
+  assert.deepEqual(audio.loads, [`fed:${NTS1}`, `fed:${NTS1}`]);
+  assert.equal(player.state().title, "NTS 1");
+});
+
 test("switching while stopped selects the channel without playing it", () => {
   const audio = fakeAudio();
   const player = createPlayer(audio);

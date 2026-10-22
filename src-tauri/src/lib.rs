@@ -16,7 +16,7 @@ use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent}
 use tauri::webview::NewWindowResponse;
 use tauri::{
     AppHandle, Emitter, EventTarget, LogicalPosition, LogicalSize, Manager, PhysicalPosition,
-    PhysicalRect, Url, WebviewBuilder, WebviewUrl, WebviewWindowBuilder, Window, Wry,
+    PhysicalRect, PhysicalSize, Url, WebviewBuilder, WebviewUrl, WebviewWindowBuilder, Window, Wry,
 };
 use tauri_plugin_updater::UpdaterExt;
 use tauri_plugin_window_state::{AppHandleExt as _, StateFlags, WindowExt as _};
@@ -616,8 +616,13 @@ fn handle(app: &AppHandle, msg: FromSkin) {
                 // A bigger skin can push a remembered position off screen. Only
                 // on a new size: a mask change must not move a window the
                 // listener parked partly off screen.
+                // The new size, not the window's: on macOS the resize lands
+                // later (tao's `set_content_size_async`), so the window still
+                // reports the old one here (ATA-236).
                 if resized {
-                    let _ = pull_on_screen(&window);
+                    let _ = window.scale_factor().and_then(|scale| {
+                        pull_on_screen(&window, LogicalSize::new(width, height).to_physical(scale))
+                    });
                 }
             }
         }
@@ -664,9 +669,9 @@ fn show_player(app: &AppHandle) {
 /// monitor was unplugged, or the skin is bigger than the last one), pull it
 /// into its monitor's work area. A window that is fully visible, even across
 /// two monitors, stays where the user put it. From the Winamp app.
-fn pull_on_screen(window: &Window) -> tauri::Result<()> {
+/// `size` is the window's outer size, or the size it is about to have.
+fn pull_on_screen(window: &Window, size: PhysicalSize<u32>) -> tauri::Result<()> {
     let position = window.outer_position()?;
-    let size = window.outer_size()?;
     let areas: Vec<_> = window
         .available_monitors()?
         .iter()
@@ -1429,7 +1434,7 @@ pub fn run() {
             win32::watch_cover(window.clone());
             #[cfg(target_os = "macos")]
             macos::watch_pointer(window.clone());
-            pull_on_screen(&window)?;
+            pull_on_screen(&window, window.outer_size()?)?;
             let size = window
                 .inner_size()?
                 .to_logical::<f64>(window.scale_factor()?);

@@ -59,6 +59,13 @@ while [ $SECONDS -lt $deadline ]; do
   sleep 15
   stream | grep -qF "$first" || continue
   shoot 2
+  # Bytes each edge connection has received, 5 s apart: one that grows is
+  # carrying the stream (ATA-236).
+  for i in 1 2; do
+    echo "$(date +%T) bytes in:" | tee -a "$log"
+    nettop -m tcp -L 1 -n -x -J bytes_in | grep -F "$(echo "$edges" | sed 's/$/:443/')" | tee -a "$log"
+    [ $i = 1 ] && sleep 5
+  done
   echo "$name: playing, $(stream | wc -l | tr -d ' ') edge connection(s); $first held 15 s"
   exit 0
 done

@@ -87,8 +87,14 @@ type Media = Pick<
   "src" | "loop" | "currentTime" | "paused" | "readyState" | "play" | "pause" | "load" | "removeAttribute" | "addEventListener"
 >;
 
-/** `items` starts with the channels; the caller appends mixtapes and picks to it as they arrive. */
-export function createPlayer(audio: Media, items: Item[] = [...CHANNELS], widget?: Widget) {
+/** `items` starts with the channels; the caller appends mixtapes and picks to it as they arrive.
+ * `src` turns a stream's url into the element's src (main.ts: `feed` on macOS). */
+export function createPlayer(
+  audio: Media,
+  items: Item[] = [...CHANNELS],
+  widget?: Widget,
+  src = (url: string) => url,
+) {
   let channel = 0;
   const pick = () => items[channel].pick === true;
   // Next or previous while paused moves the channel but keeps the last pick
@@ -135,7 +141,7 @@ export function createPlayer(audio: Media, items: Item[] = [...CHANNELS], widget
     }
     widget?.unload();
     audio.loop = false;
-    audio.src = items[channel].url;
+    audio.src = src(items[channel].url);
     audio.play().catch((e: Error) => {
       // Autoplay refused: wait for the listener's Play rather than retry forever.
       // A failed load fires "error" instead, which reconnects.

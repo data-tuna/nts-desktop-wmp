@@ -128,7 +128,10 @@ carries no CORS headers, so a cross-origin load fails at that first hop.
 radiomast then redirects to a regional `audio-edge-*.radiomast.io` host, with
 CORS on every hop. Those edge hosts move, so never hard-code one: always
 start from `streams.radiomast.io`. Mixtapes follow the same rule; see
-`mixtapes.ts`.
+`mixtapes.ts`. On macOS one `fetch()` feeds the stream to the element
+through a MediaSource (`feed.ts`): given the url, WebKit opens two full-rate
+connections (ATA-236). On the macOS runner the analyser reads the stream
+as silence on either path; a real Mac has not been checked.
 
 **Playback never depends on the now-playing API.** `https://www.nts.live/api/v2/live`
 is undocumented and can change or vanish. When it fails, the titles fall back
@@ -357,7 +360,7 @@ hidden desktop (a debug build needs `npx vite` running for its pages):
     powershell -File tools/ram.ps1 nts-desktop-wmp
     powershell -File tools/cpu.ps1 nts-desktop-wmp 30   % of one core, whole tree
     powershell -File tools/install-check.ps1 <setup.exe>  Installs for real; see below
-    bash tools/mac-smoke.sh <App.app> <skin.wmz> <dir> <name>   macOS CI only: plays, shoots
+    bash tools/mac-smoke.sh <App.app> <skin.wmz> <dir> <name>   macOS CI only: plays, shoots, logs bytes per edge connection
     node tools/proxy.mjs 8899                    A CONNECT proxy you can cut; see below
 
 A debug build reads `dist-skin/engine.js` each time the skin page loads, so

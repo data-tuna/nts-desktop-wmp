@@ -85,5 +85,8 @@ NTS_WMP_SKIN=$out/probe.wmz launch 75
 sleep 5
 shots probe
 expect "the probe skin reached nothing (1000 px wide)" '[ "$(bounds | cut -d" " -f4)" = 1000 ]'
+# Known (decisions.md, ATA-236): the analyser hears the stream as silence
+# here, with a MediaSource or a plain url alike. Logged, not checked.
+log "the analyser heard the stream (600 px high, 599 silent): $(bounds | cut -d" " -f5)"
 pkill -x nts-desktop-wmp
 exit $failed
