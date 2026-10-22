@@ -41,14 +41,39 @@ pub fn working() -> impl Iterator<Item = &'static Skin> {
     list().iter().filter(|s| s.status == "works")
 }
 
-/// The local library (ATA-220, ATA-239): every `.wmz` in `skins/local/`
-/// under the app's data folder, read each time the picker asks. Debug builds
-/// also read the checkout's gitignored `skins/local/`. Unchecked, so not on
-/// the random draw.
+/// The local library (ATA-220, ATA-239): every `.wmz` in the folder the
+/// listener chose in the picker, else in `skins/local/` under the app's data
+/// folder, read each time the picker asks. Debug builds also read the
+/// checkout's gitignored `skins/local/`. Unchecked, so not on the random draw.
 pub fn local_dirs(app: &AppHandle) -> Result<Vec<PathBuf>, String> {
-    let dir = cache_dir(app)?.join("local");
-    fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    let dir = match chosen_folder(app) {
+        Some(dir) => dir,
+        None => {
+            let dir = cache_dir(app)?.join("local");
+            fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+            dir
+        }
+    };
     Ok(with_checkout(dir))
+}
+
+fn folder_file(app: &AppHandle) -> Result<PathBuf, String> {
+    Ok(cache_dir(app)?.with_file_name("skin-folder.txt"))
+}
+
+fn chosen_folder(app: &AppHandle) -> Option<PathBuf> {
+    let text = fs::read_to_string(folder_file(app).ok()?).ok()?;
+    let text = text.trim();
+    (!text.is_empty()).then(|| text.into())
+}
+
+/// Keeps `dir` as the local library's folder.
+pub fn set_folder(app: &AppHandle, dir: &Path) -> Result<(), String> {
+    let text = dir.to_str().ok_or("the folder's name is not Unicode")?;
+    fs::write(folder_file(app)?, text).map_err(|e| e.to_string())?;
+    // The old folder's skins, until the new one is read.
+    LOCAL.lock().unwrap().clear();
+    Ok(())
 }
 
 fn with_checkout(dir: PathBuf) -> Vec<PathBuf> {
@@ -67,8 +92,53 @@ pub fn local() -> Vec<&'static Skin> {
     LOCAL.lock().unwrap().clone()
 }
 
-pub fn scan_local(app: &AppHandle) {
-    let found = local_dirs(app).map(|d| local_in(&d)).unwrap_or_default();
+/// The folders of the latest read still running.
+static SCANNING: Mutex<Option<Vec<PathBuf>>> = Mutex::new(None);
+
+/// Reads the folder on its own thread: an offline share takes some 20 s to
+/// fail, and the picker's lists must not wait for it. The result lands in
+/// `local()` for the picker's next poll.
+pub fn rescan_local(app: &AppHandle) {
+    let app = app.clone();
+    std::thread::spawn(move || scan_local(&app));
+}
+
+/// Reads the folder here, unless a read of it is running.
+fn scan_local(app: &AppHandle) {
+    let Ok(dirs) = local_dirs(app) else { return };
+    if begin_scan(&dirs) {
+        let found = local_in(&dirs);
+        end_scan(&dirs, found);
+    }
+}
+
+/// Whether to start a read of `dirs`: one per folder at a time, but a new
+/// folder never waits for an old one.
+fn begin_scan(dirs: &[PathBuf]) -> bool {
+    let mut scanning = SCANNING.lock().unwrap();
+    if scanning.as_deref() == Some(dirs) {
+        return false;
+    }
+    *scanning = Some(dirs.to_vec());
+    true
+}
+
+/// Keeps a read's result, unless a read of another folder began since.
+fn end_scan(dirs: &[PathBuf], found: Vec<Skin>) -> bool {
+    let mut scanning = SCANNING.lock().unwrap();
+    if scanning.as_deref() != Some(dirs) {
+        return false;
+    }
+    *scanning = None;
+    store(found);
+    true
+}
+
+pub fn scanning() -> bool {
+    SCANNING.lock().unwrap().is_some()
+}
+
+fn store(found: Vec<Skin>) {
     let mut list = LOCAL.lock().unwrap();
     *list = found
         .into_iter()
@@ -414,13 +484,21 @@ fn launch_skin(choice: Option<String>) -> Option<&'static Skin> {
 /// On launch: the listener's skin, or a random one, fetched on its own
 /// thread. A remembered skin no longer on the list gets the house skin, and
 /// the choice stays.
+/// The local folder is read there too, and only for a kept local skin: it
+/// may be a share that is offline.
 pub fn start(app: &AppHandle) {
-    scan_local(app);
-    if let Some(skin) = launch_skin(choice(app)) {
-        let id = begin();
-        let app = app.clone();
-        std::thread::spawn(move || fetch_and_wear(&app, skin, id));
-    }
+    let id = begin();
+    let app = app.clone();
+    std::thread::spawn(move || {
+        let choice = choice(&app);
+        if choice.as_deref().is_some_and(|c| c.starts_with("local/")) {
+            scan_local(&app);
+        }
+        match launch_skin(choice) {
+            Some(skin) => drop(fetch_and_wear(&app, skin, id)),
+            None => finish(id, Worn::House),
+        }
+    });
 }
 
 #[cfg(test)]
@@ -517,6 +595,19 @@ mod tests {
         assert_eq!(found, want.map(|(p, s)| (p.to_string(), s.to_string())));
         // A missing folder lists nothing either.
         assert!(local_in(&[tmp]).is_empty());
+    }
+
+    #[test]
+    fn a_read_of_an_old_folder_never_holds_up_a_new_one() {
+        let (old, new) = (vec![PathBuf::from("old")], vec![PathBuf::from("new")]);
+        assert!(begin_scan(&old));
+        assert!(!begin_scan(&old));
+        assert!(begin_scan(&new));
+        // The old folder's read lands late: dropped.
+        assert!(!end_scan(&old, Vec::new()));
+        assert!(scanning());
+        assert!(end_scan(&new, Vec::new()));
+        assert!(!scanning());
     }
 
     #[test]
