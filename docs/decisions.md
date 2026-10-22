@@ -1191,9 +1191,10 @@ and on `main`.
   `dangerousInsecureTransportProtocol`), then a 0.0.1 the same way.
   `tools/macos/update-check.sh` serves the new `.app.tar.gz` with a
   `latest.json` shaped like tauri-action's, and starts a copy of 0.0.1,
-  natively and then under Rosetta. In run 39698270368 both copies fetched
-  `latest.json` and the archive, swapped the bundle for 0.3.0 and restarted
-  within about 10 s.
+  natively and then under Rosetta. In run 39699234191 both copies fetched
+  `latest.json` and the archive, swapped the bundle for 0.3.0 and
+  restarted, and `codesign` passed on the swapped bundle
+  (`Signature=adhoc`).
 - **Not proven:** tauri-action's upload and merge into a real release
   (that needs a tag); the real key on a Mac build; that the published URLs
   download; that macOS 15's Open Anyway appears for this `.dmg` (the
