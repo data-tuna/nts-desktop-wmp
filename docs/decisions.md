@@ -41,13 +41,14 @@ yet (ATA-234).
   and records the loudest analyser bar. With `feed`, with the plain url
   as on `main`, and with the edge url the redirect leads to, the
   AudioContext ran at 48 kHz and the element's clock passed 74 s, but every
-  bar was 0 and the waveform flat (runs 39704028768, 39704035478,
-  39706021379, experiment branches since deleted). In the same runs a
-  local 440 Hz tone through `createMediaElementSource` read 27-228, and an
-  oscillator 0-255. So this machine's Web Audio hears a media element,
-  just not this stream. Whether a real Mac does the same is not known:
-  if it does, the app is silent on macOS on `main` too. `check.sh` logs
-  the probe's result and does not fail on it.
+  bar was 0 and the waveform flat (feed: 39704028768 and 39705063719;
+  url: 39704035478 and 39705073591; edge url: 39706021379; experiment
+  branches since deleted). In 39705063719 and 39705073591 a local 440 Hz
+  tone through `createMediaElementSource` read 27-228, and an oscillator
+  0-255; in 39706021379 the tone never started and the oscillator read
+  0-255. So this machine's Web Audio hears a media element, just not this
+  stream. The app is likely silent on macOS on `main` too; ATA-237 gives
+  macOS sound. `check.sh` logs the probe's result and does not fail on it.
 - **Windows had one connection already.** A release build on a hidden
   desktop, playing NTS 1, held one connection to the radiomast edge. It
   still sets the url on the element; `feed` runs only where the user agent
