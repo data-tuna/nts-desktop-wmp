@@ -10,7 +10,7 @@ fn main() {
             "preview_skin",
             "preview_area",
             "open_link",
-            "open_skins_folder",
+            "choose_skins_folder",
             "now_playing",
             "pick_audio",
         ]),

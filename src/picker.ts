@@ -8,6 +8,8 @@ type SkinList = {
   skins: { path: string; page: string; size: number; cached: boolean; broken: boolean }[];
   // The local library (ATA-220, ATA-239): no page, always on disk.
   local: SkinList["skins"];
+  // The folder the local library is read from.
+  folder: string;
   choice: string | null;
   worn: string | null;
   fetching: boolean;
@@ -54,17 +56,18 @@ function rowsFor(skins: SkinList["skins"]) {
   });
 }
 
-function build({ skins, local }: SkinList) {
+function build({ skins, local, folder: dir }: SkinList) {
   list.replaceChildren(...rowsFor(skins));
-  buildLocal(local);
+  buildLocal(local, dir);
 }
 
 let localKey = "";
-function buildLocal(local: SkinList["local"]) {
-  localKey = JSON.stringify(local.map((s) => [s.path, s.broken]));
+function buildLocal(local: SkinList["local"], dir: string) {
+  localKey = JSON.stringify([dir, local.map((s) => [s.path, s.broken])]);
+  folder.title = dir;
   const hint = document.createElement("li");
   hint.className = "hint";
-  hint.textContent = "No skins yet. Click “Open skins folder…” and drop .wmz files in.";
+  hint.textContent = `No .wmz skins in ${dir}. Click “Choose skins folder…” to pick the folder your skins are in.`;
   localList.replaceChildren(...(local.length ? rowsFor(local) : [hint]));
   source.options[1].textContent = `Local library (${local.length})`;
 }
@@ -84,7 +87,7 @@ async function refresh() {
     show(state.worn?.startsWith("local/") ? "local" : "archive");
   }
   // Skins dropped into the folder, taken out or replaced while the picker is open.
-  if (JSON.stringify(state.local.map((s) => [s.path, s.broken])) !== localKey) buildLocal(state.local);
+  if (JSON.stringify([state.folder, state.local.map((s) => [s.path, s.broken])]) !== localKey) buildLocal(state.local, state.folder);
   const { choice, worn, fetching } = state;
   random.checked = choice === null;
   random.disabled = busy;
@@ -141,7 +144,11 @@ new ResizeObserver(() => {
 }).observe(document.querySelector("main")!);
 use.addEventListener("click", () => selected && void choose(selected, name(selected)));
 source.addEventListener("change", () => show(source.value));
-folder.addEventListener("click", () => void invoke("open_skins_folder"));
+folder.addEventListener("click", async () => {
+  await invoke("choose_skins_folder").catch((e) => (status.textContent = `Could not choose a folder (${String(e)}).`));
+  show("local");
+  await refresh();
+});
 random.addEventListener("change", () => void choose(null, "a random skin"));
 document.addEventListener("click", (e) => {
   const a = (e.target as HTMLElement).closest<HTMLAnchorElement>("a[data-link]");

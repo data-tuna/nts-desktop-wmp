@@ -78,7 +78,8 @@ const ATTACKS = {
   "__TAURI_INTERNALS__.invoke list_skins": invoke("list_skins", {}),
   "__TAURI_INTERNALS__.invoke choose_skin": invoke("choose_skin", { path: null }),
   "__TAURI_INTERNALS__.invoke open_link": invoke("open_link", { url: "https://www.nts.live/supporters" }),
-  "__TAURI_INTERNALS__.invoke open_skins_folder": invoke("open_skins_folder", {}),
+  "__TAURI_INTERNALS__.invoke choose_skins_folder": invoke("choose_skins_folder", {}),
+  "__TAURI_INTERNALS__.invoke plugin:dialog|open": invoke("plugin:dialog|open", { options: { directory: true } }),
   "__TAURI_INTERNALS__.invoke preview_skin": invoke("preview_skin", { path: "microsoft/Classic.wmz" }),
   "__TAURI_INTERNALS__.invoke preview_area": invoke("preview_area", { x: 0, y: 0, width: 4096, height: 4096 }),
   // The trusted page's command (ATA-115).

@@ -30,6 +30,7 @@ tauri-plugin-single-instance = "2"
 tauri-plugin-window-state = "2"
 # No rustls or zip: SChannel, as for ureq; the signed artifact is the -setup.exe itself.
 tauri-plugin-updater = { version = "2", default-features = false, features = ["native-tls"] }
+tauri-plugin-dialog = "2"
 
 [target.'cfg(windows)'.dependencies]
 # Process loopback, for the visualisation during a pick (ATA-199). On the

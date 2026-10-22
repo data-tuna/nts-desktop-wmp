@@ -41,14 +41,36 @@ pub fn working() -> impl Iterator<Item = &'static Skin> {
     list().iter().filter(|s| s.status == "works")
 }
 
-/// The local library (ATA-220, ATA-239): every `.wmz` in `skins/local/`
-/// under the app's data folder, read each time the picker asks. Debug builds
-/// also read the checkout's gitignored `skins/local/`. Unchecked, so not on
-/// the random draw.
+/// The local library (ATA-220, ATA-239): every `.wmz` in the folder the
+/// listener chose in the picker, else in `skins/local/` under the app's data
+/// folder, read each time the picker asks. Debug builds also read the
+/// checkout's gitignored `skins/local/`. Unchecked, so not on the random draw.
 pub fn local_dirs(app: &AppHandle) -> Result<Vec<PathBuf>, String> {
-    let dir = cache_dir(app)?.join("local");
-    fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    let dir = match chosen_folder(app) {
+        Some(dir) => dir,
+        None => {
+            let dir = cache_dir(app)?.join("local");
+            fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+            dir
+        }
+    };
     Ok(with_checkout(dir))
+}
+
+fn folder_file(app: &AppHandle) -> Result<PathBuf, String> {
+    Ok(cache_dir(app)?.with_file_name("skin-folder.txt"))
+}
+
+fn chosen_folder(app: &AppHandle) -> Option<PathBuf> {
+    let text = fs::read_to_string(folder_file(app).ok()?).ok()?;
+    let text = text.trim();
+    (!text.is_empty()).then(|| text.into())
+}
+
+/// Keeps `dir` as the local library's folder.
+pub fn set_folder(app: &AppHandle, dir: &Path) -> Result<(), String> {
+    let text = dir.to_str().ok_or("the folder's name is not Unicode")?;
+    fs::write(folder_file(app)?, text).map_err(|e| e.to_string())
 }
 
 fn with_checkout(dir: PathBuf) -> Vec<PathBuf> {

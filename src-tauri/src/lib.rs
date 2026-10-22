@@ -242,6 +242,8 @@ struct SkinList {
     skins: Vec<PickerSkin>,
     /// The local library's skins (ATA-220, ATA-239).
     local: Vec<PickerSkin>,
+    /// The folder they are read from.
+    folder: String,
     /// The skin picked to wear on every launch; none for a random one.
     choice: Option<String>,
     /// The skin on the window now; none for the house skin.
@@ -287,6 +289,10 @@ fn list_skins(app: AppHandle) -> SkinList {
                 broken: s.status == "broken",
             })
             .collect(),
+        folder: skins::local_dirs(&app)
+            .ok()
+            .and_then(|d| Some(d.first()?.to_string_lossy().into_owned()))
+            .unwrap_or_default(),
         choice: skins::choice(&app),
         worn: worn.map(|s| s.path.clone()),
         fetching,
@@ -536,12 +542,26 @@ fn open_link(url: String) -> Result<(), String> {
     Ok(())
 }
 
-/// Opens the local library's folder, for the listener to drop skins in.
+/// Asks for the local library's folder (ATA-239) and keeps it. Cancelling
+/// keeps the folder as it was.
 #[tauri::command]
-fn open_skins_folder(app: AppHandle) -> Result<(), String> {
-    let dir = skins::local_dirs(&app)?.remove(0);
-    shell_open(&dir.to_string_lossy());
-    Ok(())
+async fn choose_skins_folder(app: AppHandle, window: tauri::Window) -> Result<(), String> {
+    use tauri_plugin_dialog::DialogExt;
+    let mut dialog = app
+        .dialog()
+        .file()
+        .set_title("Choose the folder your .wmz skins are in")
+        .set_parent(&window);
+    if let Some(dir) = skins::local_dirs(&app)?.first() {
+        dialog = dialog.set_directory(dir);
+    }
+    let picked = tauri::async_runtime::spawn_blocking(move || dialog.blocking_pick_folder())
+        .await
+        .map_err(|e| e.to_string())?;
+    match picked {
+        Some(dir) => skins::set_folder(&app, &dir.into_path().map_err(|e| e.to_string())?),
+        None => Ok(()),
+    }
 }
 
 /// Opens the skin picker.
@@ -1388,6 +1408,9 @@ pub fn run() {
                 .build(),
         )
         .plugin(tauri_plugin_updater::Builder::new().build())
+        // For the picker's folder dialog, opened from Rust. No capability
+        // grants its commands, so no webview can call them.
+        .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
             skin_send,
             list_skins,
@@ -1395,7 +1418,7 @@ pub fn run() {
             preview_skin,
             preview_area,
             open_link,
-            open_skins_folder,
+            choose_skins_folder,
             now_playing,
             pick_audio,
         ])

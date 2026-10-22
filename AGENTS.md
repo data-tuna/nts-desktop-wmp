@@ -173,10 +173,11 @@ own house skin, `skins/house/`, the one `.wmz` the repository holds. Be
 polite to archive.org: one skin per launch, no bulk downloads. The app
 downloads at most one skin per launch, plus one for each skin the listener
 selects in the picker, to preview or wear it, and never two at once for
-the same skin. The picker's "Local library" lists the `.wmz` files the
-listener drops into `skins/local/` under the app's local data folder
-("Open skins folder…" opens it), read again each time the picker asks;
-subfolders are not read (ATA-239). Debug builds also list the checkout's
+the same skin. The picker's "Local library" lists the `.wmz` files in
+the folder the listener chose with "Choose skins folder…" (kept in
+`skin-folder.txt`), or else in `skins/local/` under the app's local data
+folder, read again each time the picker asks; subfolders are not read
+(ATA-239). Debug builds also list the checkout's
 gitignored `skins/local/` (ATA-220). `tools/compat.mjs` is the one bulk download, run by hand
 when the engine changes: it fetches each file once, a few seconds apart,
 into a cache outside the repository, and fetches only what is missing on a

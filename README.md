@@ -14,8 +14,8 @@ you listen a lot, support the station directly:
 Status: in progress. The app opens on NTS 1 in a
 random skin from the archive, one of the 59 the engine draws well so far.
 Right-click the skin to pick another; the app keeps your pick. To wear
-skins you downloaded yourself, click "Open skins folder…" in the picker,
-drop the `.wmz` files in, and pick them from "Local library". The
+skins you downloaded yourself, click "Choose skins folder…" in the picker,
+choose the folder they are in, and pick them from "Local library". The
 visualisation area shows the show's picture; right-click it to pick an
 effect or a Milkdrop preset instead. The tray icon
 plays, stops and switches channels, and opens the current show's page on

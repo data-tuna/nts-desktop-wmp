@@ -6,6 +6,25 @@ the evidence.
 
 ## Stack
 
+### The local library is any folder the listener chooses (ATA-239, 2026-10-22)
+
+Ata tried "Open skins folder…" in 0.4.0: "I just want the user to be able
+to put whatever skins they want into a folder they want and that you can
+browse through the skins there." Copying skins into the app's data folder
+was not what was meant, and an uninstall that deletes the app data takes
+them too. This replaces the **Picker** point of the entry below.
+
+- **"Choose skins folder…"** opens the system's folder dialog (Tauri's
+  dialog plugin, called from Rust only: no capability grants its commands,
+  and `escape.mjs` checks `plugin:dialog|open` is refused). The folder is
+  kept in `skin-folder.txt` beside `skin.json`; cancelling keeps the old
+  one. With none chosen, the library is `skins/local/` under the app's
+  data folder, as below.
+- The skins are read from that folder each time the picker asks, never
+  copied. The button's tooltip and the empty-list hint name the folder.
+- A kept `local/<file>.wmz` that the new folder does not have gets a random
+  skin on launch, as before.
+
 ### The local library in the installed app: a folder read at runtime (ATA-239, 2026-10-22)
 
 ATA-220 read `skins/local/` at a path fixed at build time, so the installed
