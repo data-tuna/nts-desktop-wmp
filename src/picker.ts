@@ -5,8 +5,8 @@
 import { invoke } from "@tauri-apps/api/core";
 
 type SkinList = {
-  skins: { path: string; page: string; size: number; cached: boolean }[];
-  // The local library (ATA-220): no page, always on disk.
+  skins: { path: string; page: string; size: number; cached: boolean; broken: boolean }[];
+  // The local library (ATA-220, ATA-239): no page, always on disk.
   local: SkinList["skins"];
   choice: string | null;
   worn: string | null;
@@ -20,6 +20,7 @@ const random = document.getElementById("random") as HTMLInputElement;
 const status = document.getElementById("status")!;
 const preview = document.getElementById("preview")!;
 const use = document.getElementById("use") as HTMLButtonElement;
+const folder = document.getElementById("folder") as HTMLButtonElement;
 
 const name = (path: string) => path.split("/").pop()!.replace(/\.wmz$/i, "");
 const mb = (bytes: number) => `${(bytes / 1e6).toFixed(1)} MB`;
@@ -46,6 +47,7 @@ function rowsFor(skins: SkinList["skins"]) {
       link.href = skin.page;
       link.dataset.link = "";
     }
+    if (skin.broken) link.textContent = "broken: not a zip";
     li.append(button, from, link);
     rows.set(skin.path, { li, button, link });
     return li;
@@ -54,8 +56,16 @@ function rowsFor(skins: SkinList["skins"]) {
 
 function build({ skins, local }: SkinList) {
   list.replaceChildren(...rowsFor(skins));
-  localList.replaceChildren(...rowsFor(local));
-  source.hidden = !local.length;
+  buildLocal(local);
+}
+
+let localPaths = "";
+function buildLocal(local: SkinList["local"]) {
+  localPaths = JSON.stringify(local.map((s) => s.path));
+  const hint = document.createElement("li");
+  hint.className = "hint";
+  hint.textContent = "No skins yet. Click “Open skins folder…” and drop .wmz files in.";
+  localList.replaceChildren(...(local.length ? rowsFor(local) : [hint]));
   source.options[1].textContent = `Local library (${local.length})`;
 }
 
@@ -73,6 +83,8 @@ async function refresh() {
     build(state);
     show(state.worn?.startsWith("local/") ? "local" : "archive");
   }
+  // Skins dropped into the folder, or taken out, while the picker is open.
+  if (JSON.stringify(state.local.map((s) => s.path)) !== localPaths) buildLocal(state.local);
   const { choice, worn, fetching } = state;
   random.checked = choice === null;
   random.disabled = busy;
@@ -129,6 +141,7 @@ new ResizeObserver(() => {
 }).observe(document.querySelector("main")!);
 use.addEventListener("click", () => selected && void choose(selected, name(selected)));
 source.addEventListener("change", () => show(source.value));
+folder.addEventListener("click", () => void invoke("open_skins_folder"));
 random.addEventListener("change", () => void choose(null, "a random skin"));
 document.addEventListener("click", (e) => {
   const a = (e.target as HTMLElement).closest<HTMLAnchorElement>("a[data-link]");

@@ -18,13 +18,14 @@ const ITEM: &str = "windowsmediaplayerskinsarchive";
 /// Room for a few dozen skins; the oldest go first.
 const CACHE_CAP_BYTES: u64 = 100 * 1024 * 1024;
 
-#[derive(Deserialize, Serialize, Clone, Debug)]
+#[derive(Deserialize, Serialize, Clone, Debug, PartialEq)]
 pub struct Skin {
     /// The file's path inside the archive.org item, `microsoft/Classic.wmz`.
     pub path: String,
     pub md5: String,
     pub size: u64,
-    /// `works`, `partial` or `broken`, from tools/compat.mjs.
+    /// `works`, `partial` or `broken`, from tools/compat.mjs; `local` or
+    /// `broken` (not a zip) for the local library.
     pub status: String,
 }
 
@@ -40,32 +41,73 @@ pub fn working() -> impl Iterator<Item = &'static Skin> {
     list().iter().filter(|s| s.status == "works")
 }
 
-/// The local library (ATA-220): every `.wmz` in the checkout's gitignored
-/// `skins/local/`, for development. Unchecked, so not on the random draw. A
-/// build made elsewhere finds no such folder and lists none.
-const LOCAL_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../skins/local");
-
-pub fn local() -> &'static [Skin] {
-    static LIST: OnceLock<Vec<Skin>> = OnceLock::new();
-    LIST.get_or_init(|| local_in(Path::new(LOCAL_DIR)))
+/// The local library (ATA-220, ATA-239): every `.wmz` in `skins/local/`
+/// under the app's data folder, read each time the picker asks. Debug builds
+/// also read the checkout's gitignored `skins/local/`. Unchecked, so not on
+/// the random draw.
+pub fn local_dirs(app: &AppHandle) -> Result<Vec<PathBuf>, String> {
+    let dir = cache_dir(app)?.join("local");
+    fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    Ok(with_checkout(dir))
 }
 
-fn local_in(dir: &Path) -> Vec<Skin> {
-    let mut skins: Vec<Skin> = fs::read_dir(dir)
+fn with_checkout(dir: PathBuf) -> Vec<PathBuf> {
+    let mut dirs = vec![dir];
+    if cfg!(debug_assertions) {
+        dirs.push(concat!(env!("CARGO_MANIFEST_DIR"), "/../skins/local").into());
+    }
+    dirs
+}
+
+/// The last scan. Each skin is leaked once, so it can be worn like a listed
+/// one; a scan finds a few dozen at most.
+static LOCAL: Mutex<Vec<&'static Skin>> = Mutex::new(Vec::new());
+
+pub fn local() -> Vec<&'static Skin> {
+    LOCAL.lock().unwrap().clone()
+}
+
+pub fn scan_local(app: &AppHandle) {
+    let found = local_dirs(app).map(|d| local_in(&d)).unwrap_or_default();
+    let mut list = LOCAL.lock().unwrap();
+    *list = found
         .into_iter()
-        .flatten()
-        .flatten()
-        .filter_map(|e| {
-            let name = e.file_name().into_string().ok()?;
-            let size = e.metadata().ok()?.len();
-            name.to_lowercase().ends_with(".wmz").then(|| Skin {
-                path: format!("local/{name}"),
-                md5: String::new(),
-                size,
-                status: "local".into(),
-            })
+        .map(|s| {
+            list.iter()
+                .find(|o| ***o == s)
+                .copied()
+                .unwrap_or_else(|| Box::leak(Box::new(s)))
         })
         .collect();
+}
+
+/// The `.wmz` files at the top of each folder; a name in an earlier folder
+/// hides the same name in a later one. A file that is not a zip is `broken`.
+fn local_in(dirs: &[PathBuf]) -> Vec<Skin> {
+    let mut skins: Vec<Skin> = Vec::new();
+    for dir in dirs {
+        for e in fs::read_dir(dir).into_iter().flatten().flatten() {
+            let Ok(name) = e.file_name().into_string() else {
+                continue;
+            };
+            let path = format!("local/{name}");
+            if !name.to_lowercase().ends_with(".wmz") || skins.iter().any(|s| s.path == path) {
+                continue;
+            }
+            let Ok(meta) = e.metadata() else { continue };
+            let mut head = [0u8; 4];
+            let zip = fs::File::open(e.path())
+                .and_then(|mut f| std::io::Read::read_exact(&mut f, &mut head))
+                .is_ok()
+                && head == [b'P', b'K', 3, 4];
+            skins.push(Skin {
+                path,
+                md5: String::new(),
+                size: meta.len(),
+                status: if zip { "local" } else { "broken" }.into(),
+            });
+        }
+    }
     skins.sort_by_key(|s| s.path.to_lowercase());
     skins
 }
@@ -150,8 +192,14 @@ impl Drop for Claim {
 /// must match the md5 the compatibility list was built from.
 pub fn fetch(app: &AppHandle, skin: &Skin) -> Result<Vec<u8>, String> {
     if let Some(name) = skin.path.strip_prefix("local/") {
-        return fs::read(Path::new(LOCAL_DIR).join(name))
-            .map_err(|e| format!("{}: {e}", skin.path));
+        if skin.status == "broken" {
+            return Err(format!("{}: not a zip", skin.path));
+        }
+        let dir = local_dirs(app)?
+            .into_iter()
+            .find(|d| d.join(name).is_file())
+            .ok_or_else(|| format!("{}: not found", skin.path))?;
+        return fs::read(dir.join(name)).map_err(|e| format!("{}: {e}", skin.path));
     }
     let _claim = Claim::new(&skin.md5);
     let dir = cache_dir(app)?;
@@ -367,6 +415,7 @@ fn launch_skin(choice: Option<String>) -> Option<&'static Skin> {
 /// thread. A remembered skin no longer on the list gets the house skin, and
 /// the choice stays.
 pub fn start(app: &AppHandle) {
+    scan_local(app);
     if let Some(skin) = launch_skin(choice(app)) {
         let id = begin();
         let app = app.clone();
@@ -438,15 +487,43 @@ mod tests {
 
     #[test]
     fn the_local_library_lists_its_wmz_files() {
-        let dir = std::env::temp_dir().join(format!("nts-wmp-local-{}", std::process::id()));
-        fs::create_dir_all(&dir).unwrap();
-        for name in ["b.wmz", "A.WMZ", "notes.txt"] {
-            fs::write(dir.join(name), [0u8; 3]).unwrap();
-        }
-        let paths: Vec<_> = local_in(&dir).into_iter().map(|s| s.path).collect();
-        fs::remove_dir_all(&dir).unwrap();
-        assert_eq!(paths, ["local/A.WMZ", "local/b.wmz"]);
-        assert!(local_in(&dir).is_empty());
+        let tmp = std::env::temp_dir().join(format!("nts-wmp-local-{}", std::process::id()));
+        let (app, checkout) = (tmp.join("app"), tmp.join("checkout"));
+        fs::create_dir_all(&app).unwrap();
+        fs::create_dir_all(&checkout).unwrap();
+        // An empty folder lists nothing.
+        assert!(local_in(std::slice::from_ref(&app)).is_empty());
+        let zip = b"PK\x03\x04 rest";
+        fs::write(app.join("b.wmz"), zip).unwrap();
+        fs::write(app.join("A.WMZ"), zip).unwrap();
+        fs::write(app.join("notes.txt"), zip).unwrap();
+        fs::write(app.join("html.wmz"), b"<html>").unwrap();
+        fs::write(app.join("empty.wmz"), b"").unwrap();
+        fs::write(checkout.join("b.wmz"), b"not a zip").unwrap();
+        fs::write(checkout.join("c.wmz"), zip).unwrap();
+        let found: Vec<_> = local_in(&[app, checkout])
+            .into_iter()
+            .map(|s| (s.path, s.status))
+            .collect();
+        fs::remove_dir_all(&tmp).unwrap();
+        let want = [
+            ("local/A.WMZ", "local"),
+            // The app's folder comes first, so its b.wmz hides the checkout's.
+            ("local/b.wmz", "local"),
+            ("local/c.wmz", "local"),
+            ("local/empty.wmz", "broken"),
+            ("local/html.wmz", "broken"),
+        ];
+        assert_eq!(found, want.map(|(p, s)| (p.to_string(), s.to_string())));
+        // A missing folder lists nothing either.
+        assert!(local_in(&[tmp]).is_empty());
+    }
+
+    #[test]
+    fn only_debug_builds_read_the_checkout() {
+        let dirs = with_checkout("app".into());
+        assert_eq!(dirs[0], PathBuf::from("app"));
+        assert_eq!(dirs.len(), if cfg!(debug_assertions) { 2 } else { 1 });
     }
 
     #[test]

@@ -240,7 +240,7 @@ fn skin_file() -> Response<Vec<u8>> {
 #[derive(serde::Serialize)]
 struct SkinList {
     skins: Vec<PickerSkin>,
-    /// The local library's skins (ATA-220); empty outside a checkout.
+    /// The local library's skins (ATA-220, ATA-239).
     local: Vec<PickerSkin>,
     /// The skin picked to wear on every launch; none for a random one.
     choice: Option<String>,
@@ -257,11 +257,15 @@ struct PickerSkin {
     page: String,
     size: u64,
     cached: bool,
+    /// Set for a local file that is not a zip.
+    broken: bool,
 }
 
-/// The picker's lists: every skin marked as working, and the local library.
+/// The picker's lists: every skin marked as working, and the local library,
+/// read from disk again.
 #[tauri::command]
 fn list_skins(app: AppHandle) -> SkinList {
+    skins::scan_local(&app);
     let (worn, fetching) = skins::status();
     SkinList {
         skins: skins::working()
@@ -270,6 +274,7 @@ fn list_skins(app: AppHandle) -> SkinList {
                 page: skins::page(s).into(),
                 size: s.size,
                 cached: skins::is_cached(&app, s),
+                broken: false,
             })
             .collect(),
         local: skins::local()
@@ -279,6 +284,7 @@ fn list_skins(app: AppHandle) -> SkinList {
                 page: String::new(),
                 size: s.size,
                 cached: true,
+                broken: s.status == "broken",
             })
             .collect(),
         choice: skins::choice(&app),
@@ -526,7 +532,15 @@ fn open_link(url: String) -> Result<(), String> {
     if !allowed {
         return Err(format!("not a link the picker opens: {url}"));
     }
-    open_url(&url);
+    shell_open(url.as_str());
+    Ok(())
+}
+
+/// Opens the local library's folder, for the listener to drop skins in.
+#[tauri::command]
+fn open_skins_folder(app: AppHandle) -> Result<(), String> {
+    let dir = skins::local_dirs(&app)?.remove(0);
+    shell_open(&dir.to_string_lossy());
     Ok(())
 }
 
@@ -634,7 +648,7 @@ fn handle(app: &AppHandle, msg: FromSkin) {
         }
         FromSkin::LaunchUrl { url } => {
             if let Some(url) = launchable(&url, Instant::now(), &LAST_LAUNCH) {
-                open_url(&url);
+                shell_open(url.as_str());
             }
         }
         FromSkin::Picker {} => {
@@ -897,7 +911,7 @@ fn on_tray_menu(app: &AppHandle, event: MenuEvent) {
             // Cloned so the lock is not held while the browser starts.
             let page = SHOW_PAGE.lock().unwrap().clone();
             if let Some(url) = page {
-                open_url(&url);
+                shell_open(url.as_str());
             }
         }
         // A click flips a check item's mark (muda does it on macOS too); main.ts
@@ -914,15 +928,16 @@ fn on_tray_menu(app: &AppHandle, event: MenuEvent) {
     }
 }
 
+/// Opens a link in the browser, or a folder in Explorer or the Finder.
 #[cfg(windows)]
-fn open_url(url: &Url) {
-    win32::open(url.as_str());
+fn shell_open(target: &str) {
+    win32::open(target);
 }
 
 #[cfg(not(windows))]
-fn open_url(url: &Url) {
+fn shell_open(target: &str) {
     // macOS; Linux has no build yet.
-    let _ = std::process::Command::new("open").arg(url.as_str()).spawn();
+    let _ = std::process::Command::new("open").arg(target).spawn();
 }
 
 #[cfg(windows)]
@@ -1380,6 +1395,7 @@ pub fn run() {
             preview_skin,
             preview_area,
             open_link,
+            open_skins_folder,
             now_playing,
             pick_audio,
         ])
