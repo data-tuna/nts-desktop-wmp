@@ -6,6 +6,38 @@ the evidence.
 
 ## Stack
 
+### A slider's natural size from its track images, never the thumb (ATA-228, 2026-10-22)
+
+`docs/research/wmp-skin-engine.md`, section 4, Sliders, "Natural size".
+
+- **What changed.** A slider that sets no `width` or `height` takes the
+  largest width and the largest height among its background, foreground,
+  their hover images and its disabled image, as WMP does. Before, it took
+  the background, else the thumb. `sliderSize()` in `pixels.ts`, tested
+  with a background alone, a foreground larger than the background, and a
+  thumb larger than both.
+- **One difference kept.** A slider with none of those images, only a
+  thumb, keeps the thumb's size. WMP's rule gives it no size, and how WMP
+  then draws it is not known. Five skins have such sliders (Jaws's EQ, MSN,
+  New Super Mario Bros, TEDDY, Charlie's Angels), all `partial`; without
+  this they would fill their parent.
+- **Which skins.** A scan of the 214 cached skins found 192 slider widths
+  or heights that change, in 20 skins; 6 of the skins are `works`. Beck's volume goes
+  from 17 to 16 px wide, its video sliders from 32 to 95 px. claw's volume
+  was 1 px tall (its thumb) and could not be seen; it is now 87 × 123 and
+  shows. Melvin's bow-tie slider now shows its fill. Tomb Raider 2's EQ
+  bands go from 1 × 1 to 14 × 106 px, RCT3's EQ from 7 to 94 px tall and
+  its truBass, wowEffect and video sliders from 7 to 78 px wide. Darkling's
+  EQ and Revert's seek set their own size and do not change.
+- **Worse: springflower.** Its volume slider grows from 1 to 50 px tall and
+  now shows a red block. The slider has `clippingColor="#ff0000"`, and our
+  engine applies `clippingColor` to views and subviews only.
+- **Compatibility.** `tools/compat.mjs` before and after: works 57,
+  partial 100, broken 59 both times. QuickSilver (2) flips between broken
+  ("drew nothing") and works from run to run on `main` alone, which is why
+  the committed list says 56 and 60.
+- Not tried: the app itself, or a drag with a real mouse.
+
 ### `jscript:` attributes are worked out once, as in WMP (ATA-219, 2026-10-21)
 
 Row 5 of the ranked table in `docs/research/wmp-skin-engine.md`.

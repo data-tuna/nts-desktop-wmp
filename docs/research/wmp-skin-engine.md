@@ -309,7 +309,9 @@ notes below are what it did before.
   backgrounds. For the foreground, WMP draws the far cap when the
   foreground fills the track; we never draw it, since we clip the
   foreground at the thumb's middle, short of the cap (rank 10).
-- Natural size: we use the background, else the thumb. Rarely matters.
+- Natural size: as WMP since ATA-228. A slider with none of those images
+  takes its thumb's size; WMP's rule gives it none, and how WMP draws
+  that is not known.
 
 ### Text
 

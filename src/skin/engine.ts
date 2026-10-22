@@ -7,7 +7,7 @@
 // skin reference (learn.microsoft.com/windows/win32/wmp/skin-programming-reference).
 import { CHANNELS } from "../player.ts";
 import { constants, type Node } from "./wms.ts";
-import { average, css, firstAt, keyed, mappedElement, mix, overlay, parseColor, playingColors, rgbAt, runs, sliderAt, textOn, thumb, tiles, type Pixels } from "./pixels.ts";
+import { average, css, firstAt, keyed, mappedElement, mix, overlay, parseColor, playingColors, rgbAt, runs, sliderAt, sliderSize, textOn, thumb, tiles, type Pixels } from "./pixels.ts";
 import { ALBUM_ART, drawEffect, EFFECTS, effectIndex, type Frame, type Memory } from "./effects.ts";
 import { clock, CONSTANTS, OS_MEDIA_CHANGING, OS_MEDIA_OPEN, objects, playState, resImage, resScript, resString, wmpObject, type Host } from "./runtime.ts";
 
@@ -217,10 +217,11 @@ class El {
       const size = name === "left" ? "width" : "height";
       return this.parent && this.alignment(name) === "center" ? Math.round((this.parent.geo(size) - this.geo(size)) / 2) : 0;
     }
-    const pick = (img: Img | undefined) => img && (name === "width" ? img.width : img.height);
+    const pick = (img: { width: number; height: number } | undefined) => img && (name === "width" ? img.width : img.height);
     let size: number | undefined;
-    if (this.kind === "container" || this.kind === "slider" || this.kind === "progress")
-      size = pick(this.img("backgroundimage")) ?? (this.kind === "slider" ? pick(this.img("thumbimage")) : undefined);
+    // A slider with only a thumb keeps the thumb's size; how WMP draws one is not known.
+    if (this.kind === "slider") size = pick(sliderSize((n) => this.img(n)) ?? this.img("thumbimage"));
+    else if (this.kind === "container" || this.kind === "progress") size = pick(this.img("backgroundimage"));
     else if (this.kind === "button") size = pick(this.img("image"));
     else if (this.kind === "group") size = pick(this.img("mappingimage")) ?? pick(this.img("image"));
     else if (this.kind === "custom") size = pick(this.img("positionimage"));
