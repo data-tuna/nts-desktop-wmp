@@ -957,8 +957,6 @@
   "status": "partial",
   "notes": [
    "shows 16899 pixels of key colour #FF00FF",
-   "currenteffecttype=\"jscript:mediacenter.effectType();\" could not be worked out, ignored",
-   "currentpreset=\"jscript:mediacenter.effectPreset();\" could not be worked out, ignored",
    "<player>: checkPlayerMediaGlobal() failed: ReferenceError: checkPlayerMediaGlobal is not defined"
   ]
  },
@@ -1028,9 +1026,7 @@
   "size": 1285806,
   "status": "partial",
   "notes": [
-   "shows 507 pixels of key colour #FF00FF",
-   "currenteffecttype=\"jscript:mediacenter.effectType();\" could not be worked out, ignored",
-   "currentpreset=\"jscript:mediacenter.effectPreset();\" could not be worked out, ignored"
+   "shows 507 pixels of key colour #FF00FF"
   ]
  },
  {
@@ -1067,8 +1063,6 @@
   "size": 1025425,
   "status": "partial",
   "notes": [
-   "currenteffecttype=\"jscript:mediacenter.effectType();\" could not be worked out, ignored",
-   "currentpreset=\"jscript:mediacenter.effectPreset();\" could not be worked out, ignored",
    "<player>: checkPlayerState() failed: ReferenceError: shutterOn is not defined"
   ]
  },
@@ -1078,8 +1072,6 @@
   "size": 1047709,
   "status": "partial",
   "notes": [
-   "currenteffecttype=\"jscript:mediacenter.effectType();\" could not be worked out, ignored",
-   "currentpreset=\"jscript:mediacenter.effectPreset();\" could not be worked out, ignored",
    "missing image screen_glare.png",
    "<player>: checkPlayerState() failed: ReferenceError: shutterOn is not defined"
   ]
@@ -1264,11 +1256,7 @@
   "path": "theskinsfactory/Kenwood_MP7.wmz",
   "md5": "eca0a2463a37a80e680873978b092460",
   "size": 1245871,
-  "status": "partial",
-  "notes": [
-   "currenteffecttype=\"jscript:mediacenter.effectType();\" could not be worked out, ignored",
-   "currentpreset=\"jscript:mediacenter.effectPreset();\" could not be worked out, ignored"
-  ]
+  "status": "works"
  },
  {
   "path": "theskinsfactory/Kenwood_MPXP.wmz",
@@ -1318,9 +1306,7 @@
   "size": 1421853,
   "status": "partial",
   "notes": [
-   "shows 507 pixels of key colour #FF00FF",
-   "currenteffecttype=\"jscript:mediacenter.effectType();\" could not be worked out, ignored",
-   "currentpreset=\"jscript:mediacenter.effectPreset();\" could not be worked out, ignored"
+   "shows 507 pixels of key colour #FF00FF"
   ]
  },
  {
@@ -1356,9 +1342,7 @@
   "size": 1324887,
   "status": "partial",
   "notes": [
-   "shows 507 pixels of key colour #FF00FF",
-   "currenteffecttype=\"jscript:mediacenter.effectType();\" could not be worked out, ignored",
-   "currentpreset=\"jscript:mediacenter.effectPreset();\" could not be worked out, ignored"
+   "shows 507 pixels of key colour #FF00FF"
   ]
  },
  {
@@ -1376,8 +1360,6 @@
   "size": 973285,
   "status": "partial",
   "notes": [
-   "currenteffecttype=\"jscript:mediacenter.effectType();\" could not be worked out, ignored",
-   "currentpreset=\"jscript:mediacenter.effectPreset();\" could not be worked out, ignored",
    "mainBox: mainLoader(); failed: ReferenceError: videoWin is not defined",
    "mainBox: resetCode() failed: TypeError: Cannot set properties of undefined (setting 'keycode')",
    "animTrigger: pullAnimation(); failed: ReferenceError: mainIntro is not defined"
@@ -1620,8 +1602,6 @@
   "status": "partial",
   "notes": [
    "missing image yes_on.gif",
-   "currenteffecttype=\"jscript:mediacenter.effectType();\" could not be worked out, ignored",
-   "currentpreset=\"jscript:mediacenter.effectPreset();\" could not be worked out, ignored",
    "mainModule: init(); failed: ReferenceError: PlaylistFrame is not defined"
   ]
  },
@@ -1641,8 +1621,6 @@
   "status": "partial",
   "notes": [
    "missing image yes_on.gif",
-   "currenteffecttype=\"jscript:mediacenter.effectType();\" could not be worked out, ignored",
-   "currentpreset=\"jscript:mediacenter.effectPreset();\" could not be worked out, ignored",
    "mainModule: init(); failed: ReferenceError: PlaylistFrame is not defined"
   ]
  },
@@ -1650,21 +1628,13 @@
   "path": "theskinsfactory/The_Unit_v3.wmz",
   "md5": "5750db0f05be28c1862f9fa83073cad6",
   "size": 1073598,
-  "status": "partial",
-  "notes": [
-   "currenteffecttype=\"jscript:mediacenter.effectType();\" could not be worked out, ignored",
-   "currentpreset=\"jscript:mediacenter.effectPreset();\" could not be worked out, ignored"
-  ]
+  "status": "works"
  },
  {
   "path": "theskinsfactory/TheUnit.wmz",
   "md5": "ec97efb5abd0f18fd99814b80d8dd0b8",
   "size": 1068277,
-  "status": "partial",
-  "notes": [
-   "currenteffecttype=\"jscript:mediacenter.effectType();\" could not be worked out, ignored",
-   "currentpreset=\"jscript:mediacenter.effectPreset();\" could not be worked out, ignored"
-  ]
+  "status": "works"
  },
  {
   "path": "theskinsfactory/TripleX for 7.1.wmz",

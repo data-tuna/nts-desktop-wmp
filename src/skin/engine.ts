@@ -9,7 +9,7 @@ import { CHANNELS } from "../player.ts";
 import { constants, type Node } from "./wms.ts";
 import { average, css, firstAt, keyed, mappedElement, mix, overlay, parseColor, playingColors, rgbAt, runs, sliderAt, sliderSize, textOn, thumb, tiles, type Pixels } from "./pixels.ts";
 import { ALBUM_ART, drawEffect, EFFECTS, effectIndex, type Frame, type Memory } from "./effects.ts";
-import { clock, CONSTANTS, OS_MEDIA_CHANGING, OS_MEDIA_OPEN, objects, playState, resImage, resScript, resString, wmpObject, type Host } from "./runtime.ts";
+import { calls, clock, comCalls, CONSTANTS, OS_MEDIA_CHANGING, OS_MEDIA_OPEN, objects, playState, resImage, resScript, resString, wmpObject, type Host } from "./runtime.ts";
 
 /** A text showing the current item's name, title or author. */
 const TITLE = /currentmedia\.(name\b|getiteminfo\(\s*["'](title|author)["'])/i;
@@ -1053,7 +1053,7 @@ export class Skin {
         // which are not in scope here).
         const hoist = [...code.matchAll(/^[ \t]*function\s+([A-Za-z_$][\w$]*)/gm)].map(([, name]) => `if (typeof ${name} == "function") globalThis.${name} = ${name};`).join(" ");
         // oxlint-disable-next-line no-eval -- skin code runs in this webview by design (ATA-107)
-        (0, eval)(`with (__wmpScope) { ${hoist}\n${code}\n}`);
+        (0, eval)(`with (__wmpScope) { ${hoist}\n${comCalls(code)}\n}`);
       } catch (e) {
         // Keep what layout needs: the file's literal constants.
         this.log(`script ${file} failed: ${String(e)}`);
@@ -1096,6 +1096,7 @@ export class Skin {
       has: (_, k) => typeof k === "string" && member(k) !== null,
       get: (_, k) => {
         if (typeof k !== "string") return undefined;
+        if (k === "__wmpCall") return calls(api, true);
         const m = member(k);
         if (m === "extra") return extra![k.toLowerCase()];
         if (m === null) {
@@ -1240,7 +1241,7 @@ export class Skin {
     const key = `${names.join(",")}\n${code}`;
     try {
       let f = this.compiled.get(key);
-      if (!f) this.compiled.set(key, (f = new Function("scope", "self", ...names, `with (scope) with (self) {\n${code}\n}`) as (...a: unknown[]) => unknown));
+      if (!f) this.compiled.set(key, (f = new Function("scope", "self", ...names, `with (scope) with (self) {\n${comCalls(code)}\n}`) as (...a: unknown[]) => unknown));
       return f(this.scope, this.api(e), ...names.map((n) => args[n]));
     } catch (err) {
       this.log(`${e.attr("id") ?? `<${e.node.tag}>`}: ${code.trim().slice(0, 60)} failed: ${String(err)}`);
@@ -1342,7 +1343,7 @@ export class Skin {
     try {
       // An element's own properties come first: `width="jscript:parent.width-left;"`.
       let f = this.compiled.get(expr);
-      if (!f) this.compiled.set(expr, (f = new Function("scope", "self", `with (scope) with (self) { return (${expr}); }`) as (...a: unknown[]) => unknown));
+      if (!f) this.compiled.set(expr, (f = new Function("scope", "self", `with (scope) with (self) { return (${comCalls(expr)}); }`) as (...a: unknown[]) => unknown));
       return { ok: true, v: f(this.scope, this.api(e)) };
     } catch {
       return this.fail(name, raw);
