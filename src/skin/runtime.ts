@@ -61,7 +61,8 @@ const clamp = (v: unknown, lo: number, hi: number) => Math.min(hi, Math.max(lo, 
  * with `calls(obj, true)`; every other object gets it from Object.prototype,
  * with JavaScript's rules. */
 // ponytail: textual, so it also rewrites inside string literals and breaks
-// `new a.B()`; no skin in the archive does either with an empty call.
+// `new a.B()`. One archive skin has one in a string (tubeframe's setTimeout,
+// run as code later, so unchanged); none has `new a.B()`.
 export const comCalls = (code: string) => code.replace(/(?<!\.)\.(\s*[A-Za-z_$][\w$]*)\s*\(\s*\)/g, ".__wmpCall.$1");
 
 export function calls(obj: any, com: boolean): object {

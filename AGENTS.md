@@ -272,7 +272,9 @@ case-insensitive, as COM's are, but handler attributes are not members:
 so their globals never meet. Every `.name()` with no arguments in skin
 code becomes `.__wmpCall.name` before it runs, so a property reads with
 call syntax, as through COM (`comCalls` in `runtime.ts`, ATA-235). It is
-textual: it rewrites inside string literals too.
+textual: it rewrites inside string literals too. A log that says
+`reading '__wmpCall'` means whatever came before a `.name()` was
+undefined.
 
 **Node's `TextDecoder("windows-1252")` is Latin-1.** It gets 0x80-0x9F
 wrong (`€`, curly quotes), so `wms.ts` maps that range itself. WebView2 gets

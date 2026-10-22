@@ -28,8 +28,11 @@ the evidence.
   calls with arguments are untouched.
 - **Limits.** The rewrite is textual. It also rewrites inside string
   literals, where it still runs if the string is evaluated later, and it
-  breaks `new a.B()`. No skin in the archive has either with an empty
-  argument list.
+  breaks `new a.B()`. One archive skin has an empty call in a string:
+  tubeframe's `setTimeout("player.CDRomCollection.item(0).eject()",1000)`.
+  The string runs later as code, where `__wmpCall` is global too, so its
+  behaviour doesn't change. No skin has `new a.B()`. A call on something
+  undefined now logs `reading '__wmpCall'`, not the member's name.
 - **Compatibility.** `tools/compat.mjs` before and after: works 56,
   partial 100, broken 60, then works 60, partial 97, broken 59.
   Kenwood_MP7, TheUnit and The_Unit_v3 go back to `works`. The 9 other
