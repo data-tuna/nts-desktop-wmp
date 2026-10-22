@@ -124,7 +124,8 @@ CORS on every hop. Those edge hosts move, so never hard-code one: always
 start from `streams.radiomast.io`. Mixtapes follow the same rule; see
 `mixtapes.ts`. On macOS one `fetch()` feeds the stream to the element
 through a MediaSource (`feed.ts`): given the url, WebKit opens two full-rate
-connections (ATA-236).
+connections (ATA-236). On the macOS runner the analyser reads the stream
+as silence on either path; a real Mac has not been checked.
 
 **Playback never depends on the now-playing API.** `https://www.nts.live/api/v2/live`
 is undocumented and can change or vanish. When it fails, the titles fall back

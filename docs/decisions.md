@@ -34,11 +34,25 @@ yet (ATA-234).
   fails or ends, the element fires `error` or `ended`, so reconnects work as
   before. After it: one connection per skin, held through the run, and
   9SeriesDefault's clock went from 00:03 to 00:18 between the two shots.
+  That shows the element plays, not that Web Audio hears it (next point).
+  `tests/feed.test.mjs` covers the end, error, abort and 30 s trim.
+- **On the runner, Web Audio hears the stream as silence, with or without
+  the MediaSource.** The probe skin (`tools/macos/probe.js`) shows Bars
+  and records the loudest analyser bar. With `feed`, with the plain url
+  as on `main`, and with the edge url the redirect leads to, the
+  AudioContext ran at 48 kHz and the element's clock passed 74 s, but every
+  bar was 0 and the waveform flat (runs 39704028768, 39704035478,
+  39706021379, experiment branches since deleted). In the same runs a
+  local 440 Hz tone through `createMediaElementSource` read 27-228, and an
+  oscillator 0-255. So this machine's Web Audio hears a media element,
+  just not this stream. Whether a real Mac does the same is not known:
+  if it does, the app is silent on macOS on `main` too. `check.sh` logs
+  the probe's result and does not fail on it.
 - **Windows had one connection already.** A release build on a hidden
   desktop, playing NTS 1, held one connection to the radiomast edge. It
   still sets the url on the element; `feed` runs only where the user agent
   says Mac OS X.
-- **Not checked:** sound (the runner has no ears), reconnect after a real
+- **Not checked:** sound on a real Mac, reconnect after a real
   drop on macOS, and memory over hours with the 30 s trim. Those need a
   real Mac (ATA-234).
 
