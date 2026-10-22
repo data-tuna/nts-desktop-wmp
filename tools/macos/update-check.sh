@@ -63,7 +63,14 @@ for arch in arm64 x86_64; do
   else
     echo "$arch: updated $from to $now and restarted (pid $pids)"
     file "$app/Contents/MacOS/nts-desktop-wmp" | tee -a "$out/$arch-app.log"
-    codesign --verify --deep --strict "$app" && echo "$arch: codesign --verify passes on the updated bundle"
+    # Ad-hoc signed (signingIdentity "-"): with no signature at all, a
+    # downloaded copy is "damaged" rather than one macOS lets you open.
+    if codesign --verify --deep --strict "$app"; then
+      codesign -dv "$app" 2>&1 | grep -E "^(Signature|Identifier|Format)"
+    else
+      echo "::error::$arch: the updated bundle's signature does not verify"
+      failed=1
+    fi
   fi
   pkill -f "$app/Contents/MacOS/nts-desktop-wmp"
   sleep 3
