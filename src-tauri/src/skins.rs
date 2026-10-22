@@ -10,6 +10,7 @@ use std::collections::hash_map::RandomState;
 use std::fs;
 use std::hash::BuildHasher;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Condvar, Mutex, OnceLock};
 use std::time::Duration;
 use tauri::{AppHandle, Manager, Url};
@@ -70,7 +71,10 @@ fn chosen_folder(app: &AppHandle) -> Option<PathBuf> {
 /// Keeps `dir` as the local library's folder.
 pub fn set_folder(app: &AppHandle, dir: &Path) -> Result<(), String> {
     let text = dir.to_str().ok_or("the folder's name is not Unicode")?;
-    fs::write(folder_file(app)?, text).map_err(|e| e.to_string())
+    fs::write(folder_file(app)?, text).map_err(|e| e.to_string())?;
+    // The old folder's skins, until the new one is read.
+    LOCAL.lock().unwrap().clear();
+    Ok(())
 }
 
 fn with_checkout(dir: PathBuf) -> Vec<PathBuf> {
@@ -87,6 +91,26 @@ static LOCAL: Mutex<Vec<&'static Skin>> = Mutex::new(Vec::new());
 
 pub fn local() -> Vec<&'static Skin> {
     LOCAL.lock().unwrap().clone()
+}
+
+static SCANNING: AtomicBool = AtomicBool::new(false);
+
+/// Scans on its own thread, unless a scan is running: an offline share
+/// takes some 20 s to fail, and the picker's lists must not wait for it.
+/// The result lands in `local()` for the picker's next poll.
+pub fn rescan_local(app: &AppHandle) {
+    if SCANNING.swap(true, Ordering::SeqCst) {
+        return;
+    }
+    let app = app.clone();
+    std::thread::spawn(move || {
+        scan_local(&app);
+        SCANNING.store(false, Ordering::SeqCst);
+    });
+}
+
+pub fn scanning() -> bool {
+    SCANNING.load(Ordering::SeqCst)
 }
 
 pub fn scan_local(app: &AppHandle) {

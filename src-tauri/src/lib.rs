@@ -250,6 +250,8 @@ struct SkinList {
     worn: Option<String>,
     /// Whether a skin is on its way.
     fetching: bool,
+    /// Whether the folder is being read; `local` is the last read until then.
+    scanning: bool,
 }
 
 #[derive(serde::Serialize)]
@@ -263,13 +265,13 @@ struct PickerSkin {
     broken: bool,
 }
 
-/// The picker's lists: every skin marked as working, and the local library,
-/// read from disk again.
+/// The picker's lists: every skin marked as working, and the local library
+/// as last read, with a new read started.
 #[tauri::command]
 async fn list_skins(app: AppHandle) -> Result<SkinList, String> {
     // The chosen folder may be a slow or offline share: off the main thread.
     tauri::async_runtime::spawn_blocking(move || {
-        skins::scan_local(&app);
+        skins::rescan_local(&app);
         let (worn, fetching) = skins::status();
         SkinList {
             skins: skins::working()
@@ -298,6 +300,7 @@ async fn list_skins(app: AppHandle) -> Result<SkinList, String> {
             choice: skins::choice(&app),
             worn: worn.map(|s| s.path.clone()),
             fetching,
+            scanning: skins::scanning(),
         }
     })
     .await

@@ -13,6 +13,8 @@ type SkinList = {
   choice: string | null;
   worn: string | null;
   fetching: boolean;
+  // Whether the folder is being read; `local` is the last read until then.
+  scanning: boolean;
 };
 
 const list = document.getElementById("skins")!;
@@ -56,18 +58,18 @@ function rowsFor(skins: SkinList["skins"]) {
   });
 }
 
-function build({ skins, local, folder: dir }: SkinList) {
+function build({ skins, local, folder: dir, scanning }: SkinList) {
   list.replaceChildren(...rowsFor(skins));
-  buildLocal(local, dir);
+  buildLocal(local, dir, scanning);
 }
 
 let localKey = "";
-function buildLocal(local: SkinList["local"], dir: string) {
-  localKey = JSON.stringify([dir, local.map((s) => [s.path, s.broken])]);
+function buildLocal(local: SkinList["local"], dir: string, scanning: boolean) {
+  localKey = JSON.stringify([dir, scanning && !local.length, local.map((s) => [s.path, s.broken])]);
   folder.title = dir;
   const hint = document.createElement("li");
   hint.className = "hint";
-  hint.textContent = `No .wmz skins in ${dir}. Click “Choose skins folder…” to pick the folder your skins are in.`;
+  hint.textContent = scanning ? `Reading ${dir}…` : `No .wmz skins in ${dir}. Click “Choose skins folder…” to pick the folder your skins are in.`;
   localList.replaceChildren(...(local.length ? rowsFor(local) : [hint]));
   source.options[1].textContent = `Local library (${local.length})`;
 }
@@ -87,7 +89,7 @@ async function refresh() {
     show(state.worn?.startsWith("local/") ? "local" : "archive");
   }
   // Skins dropped into the folder, taken out or replaced while the picker is open.
-  if (JSON.stringify([state.folder, state.local.map((s) => [s.path, s.broken])]) !== localKey) buildLocal(state.local, state.folder);
+  if (JSON.stringify([state.folder, state.scanning && !state.local.length, state.local.map((s) => [s.path, s.broken])]) !== localKey) buildLocal(state.local, state.folder, state.scanning);
   const { choice, worn, fetching } = state;
   random.checked = choice === null;
   random.disabled = busy;
