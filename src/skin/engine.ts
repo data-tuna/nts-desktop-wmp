@@ -462,7 +462,8 @@ class El {
       g.beginPath();
       g.rect(...(clip ?? [x, y, w, h]));
       g.clip();
-      const src = this.skin.keyedImage(img, this.color("transparencycolor"));
+      // clippingColor cuts slider images too (springflower's and Melvin's volume).
+      const src = this.skin.keyedImage(img, this.color("transparencycolor"), this.color("clippingcolor"));
       if (tiled) {
         // borderSize px at each end are caps; the middle repeats along the slider
         // only (Headspace's EQ). Across it, one copy at the image's own size.
@@ -759,6 +760,10 @@ class El {
     if (this.kind === "custom") {
       const pos = this.img("positionimage");
       return pos && this.gray(pos, lx, ly) !== null ? this : null;
+    }
+    if (this.kind === "slider") {
+      const clip = this.img("clippingimage");
+      return clip && rgbAt(clip, lx, ly) === this.color("clippingcolor") ? null : this;
     }
     return this;
   }
@@ -1387,8 +1392,9 @@ export class Skin {
   }
 
   /** `img` with the given colour made transparent, cached. */
-  keyedImage(img: Img, rgb: number | null): CanvasImageSource {
-    return rgb === null ? img.bitmap : this.cached(img, `key${rgb}`, () => keyed(img, [rgb]));
+  keyedImage(img: Img, ...rgbs: (number | null)[]): CanvasImageSource {
+    const colors = rgbs.filter((c) => c !== null);
+    return colors.length ? this.cached(img, `key${colors.join(",")}`, () => keyed(img, colors)) : img.bitmap;
   }
 
   /** A mask for compositing: the pixels of `img` in `colors`, opaque. */

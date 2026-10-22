@@ -18,25 +18,39 @@ the evidence.
   thumb larger than both.
 - **One difference kept.** A slider with none of those images, only a
   thumb, keeps the thumb's size. WMP's rule gives it no size, and how WMP
-  then draws it is not known. Five skins have such sliders (Jaws's EQ, MSN,
-  New Super Mario Bros, TEDDY, Charlie's Angels), all `partial`; without
-  this they would fill their parent.
+  then draws it is not known. Seven skins have such sliders: Jaws's EQ,
+  MSN, New Super Mario Bros, TEDDY, Charlie's Angels and Revert's balance
+  (`partial`), and Revert (1)'s balance (`broken`). Without this they
+  would fill their parent.
 - **Which skins.** A scan of the 214 cached skins found 192 slider widths
-  or heights that change, in 20 skins; 6 of the skins are `works`. Beck's volume goes
-  from 17 to 16 px wide, its video sliders from 32 to 95 px. claw's volume
-  was 1 px tall (its thumb) and could not be seen; it is now 87 × 123 and
-  shows. Melvin's bow-tie slider now shows its fill. Tomb Raider 2's EQ
+  or heights that change, in 20 skins; 6 of the skins are `works`.
+  Beck's volume goes from 17 to 16 px wide, its video sliders from 32 to
+  95 px. claw's volume was 1 px tall (its thumb) and could not be seen; it
+  is now 87 × 123 and shows. Melvin's bow-tie slider now shows its fill.
+  Tomb Raider 2's EQ
   bands go from 1 × 1 to 14 × 106 px, RCT3's EQ from 7 to 94 px tall and
   its truBass, wowEffect and video sliders from 7 to 78 px wide. Darkling's
   EQ and Revert's seek set their own size and do not change.
-- **Worse: springflower.** Its volume slider grows from 1 to 50 px tall and
-  now shows a red block. The slider has `clippingColor="#ff0000"`, and our
-  engine applies `clippingColor` to views and subviews only.
+- **clippingColor on sliders.** springflower's and Melvin's volume
+  sliders grew from 1 px to 50 and 20 px, and showed a red block: each
+  sets `clippingColor="#ff0000"` with its foreground as `clippingImage`,
+  and the engine applied `clippingColor` to views and subviews only. A
+  slider now keys its `clippingColor` out of its images, as it does its
+  `transparencyColor`, and a click on a `clippingImage` pixel of that
+  colour misses it. Section 3 of the research doc rates what WMP does with
+  `clippingColor` at medium-low confidence; this follows what the skins
+  were drawn for. It also takes 188 key-colour pixels off Atomic's volume
+  slider (`partial`), whose `clippingColor` is `#ff00ff`.
 - **Compatibility.** `tools/compat.mjs` before and after: works 57,
   partial 100, broken 59 both times. QuickSilver (2) flips between broken
   ("drew nothing") and works from run to run on `main` alone, which is why
   the committed list says 56 and 60.
-- Not tried: the app itself, or a drag with a real mouse.
+- **In the app.** A debug build on a hidden desktop, wearing springflower
+  and then Melvin, both playing: no `#FF0000` pixel on either canvas.
+  DevTools clicks on the volume sliders' drawn pixels set the volume
+  (springflower 42, 66, 14; Melvin 20, 60); a click on springflower's
+  clipped red area did nothing.
+- Not tried: a drag with a real mouse.
 
 ### `jscript:` attributes are worked out once, as in WMP (ATA-219, 2026-10-21)
 
