@@ -59,9 +59,9 @@ function build({ skins, local }: SkinList) {
   buildLocal(local);
 }
 
-let localPaths = "";
+let localKey = "";
 function buildLocal(local: SkinList["local"]) {
-  localPaths = JSON.stringify(local.map((s) => s.path));
+  localKey = JSON.stringify(local.map((s) => [s.path, s.broken]));
   const hint = document.createElement("li");
   hint.className = "hint";
   hint.textContent = "No skins yet. Click “Open skins folder…” and drop .wmz files in.";
@@ -83,8 +83,8 @@ async function refresh() {
     build(state);
     show(state.worn?.startsWith("local/") ? "local" : "archive");
   }
-  // Skins dropped into the folder, or taken out, while the picker is open.
-  if (JSON.stringify(state.local.map((s) => s.path)) !== localPaths) buildLocal(state.local);
+  // Skins dropped into the folder, taken out or replaced while the picker is open.
+  if (JSON.stringify(state.local.map((s) => [s.path, s.broken])) !== localKey) buildLocal(state.local);
   const { choice, worn, fetching } = state;
   random.checked = choice === null;
   random.disabled = busy;

@@ -995,7 +995,7 @@ mod win32 {
     }
     const SW_SHOWNORMAL: i32 = 1;
 
-    /// Opens an http(s) URL in the default browser.
+    /// Opens a link in the browser, or a folder in Explorer.
     pub fn open(url: &str) {
         let wide = |s: &str| s.encode_utf16().chain([0]).collect::<Vec<u16>>();
         let (op, file) = (wide("open"), wide(url));
