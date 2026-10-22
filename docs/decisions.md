@@ -6,6 +6,38 @@ the evidence.
 
 ## Stack
 
+### Properties read with call syntax, as through COM (ATA-235, 2026-10-22)
+
+- **Why.** WMP's objects are COM objects. JScript reaches them through
+  `IDispatch::Invoke`, which a caller may ask for "a method or a property
+  get" when its language can't tell the two apart (Microsoft's
+  `IDispatch::Invoke` reference). So under WMP `mediacenter.effectType()`
+  reads `mediacenter.effectType`. 12 of The Skins Factory's skins rely on
+  it: `currentEffectType="jscript:mediacenter.effectType();"` and
+  `currentPreset="jscript:mediacenter.effectPreset();"`.
+- **How.** JavaScript cannot call a string, and the object model returns
+  plain values, so the hook is in the code, not the values. `comCalls()`
+  in `runtime.ts` rewrites every `.name()` with no arguments in skin code
+  (script files, handlers, `jscript:` values) to `.__wmpCall.name`. The
+  object model's objects and the elements answer `__wmpCall` with a view
+  that calls a method and reads a property. Every other object gets
+  `__wmpCall` from `Object.prototype`, with JavaScript's rules:
+  `"ab".toUpperCase()` still works and `"ab".length()` still throws. An
+  unknown member called on a WMP object still throws too, as COM's
+  "Object doesn't support this property or method" would. Assignment and
+  calls with arguments are untouched.
+- **Limits.** The rewrite is textual. It also rewrites inside string
+  literals, where it still runs if the string is evaluated later, and it
+  breaks `new a.B()`. No skin in the archive has either with an empty
+  argument list.
+- **Compatibility.** `tools/compat.mjs` before and after: works 56,
+  partial 100, broken 60, then works 60, partial 97, broken 59.
+  Kenwood_MP7, TheUnit and The_Unit_v3 go back to `works`. The 9 other
+  skins that logged the two expressions lose those notes and stay
+  `partial` for other reasons. No skin got worse, and none gained a note.
+  QuickSilver (2) came out `works` again on timing alone (see ATA-228),
+  so the list keeps it `broken`.
+
 ### A slider's natural size from its track images, never the thumb (ATA-228, 2026-10-22)
 
 `docs/research/wmp-skin-engine.md`, section 4, Sliders, "Natural size".
