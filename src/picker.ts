@@ -145,7 +145,7 @@ new ResizeObserver(() => {
 use.addEventListener("click", () => selected && void choose(selected, name(selected)));
 source.addEventListener("change", () => show(source.value));
 folder.addEventListener("click", async () => {
-  await invoke("choose_skins_folder").catch((e) => (status.textContent = `Could not choose a folder (${String(e)}).`));
+  await invoke("choose_skins_folder").catch((e) => (failed = `Could not choose a folder (${String(e)}).`));
   show("local");
   await refresh();
 });

@@ -40,8 +40,9 @@ release; if there is one, it installs it and restarts, which interrupts the
 stream for a few seconds. Updates are signed, and the app refuses one whose
 signature does not match.
 
-Uninstall from Settings > Apps. Downloaded skins and the local library stay in
-`%LOCALAPPDATA%\com.datatuna.ntswmp`; delete that folder to remove them.
+Uninstall from Settings > Apps. Downloaded skins, and the local library if you
+never chose a skins folder, stay in `%LOCALAPPDATA%\com.datatuna.ntswmp`;
+delete that folder to remove them. A skins folder you chose is never touched.
 
 ## Install (macOS)
 

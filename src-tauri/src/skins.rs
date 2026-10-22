@@ -436,13 +436,21 @@ fn launch_skin(choice: Option<String>) -> Option<&'static Skin> {
 /// On launch: the listener's skin, or a random one, fetched on its own
 /// thread. A remembered skin no longer on the list gets the house skin, and
 /// the choice stays.
+/// The local folder is read there too, and only for a kept local skin: it
+/// may be a share that is offline.
 pub fn start(app: &AppHandle) {
-    scan_local(app);
-    if let Some(skin) = launch_skin(choice(app)) {
-        let id = begin();
-        let app = app.clone();
-        std::thread::spawn(move || fetch_and_wear(&app, skin, id));
-    }
+    let id = begin();
+    let app = app.clone();
+    std::thread::spawn(move || {
+        let choice = choice(&app);
+        if choice.as_deref().is_some_and(|c| c.starts_with("local/")) {
+            scan_local(&app);
+        }
+        match launch_skin(choice) {
+            Some(skin) => drop(fetch_and_wear(&app, skin, id)),
+            None => finish(id, Worn::House),
+        }
+    });
 }
 
 #[cfg(test)]

@@ -266,37 +266,42 @@ struct PickerSkin {
 /// The picker's lists: every skin marked as working, and the local library,
 /// read from disk again.
 #[tauri::command]
-fn list_skins(app: AppHandle) -> SkinList {
-    skins::scan_local(&app);
-    let (worn, fetching) = skins::status();
-    SkinList {
-        skins: skins::working()
-            .map(|s| PickerSkin {
-                path: s.path.clone(),
-                page: skins::page(s).into(),
-                size: s.size,
-                cached: skins::is_cached(&app, s),
-                broken: false,
-            })
-            .collect(),
-        local: skins::local()
-            .iter()
-            .map(|s| PickerSkin {
-                path: s.path.clone(),
-                page: String::new(),
-                size: s.size,
-                cached: true,
-                broken: s.status == "broken",
-            })
-            .collect(),
-        folder: skins::local_dirs(&app)
-            .ok()
-            .and_then(|d| Some(d.first()?.to_string_lossy().into_owned()))
-            .unwrap_or_default(),
-        choice: skins::choice(&app),
-        worn: worn.map(|s| s.path.clone()),
-        fetching,
-    }
+async fn list_skins(app: AppHandle) -> Result<SkinList, String> {
+    // The chosen folder may be a slow or offline share: off the main thread.
+    tauri::async_runtime::spawn_blocking(move || {
+        skins::scan_local(&app);
+        let (worn, fetching) = skins::status();
+        SkinList {
+            skins: skins::working()
+                .map(|s| PickerSkin {
+                    path: s.path.clone(),
+                    page: skins::page(s).into(),
+                    size: s.size,
+                    cached: skins::is_cached(&app, s),
+                    broken: false,
+                })
+                .collect(),
+            local: skins::local()
+                .iter()
+                .map(|s| PickerSkin {
+                    path: s.path.clone(),
+                    page: String::new(),
+                    size: s.size,
+                    cached: true,
+                    broken: s.status == "broken",
+                })
+                .collect(),
+            folder: skins::local_dirs(&app)
+                .ok()
+                .and_then(|d| Some(d.first()?.to_string_lossy().into_owned()))
+                .unwrap_or_default(),
+            choice: skins::choice(&app),
+            worn: worn.map(|s| s.path.clone()),
+            fetching,
+        }
+    })
+    .await
+    .map_err(|e| e.to_string())
 }
 
 /// Wears `path` from now on, or with none a random skin each launch (and a
