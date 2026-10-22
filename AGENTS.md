@@ -66,7 +66,8 @@ Written in English.
                           app plays, for a pick's visualisation. Window
                           config in tauri.conf.json, permissions in
                           capabilities/.
-    src-tauri/icons/      App icons. For now the Winamp app's pixel-art radio.
+    src-tauri/icons/      App icons: Ata's Paint drawing of a bootleg boot
+                          (ATA-227). source.png is the 1024 px master.
     docs/decisions.md     Decisions, research findings, and why.
     docs/research/        Longer research notes, such as how WMP 7.1's own
                           skin engine behaves (wmp-skin-engine.md, ATA-212).
@@ -456,8 +457,12 @@ one: a `previewView` for WMP's skin chooser, or a `mediaSwitcherView` or
 in the picker loads the skin into the preview webview again, from the
 cache: about 0.3 s. No thumbnails are saved.
 
-**The icon is the Winamp app's.** Both apps look the same in the taskbar
-until this one gets its own.
+**The icon is Ata's own drawing** (ATA-227): a black boot made in Paint,
+"Boo-tleg NTS" on the side. `src-tauri/icons/source.png` is the master,
+1024 px with the background already removed and the pixels scaled 3x, not
+smoothed. To change it, edit that file and run
+`npx tauri icon src-tauri/icons/source.png`, then delete the `android/`,
+`ios/` and `64x64.png` it also writes: the app ships none of them.
 
 **PR CI builds the Rust side on macOS only.** The Windows job runs
 typecheck, lint, the frontend build, the tests and `cargo fmt --check`. The
