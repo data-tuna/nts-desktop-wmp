@@ -22,6 +22,11 @@ them too. This replaces the **Picker** point of the entry below.
   data folder, as below.
 - The skins are read from that folder each time the picker asks, never
   copied. The button's tooltip and the empty-list hint name the folder.
+- The folder may be a share that is offline, which takes some 20 s to
+  fail. So it is never read on the setup path or the main thread: the
+  launch reads it on its own thread, and only for a kept local skin, and
+  `list_skins` returns the last read at once while a new one runs in the
+  background ("Reading <folder>…" until the first lands).
 - A kept `local/<file>.wmz` that the new folder does not have gets a random
   skin on launch, as before.
 
