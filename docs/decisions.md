@@ -6,6 +6,42 @@ the evidence.
 
 ## Stack
 
+### macOS: big skins pulled on screen, one stream connection (ATA-236, 2026-10-22)
+
+Two faults from the ATA-229 runner shots. Checked on the `macos-latest`
+runner with a manual archive-skins run (39699037731). There is no real Mac
+yet (ATA-234).
+
+- **Big skins opened partly off screen because the resize lands late.**
+  tao resizes a macOS window with `set_content_size_async`, so right after
+  `set_size` the window still reports its old 234x201, and `pull_on_screen`
+  found that fully visible. It now takes the new size from the shape
+  message. The work area was not at fault: Tauri gives it in top-left
+  coordinates without the menu bar and the Dock. Located in the runner's
+  screen shots: Headspace at (264, 227) to (1024, 621), 9SeriesDefault at
+  (165, 227) to (1024, 695), both inside the 1024x768 screen and above the
+  Dock. The pull still runs only when the size changes, so a mask change
+  leaves a parked window where it is. Windows resizes at once, so there the
+  size passed in is the one the window already reports.
+- **The second connection was a second full stream.** `nettop` on the
+  runner showed both connections receiving about 170 KB every 5 s, the
+  stream's 256 kbit/s, in all four skins (run 39697433437). Given a url,
+  WebKit's `<audio>` requests it twice, the first time for bytes 0-1, as
+  Safari is known to do. Radiomast answers every request with the endless
+  stream (`Accept-Ranges: none`), so the probe never ends. On macOS
+  `feed.ts` now fetches the stream once and appends it to a MediaSource
+  that the element plays, keeping 30 s behind the playhead. When the fetch
+  fails or ends, the element fires `error` or `ended`, so reconnects work as
+  before. After it: one connection per skin, held through the run, and
+  9SeriesDefault's clock went from 00:03 to 00:18 between the two shots.
+- **Windows had one connection already.** A release build on a hidden
+  desktop, playing NTS 1, held one connection to the radiomast edge. It
+  still sets the url on the element; `feed` runs only where the user agent
+  says Mac OS X.
+- **Not checked:** sound (the runner has no ears), reconnect after a real
+  drop on macOS, and memory over hours with the 30 s trim. Those need a
+  real Mac (ATA-234).
+
 ### macOS: the skin's shape, drag, menu bar and app menu (ATA-230, 2026-10-21)
 
 Checked on the `macos-latest` GitHub runner with `tools/macos/check.sh`,
@@ -1157,7 +1193,8 @@ and on `main`.
     Milkdrop were not switched to: the runner has no DevTools into WebKit.
   - **The menu bar** shows Tauri's default menu (File, Edit, View, Window,
     Help) and the tray icon; the app also has a Dock icon.
-  - Each run held two connections to edges at once. Why is not known yet.
+  - Each run held two connections to edges at once (explained and fixed
+    by ATA-236, above).
 - **Not seen on the runner:** dragging, clicks, media keys, sound, Retina
   scale, and the updater (a local build has no endpoint and says so).
   ATA-230 and ATA-232 work from the list above.
