@@ -1184,7 +1184,9 @@ and on `main`.
   Without it `codesign --verify` said the bundle "is not signed at all".
   Not a Developer ID, and not notarised.
 - **Tried on PRs, never with the real key.** `update-check.yml` runs on PRs
-  that touch the release, the updater or the macOS config, and by hand. It
+  that touch the release, the bundle config (`tauri*.conf.json`) or
+  `Cargo.toml`/`Cargo.lock`, and by hand; a change to `update()` in
+  `lib.rs` alone does not start it. It
   makes a key on the runner (`tauri signer generate --ci`), builds the new
   version with the release config plus one that swaps in that key's public
   half and an endpoint at `http://127.0.0.1:8765` (plain http only there,

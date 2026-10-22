@@ -4,13 +4,16 @@ name: Update check
 # release.yml's macOS job would publish, signed with a key made on the
 # runner and thrown away with it, then has a 0.0.1 build update itself to
 # that from a local server. The real signing key is only ever in
-# release.yml's tag jobs. Runs on PRs that touch the release or the updater.
+# release.yml's tag jobs. Runs on PRs that touch the release, the bundle
+# config or the updater's version; not lib.rs's update(), or it would run on
+# most Rust PRs.
 on:
   pull_request:
     paths:
       - .github/workflows/release.yml
       - .github/workflows/update-check.yml
       - tools/macos/update-check.sh
+      - src-tauri/tauri.conf.json
       - src-tauri/tauri.release.conf.json
       - src-tauri/tauri.macos.conf.json
       - src-tauri/Cargo.toml

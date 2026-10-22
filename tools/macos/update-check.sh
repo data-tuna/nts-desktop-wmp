@@ -45,6 +45,7 @@ for arch in arm64 x86_64; do
   ditto "$old" "$app"
   from=$(plist "$app")
   NTS_WMP_SKIN=$PWD/skins/house/house.wmz arch -$arch "$app/Contents/MacOS/nts-desktop-wmp" > "$out/$arch-app.log" 2>&1 &
+  first=$!  # arch execs in place, so this is the app's own pid
   deadline=$((SECONDS + 180))
   while [ $SECONDS -lt $deadline ] && [ "$(plist "$app")" != "$version" ]; do sleep 2; done
   now=$(plist "$app")
@@ -54,14 +55,18 @@ for arch in arm64 x86_64; do
     failed=1
     continue
   fi
-  # The restart: a process from the swapped bundle, still up 10 s later.
+  # The restart: the first process gone, another from the swapped bundle
+  # still up 10 s later.
   sleep 10
-  pids=$(pgrep -f "$app/Contents/MacOS/nts-desktop-wmp" | tr '\n' ' ')
-  if [ -z "$pids" ]; then
+  pids=$(pgrep -f "$app/Contents/MacOS/nts-desktop-wmp" | grep -vx "$first" | tr '\n' ' ')
+  if kill -0 "$first" 2>/dev/null; then
+    echo "::error::$arch: updated $from to $now, but pid $first is still running: no restart"
+    failed=1
+  elif [ -z "$pids" ]; then
     echo "::error::$arch: updated $from to $now, but no app running from it after the restart"
     failed=1
   else
-    echo "$arch: updated $from to $now and restarted (pid $pids)"
+    echo "$arch: updated $from to $now and restarted (pid $first, now $pids)"
     file "$app/Contents/MacOS/nts-desktop-wmp" | tee -a "$out/$arch-app.log"
     # Ad-hoc signed (signingIdentity "-"): with no signature at all, a
     # downloaded copy is "damaged" rather than one macOS lets you open.
