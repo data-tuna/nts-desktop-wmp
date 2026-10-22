@@ -6,7 +6,7 @@ import assert from "node:assert/strict";
 import { deflateRawSync } from "node:zlib";
 import { unzip } from "../src/skin/wmz.ts";
 import { constants, decode, parse } from "../src/skin/wms.ts";
-import { average, firstAt, keyed, mappedElement, mix, overlay, parseColor, playingColors, runs, sliderAt, textOn, thumb, tiles } from "../src/skin/pixels.ts";
+import { average, firstAt, keyed, mappedElement, mix, overlay, parseColor, playingColors, runs, sliderAt, sliderSize, textOn, thumb, tiles } from "../src/skin/pixels.ts";
 
 /** A zip with one entry per [name, bytes, deflate?], as skin tools write them. */
 function zip(entries) {
@@ -213,6 +213,16 @@ test("slider: a tiled image keeps borderSize px at each end as caps and repeats 
   assert.deepEqual(tiles(25, 10, 0), [[0, 0, 10], [0, 10, 10], [0, 20, 5]]);
   // An image too short for both caps repeats whole.
   assert.deepEqual(tiles(5, 2, 7), [[0, 0, 2], [0, 2, 2], [0, 4, 1]]);
+});
+
+test("slider: with no size of its own, it takes the largest background or foreground image, never the thumb", () => {
+  const size = (images) => sliderSize((name) => images[name]);
+  assert.deepEqual(size({ backgroundimage: { width: 80, height: 10 } }), { width: 80, height: 10 }, "background only");
+  const both = { backgroundimage: { width: 60, height: 12 }, foregroundimage: { width: 50, height: 16 } };
+  assert.deepEqual(size(both), { width: 60, height: 16 }, "the largest of each");
+  assert.deepEqual(size({ ...both, thumbimage: { width: 70, height: 20 } }), { width: 60, height: 16 }, "a thumb larger than both does not count");
+  assert.deepEqual(size({ thumbimage: { width: 9, height: 17 } }), undefined, "a thumb alone gives no size");
+  assert.deepEqual(size({ backgroundimage: { width: 10, height: 10 }, disabledimage: { width: 12, height: 8 }, foregroundhoverimage: { width: 4, height: 14 } }), { width: 12, height: 14 });
 });
 
 test("effects: bars are log-spaced spectrum peaks, the wave is evenly sampled, and unknown effects fall back", async () => {

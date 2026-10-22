@@ -259,6 +259,9 @@ we handle. No change needed.
   Windows' defaults rather than read from the machine.
 - 8-bit BMPs: we decode to RGB first, so a key colour that is not in the
   palette never matches either. Same result.
+- `clippingColor` on a slider (ATA-228): keyed out of its images like
+  `transparencyColor`, and a click on a `clippingImage` pixel of that
+  colour misses it. Not confirmed in WMP's code.
 
 ## 4. Sliders, text and effects
 
@@ -309,7 +312,9 @@ notes below are what it did before.
   backgrounds. For the foreground, WMP draws the far cap when the
   foreground fills the track; we never draw it, since we clip the
   foreground at the thumb's middle, short of the cap (rank 10).
-- Natural size: we use the background, else the thumb. Rarely matters.
+- Natural size: as WMP since ATA-228. A slider with none of those images
+  takes its thumb's size; WMP's rule gives it none, and how WMP draws
+  that is not known.
 
 ### Text
 

@@ -7,7 +7,7 @@
 // skin reference (learn.microsoft.com/windows/win32/wmp/skin-programming-reference).
 import { CHANNELS } from "../player.ts";
 import { constants, type Node } from "./wms.ts";
-import { average, css, firstAt, keyed, mappedElement, mix, overlay, parseColor, playingColors, rgbAt, runs, sliderAt, textOn, thumb, tiles, type Pixels } from "./pixels.ts";
+import { average, css, firstAt, keyed, mappedElement, mix, overlay, parseColor, playingColors, rgbAt, runs, sliderAt, sliderSize, textOn, thumb, tiles, type Pixels } from "./pixels.ts";
 import { ALBUM_ART, drawEffect, EFFECTS, effectIndex, type Frame, type Memory } from "./effects.ts";
 import { clock, CONSTANTS, OS_MEDIA_CHANGING, OS_MEDIA_OPEN, objects, playState, resImage, resScript, resString, wmpObject, type Host } from "./runtime.ts";
 
@@ -217,10 +217,11 @@ class El {
       const size = name === "left" ? "width" : "height";
       return this.parent && this.alignment(name) === "center" ? Math.round((this.parent.geo(size) - this.geo(size)) / 2) : 0;
     }
-    const pick = (img: Img | undefined) => img && (name === "width" ? img.width : img.height);
+    const pick = (img: { width: number; height: number } | undefined) => img && (name === "width" ? img.width : img.height);
     let size: number | undefined;
-    if (this.kind === "container" || this.kind === "slider" || this.kind === "progress")
-      size = pick(this.img("backgroundimage")) ?? (this.kind === "slider" ? pick(this.img("thumbimage")) : undefined);
+    // A slider with only a thumb keeps the thumb's size; how WMP draws one is not known.
+    if (this.kind === "slider") size = pick(sliderSize((n) => this.img(n)) ?? this.img("thumbimage"));
+    else if (this.kind === "container" || this.kind === "progress") size = pick(this.img("backgroundimage"));
     else if (this.kind === "button") size = pick(this.img("image"));
     else if (this.kind === "group") size = pick(this.img("mappingimage")) ?? pick(this.img("image"));
     else if (this.kind === "custom") size = pick(this.img("positionimage"));
@@ -461,7 +462,8 @@ class El {
       g.beginPath();
       g.rect(...(clip ?? [x, y, w, h]));
       g.clip();
-      const src = this.skin.keyedImage(img, this.color("transparencycolor"));
+      // clippingColor cuts slider images too (springflower's and Melvin's volume).
+      const src = this.skin.keyedImage(img, this.color("transparencycolor"), this.color("clippingcolor"));
       if (tiled) {
         // borderSize px at each end are caps; the middle repeats along the slider
         // only (Headspace's EQ). Across it, one copy at the image's own size.
@@ -758,6 +760,10 @@ class El {
     if (this.kind === "custom") {
       const pos = this.img("positionimage");
       return pos && this.gray(pos, lx, ly) !== null ? this : null;
+    }
+    if (this.kind === "slider") {
+      const clip = this.img("clippingimage");
+      return clip && rgbAt(clip, lx, ly) === this.color("clippingcolor") ? null : this;
     }
     return this;
   }
@@ -1386,8 +1392,9 @@ export class Skin {
   }
 
   /** `img` with the given colour made transparent, cached. */
-  keyedImage(img: Img, rgb: number | null): CanvasImageSource {
-    return rgb === null ? img.bitmap : this.cached(img, `key${rgb}`, () => keyed(img, [rgb]));
+  keyedImage(img: Img, ...rgbs: (number | null)[]): CanvasImageSource {
+    const colors = rgbs.filter((c) => c !== null);
+    return colors.length ? this.cached(img, `key${colors.join(",")}`, () => keyed(img, colors)) : img.bitmap;
   }
 
   /** A mask for compositing: the pixels of `img` in `colors`, opaque. */

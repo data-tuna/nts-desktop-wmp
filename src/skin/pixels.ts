@@ -178,6 +178,13 @@ export function sliderAt(length: number, border: number, size: number, t: number
   return { edge, thumb: edge - Math.floor(size / 2) };
 }
 
+/** The size of a slider that sets none, as in WMP 7.1: the largest width
+ * and the largest height among these images. The thumb never counts. */
+export function sliderSize(image: (name: string) => { width: number; height: number } | undefined): { width: number; height: number } | undefined {
+  const found = ["backgroundimage", "backgroundhoverimage", "foregroundimage", "foregroundhoverimage", "disabledimage"].map(image).filter((i) => i !== undefined);
+  return found.length ? { width: Math.max(...found.map((i) => i.width)), height: Math.max(...found.map((i) => i.height)) } : undefined;
+}
+
 /** A tiled slider image of `size` px laid along a `length` px slider, as
  * [from in the image, to on the slider, px] copies. The first and last
  * `border` px are end caps drawn once; only the middle repeats. An image too
