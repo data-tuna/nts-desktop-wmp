@@ -6,6 +6,34 @@ the evidence.
 
 ## Stack
 
+### The local library in the installed app: a folder read at runtime (ATA-239, 2026-10-22)
+
+ATA-220 read `skins/local/` at a path fixed at build time, so the installed
+app never showed the library Ata had downloaded. This replaces the
+**Where** and **Picker** points of that entry.
+
+- **Where.** `skins/local/` under the app's local data folder:
+  `%LOCALAPPDATA%\com.datatuna.ntswmp\skins\local\` on Windows,
+  `~/Library/Application Support/com.datatuna.ntswmp/skins/local/` on
+  macOS. The app creates it. Only its top level is read. Debug builds also
+  read the checkout's gitignored `skins/local/`, so `tauri dev` still
+  works; a file name in the app's folder hides the same name there. The
+  cache prune reads only the top of `skins/`, so it never deletes these.
+- **Read when the picker asks.** `list_skins` lists the folder again on
+  every call, so skins dropped in while the picker is open show up within
+  two seconds, with no restart. The launch reads it once too, for a kept
+  local skin.
+- **Picker.** "Open skins folder…" opens that folder in Explorer or the
+  Finder. "Local library (N)" is always in the menu; empty, it says how to
+  add skins.
+- **Broken files.** A `.wmz` that does not start like a zip is listed as
+  "broken: not a zip". Previewing it says "No preview"; wearing it gives
+  the house skin. Nothing is parsed in Rust: a zip that is damaged further
+  in reaches the engine in the skin webview, as an archive.org skin would,
+  and fails there to the house skin.
+- Unchanged from ATA-220: no local skin is on the random draw, a kept one
+  is `local/<file>.wmz` in `skin.json`, and skins never enter the repo.
+
 ### macOS: big skins pulled on screen, one stream connection (ATA-236, 2026-10-22)
 
 Two faults from the ATA-229 runner shots. Checked on the `macos-latest`
